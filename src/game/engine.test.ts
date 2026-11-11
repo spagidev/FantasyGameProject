@@ -12,7 +12,7 @@ import {
   type Action,
   type Run,
 } from './engine';
-import { advanceSave, decodeSave, emptySave, validRun } from './storage';
+import { advanceSave, decodeSave, emptySave, MAX_SAVE_BYTES, validRun } from './storage';
 
 function battle(keeper: KeeperId = 'warden') {
   return transition(newRun(keeper, 123), { type: 'travel', lane: 0 });
@@ -181,6 +181,9 @@ describe('routes, choices and economy', () => {
 });
 
 describe('save and profile validation', () => {
+  it('rejects oversized journal data before parsing', () => {
+    expect(decodeSave(' '.repeat(MAX_SAVE_BYTES + 1))).toBeNull();
+  });
   it('roundtrips a real fight including its next intent', () => {
     const run = act(battle(), 'strike');
     const save = advanceSave(emptySave(), run);

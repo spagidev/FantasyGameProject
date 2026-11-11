@@ -2,6 +2,7 @@ import { KEEPERS, LORE, RELICS, type KeeperId } from './data';
 import type { Run } from './engine';
 
 export const SAVE_KEY = 'emberwake.save.v1';
+export const MAX_SAVE_BYTES = 64 * 1024;
 export type Profile = { runs: number; wins: number; lore: string[]; lastKeeper: KeeperId };
 export type Save = { version: 1; run: Run | null; profile: Profile };
 export function emptySave(): Save {
@@ -116,6 +117,7 @@ export function validRun(x: unknown): x is Run {
 }
 
 export function decodeSave(raw: string): Save | null {
+  if (raw.length > MAX_SAVE_BYTES) return null;
   try {
     const x: unknown = JSON.parse(raw);
     if (!record(x) || x.version !== 1 || (x.run !== null && !validRun(x.run)) || !record(x.profile))

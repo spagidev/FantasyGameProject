@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
 import { EVENTS, KEEPERS, RELICS, type KeeperId } from '../src/game/data';
 import { nodeAt, type Action, type Run } from '../src/game/engine';
@@ -183,4 +184,95 @@ test('desktop presentation and map have no browser errors', async ({ page }) => 
   await page.getByRole('button', { name: /Begin expedition/ }).click();
   await page.screenshot({ path: 'test-results/desktop-map.png', fullPage: true });
   expect(errors).toEqual([]);
+});
+
+test('elite and trader routes honor purchases across reloads', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/');
+  await page.getByLabel('Journey seed').fill('trader-crossing');
+  await page.getByRole('button', { name: /Begin expedition/ }).click();
+  let run = await readRun(page);
+  await clickAction(page, run, { type: 'travel', lane: 1 });
+  run = await readRun(page);
+  let moves = 0;
+  while (!(run.phase === 'map' && run.depth === 1) && moves++ < 60) {
+    await clickAction(
+      page,
+      run,
+      run.phase === 'map' ? { type: 'travel', lane: 1 } : campaignAction(run),
+    );
+    run = await readRun(page);
+    expect(run.phase).not.toBe('lost');
+  }
+  expect(run.depth).toBe(1);
+  await clickAction(page, run, { type: 'travel', lane: 1 });
+  run = await readRun(page);
+  expect(run.phase).toBe('shop');
+  const coins = run.coins;
+  const attack = run.attack;
+  await page.getByRole('button', { name: /An edge of dawn/ }).click();
+  expect((await readRun(page)).coins).toBe(coins - 35);
+  expect((await readRun(page)).attack).toBe(attack + 2);
+  await expect(page.getByRole('button', { name: /An edge of dawn/ })).toBeDisabled();
+  await page.reload();
+  await expect(page.getByRole('button', { name: /An edge of dawn/ })).toBeDisabled();
+  const flaskCount = (await readRun(page)).flasks;
+  await page.getByRole('button', { name: /A bottled sunrise/ }).click();
+  expect((await readRun(page)).flasks).toBe(flaskCount + 1);
+  await page.getByRole('button', { name: /Continue without buying/ }).click();
+  expect((await readRun(page)).phase).toBe('map');
+});
+
+test('journal export/import restores an exact turn and rejects invalid files', async ({
+  page,
+  browser,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /Begin expedition/ }).click();
+  await page.locator('.route-choice').first().click();
+  await page.locator('.action-button').first().click();
+  const original = await readRun(page);
+  await page.getByRole('button', { name: 'Manage journal' }).click();
+  const exported = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download journal' }).click();
+  const download = await exported;
+  const contents = await readFile((await download.path())!, 'utf8');
+  expect(JSON.parse(contents).run).toEqual(original);
+  const newContext = await browser.newContext();
+  const restoredPage = await newContext.newPage();
+  await restoredPage.goto('/');
+  await restoredPage.getByRole('button', { name: 'Seer', exact: true }).click();
+  await restoredPage.getByRole('button', { name: /Begin expedition/ }).click();
+  const beforeRestore = await readRun(restoredPage);
+  await restoredPage.getByRole('button', { name: 'Manage journal' }).click();
+  const fileInput = restoredPage.getByLabel('Choose a journal file');
+  await fileInput.setInputFiles({
+    name: 'broken.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{bad'),
+  });
+  await expect(restoredPage.getByRole('alert')).toContainText('not a compatible Emberwake journal');
+  expect(await readRun(restoredPage)).toEqual(beforeRestore);
+  await fileInput.setInputFiles({
+    name: 'too-large.json',
+    mimeType: 'application/json',
+    buffer: Buffer.alloc(65537, 'x'),
+  });
+  await expect(restoredPage.getByRole('alert')).toContainText('too large');
+  await fileInput.setInputFiles({
+    name: 'journal.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(contents),
+  });
+  await expect(restoredPage.getByText('A story ready to return', { exact: false })).toBeVisible();
+  expect(await readRun(restoredPage)).toEqual(beforeRestore); // File selection never replaces progress.
+  const accessibility = await new AxeBuilder({ page: restoredPage })
+    .withTags(['wcag2a', 'wcag2aa'])
+    .analyze();
+  expect(accessibility.violations).toEqual([]);
+  await restoredPage.getByRole('button', { name: /Restore this journal/ }).click();
+  expect(await readRun(restoredPage)).toEqual(original);
+  await restoredPage.reload();
+  expect(await readRun(restoredPage)).toEqual(original);
+  await newContext.close();
 });

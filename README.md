@@ -38,6 +38,7 @@ Browser tests use `/usr/bin/chromium` when present. On other machines, run `npx 
 - **Two complete endings** and a persistent nine-entry chronicle.
 - **Reproducible journeys:** enter the same seed word for the same route, events, and relic offers.
 - **Local autosave:** reload to resume the exact turn. Browser storage failures are reported without preventing play.
+- **Portable journals:** export or restore a validated save file to carry the expedition between browsers. Open “Journal” in the footer; files stay on your device.
 - Responsive layouts, keyboard controls, reduced-motion support, native accessible dialogs, and locally bundled fonts and original SVG artwork.
 
 In combat, use the action buttons or keys **1–4**. Your action resolves first, then poison, then the enemy's visible intention. **Guard lasts one enemy action. Flasks also end your turn.** Open “How to play” for the complete introduction.

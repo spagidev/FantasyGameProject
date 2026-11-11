@@ -9,7 +9,7 @@ A complete, local-first campaign: original world, exact rules, three keepers, th
 1. **Playtest the decisions.** Gather human feedback on combat clarity, difficulty, and route incentives. Run a seed/keeper balance matrix and record results before adjusting stats. The bounded test player proves legal winning paths; it is not evidence of novice difficulty or overall balance.
 2. **Expand encounter variety.** Add several chapter-specific stories and ordinary enemy patterns, keeping costs and intentions exact. Avoid adding currencies before the existing decisions are interesting.
 3. **Clarify the moment-to-moment experience.** Improve damage feedback, keyboard discovery, mobile map readability, and the explanation of guard/focus interactions. Keep reduced-motion support and verify all changes with real browser tests.
-4. **Save portability.** Add validated export/import and migration tests so players can keep their stories across browsers. Never silently clear a compatible save when changing content.
+4. **Save migrations.** Validated journal export/import is implemented. Add migration tests when the format changes so players can keep their stories across versions. Never silently clear a compatible save when changing content.
 5. **Optional atmosphere.** User-initiated, muted-by-default ambient sound and richer local artwork. The game must remain playable without audio or external network services.
 6. **Static hosting.** Choose a public hosting target if requested. The built application needs no backend. Deployment and real public availability must be reported only after verification.
 

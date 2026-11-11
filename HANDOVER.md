@@ -8,7 +8,7 @@ The user asks to stop at a saved checkpoint if five-hour quota usage exceeds 90%
 
 ## Current implementation
 
-The First Crossing is a complete campaign with three keepers, twelve encounters across three realms, explicit enemy intentions, guard/focus/poison combat, connected seeded routes, stories, camps, traders, six relics, two endings, and a persistent nine-entry chronicle. There are no timers, accounts, purchases, or required external runtime services. Original SVG landscapes/characters and bundled local fonts work on desktop and mobile.
+The First Crossing is a complete campaign with three keepers, twelve encounters across three realms, explicit enemy intentions, guard/focus/poison combat, connected seeded routes, stories, camps, traders, six relics, two endings, a persistent nine-entry chronicle, and validated portable journal exports/imports. There are no timers, accounts, purchases, or required external runtime services. Original SVG landscapes/characters and bundled local fonts work on desktop and mobile.
 
 - Start with `docs/LORE.md` and `docs/RULES.md`.
 - Pure game transitions: `src/game/engine.ts`.
@@ -33,18 +33,22 @@ npm run format:check
 
 ## Validation evidence
 
-- 22 engine/storage/campaign tests passed, including legal victories with all three keepers.
+- 23 engine/storage/campaign tests passed, including legal victories with all three keepers.
 - Production TypeScript/Vite build passed.
-- Complete browser suite: 9/9 passed, including all three full campaigns, both endings, exact save/resume, mobile layout, corrupt/blocked storage handling, keyboard turns, dialog focus, and automated WCAG A/AA checks for lobby/combat.
+- Complete browser suite: 11/11 passed in the final run (40.5 seconds), covering all three full campaigns, both endings, exact save/resume, mobile layout, corrupt/blocked storage handling, keyboard turns, dialog focus, elite/trader purchases, and portable journals.
 - Desktop and mobile screenshots were visually inspected.
 - Runtime dependency audit found no vulnerabilities.
-- Formatting check passes. Chronicle contrast fixes receive a targeted browser accessibility check.
+- Automated WCAG A/AA checks passed for lobby, combat, chronicle, and journal import preview. Local formatting check passed; it is also configured in CI.
 
 These demonstrate the implemented campaign works; they do not establish perfect balance or novice usability. The test player's bounded search is not human playtest feedback. No public hosting target has been deployed.
 
 ## Remote state
 
-The repository initially had no commits or remote branches. Read-only HTTPS Git access works. GitHub API access via `gh api repos/spagidev/FantasyGameProject` returns Forbidden; `gh auth status` reports its supplied token unusable. Do not print or extract credentials. Test the scoped Git push before assuming it shares the API restriction. Record the actual push result and commit below before ending the session.
+The repository initially had no commits or remote branches. Read-only HTTPS Git access works. GitHub API access via `gh api repos/spagidev/FantasyGameProject` returns Forbidden; `gh auth status` reports its supplied token unusable. Do not print or extract credentials. Normal HTTPS Git push works: the lore/rules commit `814665a` and first playable campaign `c97d58e` were pushed to newly created `main`. There was no pre-existing base branch for an initial PR. Follow-up commits use normal, non-force pushes; no PRs were created because the GitHub API is forbidden. Inspect `git log` for the exact latest commit and `git ls-remote origin refs/heads/main` to compare it. The GitHub Actions workflow is configured, but its remote status has not been observed.
+
+## Next development priorities
+
+Human playtesting and a seed/keeper balance matrix should precede difficulty changes. Add chapter-specific story scenes and enemy pattern variety without invalidating existing version 1 saves. Save portability is implemented; any future save-format change needs explicit migrations. The Vite dev server was started on port 5173 in this instance; restart it in future instances rather than assuming it survives. No cloud configuration draft was changed or published during implementation.
 
 ## Continuation prompt
 

@@ -27,6 +27,7 @@ import { EnemyFigure, KeeperArt, Landscape } from './components/Art';
 import { Icon, type IconName } from './components/Icon';
 import { Modal } from './components/Modal';
 import { RouteMap } from './components/RouteMap';
+import { Journal } from './components/Journal';
 
 function load(): { save: Save; warning: string } {
   try {
@@ -58,7 +59,7 @@ export default function App() {
   const [keeper, setKeeper] = useState<KeeperId>(loaded.save.profile.lastKeeper);
   const [seed, setSeed] = useState('');
   const [view, setView] = useState<'journey' | 'chronicle'>('journey');
-  const [modal, setModal] = useState<'help' | 'abandon' | null>(null);
+  const [modal, setModal] = useState<'help' | 'abandon' | 'journal' | null>(null);
   const [saved, setSaved] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const run = save.run;
@@ -473,10 +474,15 @@ export default function App() {
         <span>
           EMBERWAKE <i>·</i> Made for the wanderers.
         </span>
-        <span className="save-status">
+        <button
+          className="save-status"
+          aria-label="Manage journal"
+          onClick={() => setModal('journal')}
+        >
           <i className={saved ? 'saved-dot' : ''} />
-          {saved ? 'Progress saved on this device' : 'Playing in this tab'}
-        </span>
+          {saved ? 'Saved on this device' : 'Playing in this tab'} · Journal{' '}
+          <Icon name="book" size={12} />
+        </button>
         <button onClick={() => setModal('help')}>
           Keep a little light with you <Icon name="external" size={12} />
         </button>
@@ -490,6 +496,23 @@ export default function App() {
       {modal === 'help' && (
         <Modal title="A little knowledge. A longer road." onClose={() => setModal(null)}>
           <Help />
+        </Modal>
+      )}
+      {modal === 'journal' && (
+        <Modal title="Keep your story close." onClose={() => setModal(null)}>
+          <Journal
+            save={save}
+            onRestore={(restored) => {
+              setSave(restored);
+              setKeeper(restored.profile.lastKeeper);
+              setWarning('');
+              setView('journey');
+              setModal(null);
+              requestAnimationFrame(() =>
+                boardRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' }),
+              );
+            }}
+          />
         </Modal>
       )}
       {modal === 'abandon' && (
