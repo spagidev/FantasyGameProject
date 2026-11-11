@@ -95,6 +95,11 @@ export function Journal({ save, onRestore }: { save: Save; onRestore: (save: Sav
               ? `${KEEPERS[pending.run.keeper].name} · ${pending.run.depth < 0 ? 'The road ahead' : CHAPTERS[Math.floor(pending.run.depth / 4)].short}`
               : 'A keeper’s chronicle'}
           </h3>
+          {pending.run?.ruleset === 1 && (
+            <p className="journal-classic">
+              Classic crossing · the original rules and exact turn are preserved.
+            </p>
+          )}
           <div className="journal-summary">
             <span>
               <b>{pending.profile.lore.length}</b> memories

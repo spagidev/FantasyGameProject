@@ -2,6 +2,102 @@ export type KeeperId = 'warden' | 'seer' | 'wayfarer';
 export type RelicId = 'briar' | 'dawn' | 'mothglass' | 'thread' | 'psalm' | 'hearthseed';
 export type NodeKind = 'battle' | 'elite' | 'event' | 'camp' | 'shop' | 'boss';
 export type EnemyArt = 'wraith' | 'stag' | 'sentinel' | 'king';
+export type WaylightId = 'well' | 'kiln' | 'lens';
+export type TalentId =
+  'citadel' | 'sunsteel' | 'vow' | 'astral' | 'starfall' | 'moonward' | 'bloom' | 'sap' | 'trail';
+
+export const WAYLIGHTS = {
+  well: {
+    name: 'Dawnwell',
+    icon: 'heart',
+    benefit: 'Restore 2 health on each future crossing.',
+    short: '+2 health / crossing',
+    text: 'A spring runs through the ruins. Clear its guardian and the people who once tended it will keep your road supplied.',
+  },
+  kiln: {
+    name: 'Cinder Kiln',
+    icon: 'coins',
+    benefit: 'Gain 4 coins on each future crossing.',
+    short: '+4 coins / crossing',
+    text: 'The old coiners still know the weight of an honest promise. Free their kiln and they will fund the road ahead.',
+  },
+  lens: {
+    name: 'Moth Observatory',
+    icon: 'focus',
+    benefit: 'Start future battles with 1 extra focus (maximum 5).',
+    short: '+1 starting focus',
+    text: 'Beyond the broken lens, the moths have found a star. Free the observatory and they will teach you to carry its pattern.',
+  },
+} as const;
+
+export const TALENTS: Record<
+  TalentId,
+  { keeper: KeeperId; name: string; icon: string; description: string; flavor: string }
+> = {
+  citadel: {
+    keeper: 'warden',
+    name: 'The living gate',
+    icon: 'shield',
+    description: 'Guard blocks 4 additional damage.',
+    flavor: 'A door is a promise that someone will come home.',
+  },
+  sunsteel: {
+    keeper: 'warden',
+    name: 'Sunsteel resolve',
+    icon: 'sword',
+    description: 'Sundering blow deals 5 additional damage.',
+    flavor: 'Remember what you are fighting for.',
+  },
+  vow: {
+    keeper: 'warden',
+    name: 'An unbroken vow',
+    icon: 'focus',
+    description: 'Strike generates 1 extra focus.',
+    flavor: 'Each footstep says: not one more left behind.',
+  },
+  astral: {
+    keeper: 'seer',
+    name: 'The first constellation',
+    icon: 'focus',
+    description: 'Start each battle with 1 extra focus (maximum 5).',
+    flavor: 'The stars were never above you. They were waiting within.',
+  },
+  starfall: {
+    keeper: 'seer',
+    name: 'A falling star',
+    icon: 'sparkles',
+    description: 'Starfire deals 5 additional piercing damage.',
+    flavor: 'Even a forgotten sky can answer.',
+  },
+  moonward: {
+    keeper: 'seer',
+    name: 'The quiet moon',
+    icon: 'shield',
+    description: 'Gain 1 armor. Guard blocks 2 additional damage.',
+    flavor: 'Some lights are meant to shelter, not to burn.',
+  },
+  bloom: {
+    keeper: 'wayfarer',
+    name: 'A patient garden',
+    icon: 'leaf',
+    description: 'Nightbloom applies 2 additional poison.',
+    flavor: 'Plant something that will outlive your sorrow.',
+  },
+  sap: {
+    keeper: 'wayfarer',
+    name: 'Sap of the old wood',
+    icon: 'heart',
+    description: 'Strike restores 3 health instead of 2.',
+    flavor: 'The forest gives back what the road takes.',
+  },
+  trail: {
+    keeper: 'wayfarer',
+    name: 'A road shared',
+    icon: 'coins',
+    description: 'After each victory, gain 6 extra coins and restore 2 health.',
+    flavor: 'Those you helped have not forgotten you.',
+  },
+};
 export type Intent = {
   name: string;
   damage: number;

@@ -6,6 +6,7 @@ import {
   LORE,
   NODE_LABELS,
   RELICS,
+  WAYLIGHTS,
   type KeeperId,
   type RelicId,
 } from './game/data';
@@ -19,19 +20,35 @@ import {
   nextNodes,
   nodeAt,
   transition,
+  guardAmount,
+  skillDamage,
+  strikeFocus,
+  strikeHealing,
+  poisonAmount,
+  waylightFor,
+  victoryCoins,
   type Action,
   type Run,
+  type MapNode,
 } from './game/engine';
-import { advanceSave, decodeSave, emptySave, SAVE_KEY, type Save } from './game/storage';
+import {
+  advanceSave,
+  decodeSave,
+  emptySave,
+  SAVE_KEY,
+  LEGACY_SAVE_KEY,
+  type Save,
+} from './game/storage';
 import { EnemyFigure, KeeperArt, Landscape } from './components/Art';
 import { Icon, type IconName } from './components/Icon';
 import { Modal } from './components/Modal';
 import { RouteMap } from './components/RouteMap';
 import { Journal } from './components/Journal';
+import { Scout, TalentChoice, WaylightsPanel } from './components/Strategy';
 
 function load(): { save: Save; warning: string } {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(LEGACY_SAVE_KEY);
     if (!raw) return { save: emptySave(), warning: '' };
     const save = decodeSave(raw);
     return {
@@ -61,6 +78,7 @@ export default function App() {
   const [view, setView] = useState<'journey' | 'chronicle'>('journey');
   const [modal, setModal] = useState<'help' | 'abandon' | 'journal' | null>(null);
   const [saved, setSaved] = useState(false);
+  const [scouted, setScouted] = useState<MapNode | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const run = save.run;
   const chapter = run
@@ -98,6 +116,7 @@ export default function App() {
     const onKey = (event: KeyboardEvent) => {
       if (
         modal ||
+        scouted ||
         view !== 'journey' ||
         run?.phase !== 'combat' ||
         event.repeat ||
@@ -119,7 +138,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [run?.phase, modal, view, dispatch]);
+  }, [run?.phase, modal, scouted, view, dispatch]);
 
   function start() {
     const newSeed = seed.trim()
@@ -228,12 +247,14 @@ export default function App() {
                     ? 'The sun is gone. The world has forgotten why.\nOne ember, three bells, and a road into the unknown.'
                     : terminal(run)
                       ? 'Every crossing changes the keeper. Every ending leaves a beginning.'
-                      : CHAPTERS[chapter].passage}
+                      : run.bells > chapter
+                        ? CHAPTERS[chapter].memory
+                        : CHAPTERS[chapter].passage}
                 </p>
               </div>
               <div className="journey-metadata">
                 <span className="edition-badge">
-                  <i /> THE FIRST CROSSING
+                  <i /> {run?.ruleset === 1 ? 'THE FIRST CROSSING' : 'ROADS REKINDLED'}
                 </span>
                 <div className="meta-items">
                   <span>
@@ -271,11 +292,13 @@ export default function App() {
             <div className="game-layout">
               <div className="game-main" ref={boardRef}>
                 {!run || run.phase === 'map' ? (
-                  <RouteMap run={run} onTravel={(lane) => dispatch({ type: 'travel', lane })} />
+                  <RouteMap run={run} onInspect={setScouted} />
                 ) : run.phase === 'combat' ? (
                   <Combat run={run} dispatch={dispatch} />
                 ) : run.phase === 'reward' ? (
                   <Rewards run={run} dispatch={dispatch} />
+                ) : run.phase === 'talent' ? (
+                  <TalentChoice run={run} dispatch={dispatch} />
                 ) : ['camp', 'shop', 'event'].includes(run.phase) ? (
                   <Encounter run={run} dispatch={dispatch} />
                 ) : (
@@ -402,13 +425,20 @@ export default function App() {
                               <strong>{node.name}</strong>
                               <em>
                                 {['battle', 'boss', 'elite'].includes(node.kind)
-                                  ? `${makeEnemy(node).maxHealth} health · ${node.kind === 'boss' ? '45' : node.kind === 'elite' ? '32' : '18'} coins + relic`
+                                  ? `${makeEnemy(node, run.ruleset).maxHealth} health · ${victoryCoins(run, node)} coins + relic`
                                   : node.kind === 'event'
                                     ? 'A story. A choice. A little consequence.'
                                     : node.kind === 'camp'
                                       ? 'Rest, refill a flask, or improve your blade.'
                                       : 'Trade coins for supplies and strength.'}
                               </em>
+                              {run.ruleset === 2 && waylightFor(node) && (
+                                <span className="route-site-benefit">
+                                  <Icon name="flame" size={11} />
+                                  {WAYLIGHTS[waylightFor(node)!].name} ·{' '}
+                                  {WAYLIGHTS[waylightFor(node)!].short}
+                                </span>
+                              )}
                             </span>
                             <Icon name="chevron" size={16} />
                           </button>
@@ -431,7 +461,6 @@ export default function App() {
                         </ol>
                       </div>
                     )}
-                    <RelicInventory ids={run.relics} />
                     {!terminal(run) && (
                       <button className="abandon-button" onClick={() => setModal('abandon')}>
                         <Icon name="flag" size={13} /> Leave this expedition
@@ -440,6 +469,12 @@ export default function App() {
                   </>
                 )}
               </aside>
+              {run && (
+                <div className="run-supplies">
+                  <RelicInventory ids={run.relics} />
+                  <WaylightsPanel run={run} />
+                </div>
+              )}
             </div>
             {!run && (
               <div className="feature-strip">
@@ -496,6 +531,18 @@ export default function App() {
       {modal === 'help' && (
         <Modal title="A little knowledge. A longer road." onClose={() => setModal(null)}>
           <Help />
+        </Modal>
+      )}
+      {scouted && (
+        <Modal title={scouted.name} onClose={() => setScouted(null)}>
+          <Scout
+            run={run}
+            node={scouted}
+            onTravel={() => {
+              dispatch({ type: 'travel', lane: scouted.lane });
+              setScouted(null);
+            }}
+          />
         </Modal>
       )}
       {modal === 'journal' && (
@@ -636,8 +683,7 @@ function Combat({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) 
   const e = run.enemy!;
   const intent = intentFor(run)!;
   const chapter = Math.floor(run.depth / 4);
-  const specialDamage =
-    run.keeper === 'wayfarer' ? run.attack + 2 : run.attack * 2 + (run.keeper === 'seer' ? 7 : 3);
+  const specialDamage = skillDamage(run);
   return (
     <section className="combat-board" aria-label="Turn-based combat">
       <div className="arena">
@@ -742,14 +788,14 @@ function Combat({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) 
             title="Strike"
             number="1"
             detail={`Deal ${run.attack} damage`}
-            sub={`+${run.relics.includes('mothglass') ? 2 : 1} focus${run.keeper === 'wayfarer' ? ' · heal 2' : ''}`}
+            sub={`+${strikeFocus(run)} focus${strikeHealing(run) ? ` · heal ${strikeHealing(run)}` : ''}`}
             onClick={() => dispatch({ type: 'strike' })}
           />
           <ActionButton
             icon="shield"
             title="Guard"
             number="2"
-            detail={`Block ${9 + run.armor + (run.keeper === 'seer' ? 4 : 0)} damage`}
+            detail={`Block ${guardAmount(run)} damage`}
             sub={`+2 focus${run.relics.includes('briar') ? ' · deal 3 damage' : ''}`}
             onClick={() => dispatch({ type: 'guard' })}
           />
@@ -758,7 +804,7 @@ function Combat({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) 
             title={k.skill}
             number="3"
             detail={`Deal ${specialDamage}${run.keeper === 'seer' ? ' piercing' : ''} damage`}
-            sub={`${k.cost} focus${run.keeper === 'wayfarer' ? ' · +5 poison' : run.keeper === 'warden' ? ' · +5 guard' : ' · bypass guard'}`}
+            sub={`${k.cost} focus${run.keeper === 'wayfarer' ? ` · +${poisonAmount(run)} poison` : run.keeper === 'warden' ? ' · +5 guard' : ' · bypass guard'}`}
             disabled={run.focus < k.cost}
             onClick={() => dispatch({ type: 'skill' })}
             special
@@ -820,6 +866,7 @@ function ActionButton({
 
 function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) {
   const boss = run.depth % 4 === 3;
+  const site = run.ruleset === 2 ? waylightFor(nodeAt(run.seed, run.depth, run.lane)) : null;
   return (
     <section className="scene-board reward-board">
       <Landscape chapter={Math.floor(run.depth / 4)} />
@@ -837,10 +884,18 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
             : 'Among the ashes, a small thing catches the light.\nChoose one gift for the road ahead.'}
         </p>
         <div className="reward-coins">
-          <Icon name="coins" size={16} /> +
-          {boss ? 45 : nodeAt(run.seed, run.depth, run.lane).kind === 'elite' ? 32 : 18} coins
-          collected{run.relics.includes('thread') && <span> · +5 health</span>}
+          <Icon name="coins" size={16} /> +{victoryCoins(run)} coins collected
+          {run.relics.includes('thread') && <span> · +5 health</span>}
         </div>
+        {site && (
+          <div className="reward-waylight">
+            <Icon name="flame" size={20} />
+            <span>
+              <strong>{WAYLIGHTS[site].name} rekindled</strong>
+              <small>{WAYLIGHTS[site].benefit}</small>
+            </span>
+          </div>
+        )}
         <div className="reward-grid">
           {run.rewards.map((id) => (
             <button
@@ -1200,8 +1255,9 @@ function Help() {
         <div>
           <h3>Read the road</h3>
           <p>
-            Pick a glowing route. Encounters give coins and relics. Story choices change your
-            strength or supplies. Sanctuaries offer one comfort; traders sell each item once.
+            Scout any map node for free before choosing a glowing route. Encounters give coins and
+            relics. Story choices change your strength or supplies. Sanctuaries offer one comfort;
+            traders sell each item once.
           </p>
         </div>
       </div>
@@ -1255,8 +1311,8 @@ function Help() {
       </div>
       <p className="help-tip">
         <Icon name="info" /> Guard lasts one enemy action. Enemy guard lasts until broken. Poison
-        ticks after your action, bypasses guard, then loses one stack. Focus starts at 2 each fight
-        and caps at 5.
+        ticks after your action, bypasses guard, then loses one stack. Focus starts at 2 before
+        waylight and lesson bonuses, and caps at 5.
       </p>
       <div className="help-step">
         <span>03</span>
@@ -1279,6 +1335,18 @@ function Help() {
             After each victory, take a unique relic or recover 12 health. Relics last this
             expedition. Memories last beyond it. There are no permanent stat bonuses, timers, or
             purchases.
+          </p>
+        </div>
+      </div>
+      <div className="help-step">
+        <span>05</span>
+        <div>
+          <h3>Leave a little light behind</h3>
+          <p>
+            At the start of each realm, choose which waylight to free: a Dawnwell heals 2 on future
+            crossings, a Cinder Kiln earns 4 coins per crossing, and a Moth Observatory adds 1
+            starting focus. They stack for this run and never generate rewards while you are away.
+            After the first two bells, remember one keeper lesson to specialize your build.
           </p>
         </div>
       </div>

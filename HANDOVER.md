@@ -1,25 +1,44 @@
-# Emberwake · safe checkpoint
+# Emberwake · Roads Rekindled checkpoint (v0.2.0)
 
-## User goal and standing authorization
+## Standing instructions and stop signal
 
-Build and improve a simple, attractive, replayable turn-based fantasy browser game. Establish the lore first, keep the rules logical and explicit, and pursue implementation autonomously. The user pre-approves PR merges. Do not publish cloud environment changes without a new request.
+The user wants autonomous development of an attractive, replayable, turn-based fantasy browser game, with original lore and explicit rules, and pre-approves PR merges. They requested broad inspiration from Heroes of Might and Magic III, without copying exact content. Do not publish cloud environment configuration without a new request.
 
-The user asks to stop at a saved checkpoint if five-hour quota usage exceeds 90% or weekly usage exceeds 97%. No quota/usage-status tool or reliable remaining-quota signal is exposed in this session; tool discovery has been checked repeatedly. Do not invent usage numbers. Commit regularly and preserve this handover if a limit becomes visible.
+The user requests a safe stop above 90% five-hour quota usage or 97% weekly usage. No reliable quota-status tool is exposed; discovery has been checked repeatedly. The user reported 51% at the beginning of this enhancement session. Their latest reply is **“8% save your work now”**. This is an explicit instruction to stop feature work and save immediately, regardless of whether that percentage describes usage or remaining allowance. Resume new development only when the user asks. Do not invent quota readings.
 
-## Current implementation
+## Implemented
 
-The First Crossing is a complete campaign with three keepers, twelve encounters across three realms, explicit enemy intentions, guard/focus/poison combat, connected seeded routes, stories, camps, traders, six relics, two endings, a persistent nine-entry chronicle, and validated portable journal exports/imports. There are no timers, accounts, purchases, or required external runtime services. Original SVG landscapes/characters and bundled local fonts work on desktop and mobile.
+The First Crossing remains a complete twelve-encounter campaign through three realms, with three keepers, deterministic guard/focus/poison combat, connected seeded routes, stories, camps, traders, six relics, two endings, and a persistent nine-entry chronicle. Responsive original SVG artwork, local fonts, keyboard controls, native dialogs, autosave, and portable validated journals are included. No accounts, purchases, timers, telemetry, or external runtime services.
 
-- Start with `docs/LORE.md` and `docs/RULES.md`.
-- Pure game transitions: `src/game/engine.ts`.
-- Browser save validation and run-count accounting: `src/game/storage.ts`.
-- UI: `src/App.tsx`, `src/components/`, `src/styles.css`.
-- Versioned local save: `emberwake.save.v1`.
-- `docs/ROADMAP.md` lists useful follow-up work and design boundaries.
+**Roads Rekindled (v0.2):**
 
-## Environment and commands
+- The first battle in each realm guards a **waylight**: Dawnwell (heal 2 per later crossing), Cinder Kiln (4 coins per later crossing), or Moth Observatory (+1 opening focus, capped at 5). Ownership stacks and lasts one expedition. Only legal player-initiated travel pays benefits; no idle rewards.
+- After each of the first two boss rewards, pick an unlearned **keeper lesson**. Three per keeper, nine total; two per run. Effects specialize defense, focus, skill damage, poison, healing, or victory supplies.
+- **Free scouting** of any map node shows exact repeating intentions, rewards, and site benefits. Only reachable next-depth nodes permit travel.
+- Normal enemy lanes and elites have distinct deterministic patterns. Boss patterns are unchanged.
+- Shared engine helpers calculate UI skill/guard/focus/healing values.
+- Relics, sites, and lessons appear in a shared supplies panel below the main game area, keeping the desktop sidebar compact and mobile vitality near combat.
 
-Existing checkout: `/workspace/FantasyGameProject`. Use it directly; no new worktree is needed. Node 24.22.1, npm 11.9.0, system Chromium `/usr/bin/chromium`.
+## Research
+
+Read `docs/DESIGN_RESEARCH.md`. It contains pinned links to VCMI documentation/source actually inspected, limitations, and the mapping to independent Emberwake mechanics. Community wiki, Wikipedia, and GOG reads were blocked by the network proxy. The references establish technical mechanics; explanations of enduring appeal are explicitly design hypotheses, not player-retention research. No code or assets from Heroes III or VCMI were copied. The temporary read-only research checkout is `/tmp/emberwake-research/vcmi`; it is not a project repository.
+
+## Saves and compatibility
+
+Current payload format: **2**, storage key `emberwake.save.v2`. If absent, the loader checks `emberwake.save.v1`, validates and normalizes it, and preserves the original slot as a backup. Version 1 expeditions receive `ruleset: 1` and keep their exact turn, health, enemy, inventory, profile, original future patterns, and original progression. They do not gain sites or lessons. New runs use `ruleset: 2`. Both formats can be imported; exports use format 2 while preserving the campaign's ruleset. A fixed original-format journal fixture lives in `tests/fixtures/v1-journal.json`.
+
+## Validation
+
+- **38 engine/storage/strategy tests passed**, including all nine lesson effects, income timing, caps, invalid actions, migration, and classic campaign completion.
+- **13/13 full browser tests passed** after feature implementation: three full campaigns and both endings, two lessons/three waylights per new campaign, elite/trader purchases, journal portability, exact reload, v1 migration/backup, scouting reachability, mobile layout, blocked/corrupt storage, keyboard controls, and accessibility checks.
+- **90/90 simulation campaigns won** across 2 rulesets × 3 keepers × 3 route plans × 5 fixed seeds. `npm run balance` regenerates `docs/BALANCE_REPORT.json`; each keeper/route group must have at least one winning seed. This is a strong search player, not novice feedback. The campaign is forgiving under that policy; do not call it balanced or addictive without human playtests.
+- Production TypeScript/Vite build passed after the final supplies-panel layout polish. Small label-contrast issues uncovered by that layout were corrected. The five affected browser checks (lobby, combat/save-resume, mobile, scouting, classic migration) then passed 5/5 in 9.3 seconds. Formatting and diff checks passed before the final commit.
+- New desktop map/scouting and mobile screenshots were inspected. Latest optional captures are under `/tmp/emberwake-v02-*.png`. The README image still represents the first release's visual style.
+- No public hosting deployment or remote CI result is claimed.
+
+## Commands and environment
+
+Use the existing checkout `/workspace/FantasyGameProject`; no worktree is needed. Node 24.22.1, npm 11.9.0, system Chromium `/usr/bin/chromium`.
 
 ```sh
 cd /workspace/FantasyGameProject
@@ -27,29 +46,22 @@ npm ci --cache /workspace/.npm-cache
 npm run dev -- --port 5173
 npm run check
 npm run format:check
+npm run balance  # optional; regenerates the tracked report, ~25 seconds
 ```
 
-`npm`'s default home cache is not writable in the cloud sandbox; use the workspace cache when installing. The browser tests fall back to Playwright's installed Chromium on systems without `/usr/bin/chromium`. GitHub CI installs it explicitly.
+The default home npm cache is not writable in the cloud sandbox. The Vite development server was running on port 5173; restart it in a future instance. CI installs Playwright Chromium, and local tests use system Chromium when present. No new environment configuration draft was saved or published.
 
-## Validation evidence
+## Remote history
 
-- 23 engine/storage/campaign tests passed, including legal victories with all three keepers.
-- Production TypeScript/Vite build passed.
-- Complete browser suite: 11/11 passed in the final run (40.5 seconds), covering all three full campaigns, both endings, exact save/resume, mobile layout, corrupt/blocked storage handling, keyboard turns, dialog focus, elite/trader purchases, and portable journals.
-- Desktop and mobile screenshots were visually inspected.
-- Runtime dependency audit found no vulnerabilities.
-- Automated WCAG A/AA checks passed for lobby, combat, chronicle, and journal import preview. Local formatting check passed; it is also configured in CI.
+Normal HTTPS Git reads and pushes work. GitHub API access through `gh` returned Forbidden, so no PR creation or CI status is claimed. Existing remote checkpoint before this enhancement: `1b28ac3`. Research was committed locally as `10dfef7`. The implementation checkpoint is committed with the message “feat: deepen expeditions with waylights, scouting, and keeper lessons”; inspect `git log` and compare `git rev-parse HEAD` with `git ls-remote origin refs/heads/main` for its exact hash. Never force-push.
 
-These demonstrate the implemented campaign works; they do not establish perfect balance or novice usability. The test player's bounded search is not human playtest feedback. No public hosting target has been deployed.
+## Next useful work after the user resumes
 
-## Remote state
+1. Human playtest the new route/lesson choices, especially whether the site economy is clear and whether the campaign needs an optional harder mode. The automated policy wins every sampled run.
+2. Expand chapter-specific narrative scenes and enemy identity. Avoid new currencies or a large army/town system before validating existing choices.
+3. Add focused browser checks for the lesson-selection screen, including save/reload before choosing and each keeper's upgraded action text. Engine effects and full-run browser progression are already covered.
+4. Preserve the v1 fixture and migration tests in every future format change.
 
-The repository initially had no commits or remote branches. Read-only HTTPS Git access works. GitHub API access via `gh api repos/spagidev/FantasyGameProject` returns Forbidden; `gh auth status` reports its supplied token unusable. Do not print or extract credentials. Normal HTTPS Git push works: the lore/rules commit `814665a` and first playable campaign `c97d58e` were pushed to newly created `main`. There was no pre-existing base branch for an initial PR. Follow-up commits use normal, non-force pushes; no PRs were created because the GitHub API is forbidden. Inspect `git log` for the exact latest commit and `git ls-remote origin refs/heads/main` to compare it. The GitHub Actions workflow is configured, but its remote status has not been observed.
+## Handover prompt
 
-## Next development priorities
-
-Human playtesting and a seed/keeper balance matrix should precede difficulty changes. Add chapter-specific story scenes and enemy pattern variety without invalidating existing version 1 saves. Save portability is implemented; any future save-format change needs explicit migrations. The Vite dev server was started on port 5173 in this instance; restart it in future instances rather than assuming it survives. No cloud configuration draft was changed or published during implementation.
-
-## Continuation prompt
-
-> Continue autonomous development of Emberwake in `/workspace/FantasyGameProject`. Read HANDOVER.md, docs/LORE.md, docs/RULES.md, and docs/ROADMAP.md; inspect git status/log and preserve existing work. Check whether reliable five-hour/weekly quota status is now available, stopping above 90%/97% respectively at a tested, committed checkpoint with an updated handover. The user pre-approves PR merges. Do not publish cloud environment changes. Run the existing checks, then tackle the next useful roadmap item, maintaining the deterministic rules, local saves, accessibility, and visual quality. Do not ask routine implementation questions. If GitHub access is blocked, keep progressing locally, commit changes, and report the precise external blocker.
+> Resume autonomous development of Emberwake in /workspace/FantasyGameProject. Read HANDOVER.md, docs/LORE.md, docs/RULES.md, docs/DESIGN_RESEARCH.md, and docs/ROADMAP.md. Inspect Git status/log and preserve existing work. The previous session stopped because I explicitly said “save your work now”; I now authorize continuation. Check any available five-hour and weekly quota status, save regular tested checkpoints, and stop above 90%/97% respectively. The user pre-approves PR merges. Continue broad strategic inspiration without copying Heroes III content or VCMI code/assets. Maintain original lore, deterministic visible rules, local saves, classic-run compatibility, accessibility, and visual quality. Do not publish cloud environment configuration. Start from the next useful work in this handover rather than rebuilding completed features.

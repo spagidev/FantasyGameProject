@@ -1086,7 +1086,7 @@ h1 em {
 .section-label small {
   margin-left: auto;
   letter-spacing: 0;
-  color: #788b75;
+  color: #9aab8c;
 }
 .empty-relics {
   font-family: var(--serif);
@@ -3582,6 +3582,545 @@ h1 em {
   gap: 6px;
   margin-top: 22px;
   line-height: 1.8;
+}
+.route-site-benefit {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 8px;
+  color: #d4bd86;
+  margin-top: 8px;
+  line-height: 1.7;
+}
+.map-node:hover {
+  border-color: #c4bb8c;
+  background: #2f4639;
+}
+.map-legend span {
+  line-height: 1.6;
+}
+.waylight-ledger {
+  grid-column: 1/3;
+  padding: 20px 23px;
+  border-top: 1px solid var(--line);
+  background: #0d1e1c44;
+}
+.waylight-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 18px;
+}
+.waylight-list > div {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.waylight-list > div > svg {
+  color: #cfb987;
+  width: 21px;
+  flex-shrink: 0;
+}
+.waylight-list strong {
+  display: block;
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 500;
+  color: #d5d2ac;
+}
+.waylight-list b {
+  font:
+    9px 'DM Sans Variable',
+    sans-serif;
+  color: #b8bf98;
+  margin-left: 4px;
+}
+.waylight-list small {
+  display: block;
+  color: #a3b492;
+  font-size: 9px;
+  margin-top: 4px;
+  line-height: 1.7;
+}
+.waylight-yield {
+  font-size: 9px;
+  line-height: 1.9;
+  color: #bdc69f;
+  border: 1px solid #4b5c3d;
+  background: #20382b;
+  padding: 10px;
+  margin-top: 17px;
+  border-radius: 3px;
+}
+.waylight-yield > span {
+  display: block;
+}
+.lesson-list {
+  border-top: 1px solid #3a4d36;
+  margin-top: 20px;
+  padding-top: 19px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.lesson-list > .eyebrow {
+  font-size: 7px;
+  color: #b8b486;
+}
+.classic-notice {
+  grid-column: 1/3;
+  border-top: 1px solid var(--line);
+  padding: 17px 23px;
+  display: flex;
+  align-items: start;
+  gap: 8px;
+  font-size: 9px;
+  line-height: 1.9;
+  color: #a2b395;
+}
+.classic-notice > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: #bfa678;
+}
+.talent-board .reward-grid {
+  margin-top: 30px;
+}
+.talent-card h3 {
+  font-size: 22px;
+}
+.talent-card > p {
+  min-height: 48px;
+  font-size: 10px;
+  line-height: 1.8;
+}
+.talent-card .take-relic {
+  font-size: 8px;
+}
+.talent-board .scene-hint {
+  margin-top: 25px;
+  font-size: 10px;
+  max-width: 420px;
+  line-height: 1.9;
+}
+.scout-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 10px;
+  color: #a8ba9a;
+  line-height: 1.7;
+}
+.scout-meta > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #d5c491;
+}
+.scout-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 20px 0;
+  margin-bottom: 22px;
+  border-bottom: 1px solid #42533a;
+}
+.scout-rewards > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: #adbfa0;
+}
+.scout-rewards svg {
+  color: #bfae7c;
+}
+.scout-rewards b {
+  font-weight: 500;
+  color: #e5d0a0;
+}
+.scout-content > .eyebrow {
+  font-size: 8px;
+  color: #b8bf97;
+}
+.scout-pattern {
+  list-style: none;
+  padding: 0;
+  margin: 17px 0 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.scout-pattern > li {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 15px;
+  border: 1px solid #4c5c3e;
+  background: #20362c;
+  border-radius: 4px;
+}
+.scout-pattern > li > span {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border: 1px solid #78805a;
+  color: #d7c38c;
+  font-size: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.scout-pattern strong {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 500;
+  color: #e2d8b3;
+}
+.scout-pattern p {
+  font-size: 10px;
+  line-height: 1.8;
+  color: #b9c5a3;
+  margin-top: 4px;
+}
+.scout-site {
+  display: flex;
+  align-items: start;
+  gap: 15px;
+  border: 1px solid #8b7e50;
+  background: #3c402733;
+  border-radius: 4px;
+  padding: 19px;
+  margin: 22px 0;
+}
+.scout-site > svg {
+  flex-shrink: 0;
+  color: #d0b681;
+  margin-top: 7px;
+}
+.scout-site .eyebrow {
+  font-size: 7px;
+  color: #bcba8b;
+}
+.scout-site h3 {
+  font-size: 26px;
+  color: #e2ce9e;
+  margin-top: 5px;
+}
+.scout-site p {
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.65;
+  color: #bdc6a8;
+  margin-top: 10px;
+}
+.scout-site strong {
+  display: block;
+  font-size: 11px;
+  color: #dec692;
+  line-height: 1.8;
+  font-weight: 500;
+  margin-top: 13px;
+}
+.scout-site small {
+  display: block;
+  font-size: 9px;
+  color: #a0b092;
+  line-height: 1.8;
+  margin-top: 8px;
+}
+.scout-unreachable {
+  background: #112522;
+  border-left: 2px solid #7c875c;
+  padding: 13px 15px;
+  font-size: 11px;
+  line-height: 1.9;
+  color: #b8c5a0;
+  margin-top: 20px;
+}
+.scout-free {
+  font-size: 9px;
+  line-height: 1.8;
+  color: #a1b394;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 15px;
+}
+.scout-story {
+  margin: 22px 0;
+}
+.scout-story > p {
+  font-family: var(--serif);
+  font-size: 21px;
+  color: #c4cbb0;
+  line-height: 1.65;
+  margin-bottom: 20px;
+}
+.scout-story > div {
+  padding: 12px 0;
+  border-top: 1px solid #41543a;
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.scout-story strong {
+  font-weight: 500;
+  color: #dbcca2;
+}
+.scout-story span {
+  color: #b2c19b;
+  text-align: right;
+}
+@media (max-width: 950px) {
+  .talent-card h3 {
+    font-size: 20px;
+  }
+  .talent-card > p {
+    min-height: 0;
+  }
+  .route-site-benefit {
+    font-size: 7px;
+  }
+  .waylight-ledger {
+    padding: 19px 20px;
+  }
+  .scout-meta {
+    font-size: 9px;
+  }
+}
+@media (max-width: 740px) {
+  .waylight-ledger {
+    padding: 22px 20px;
+  }
+  .waylight-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  .waylight-list strong {
+    font-size: 17px;
+  }
+  .waylight-list small {
+    font-size: 9px;
+  }
+  .lesson-list {
+    gap: 17px;
+  }
+  .lesson-list .inventory-relic strong {
+    font-size: 17px;
+  }
+  .lesson-list .inventory-relic small {
+    font-size: 9px;
+  }
+  .route-site-benefit {
+    font-size: 9px;
+  }
+  .scout-meta {
+    font-size: 10px;
+    flex-wrap: wrap;
+  }
+  .scout-rewards {
+    gap: 13px;
+  }
+  .scout-rewards > span {
+    font-size: 10px;
+  }
+  .scout-pattern p {
+    font-size: 10px;
+  }
+  .scout-site {
+    padding: 17px;
+    gap: 11px;
+  }
+  .scout-site > svg {
+    width: 22px;
+  }
+  .scout-story > div {
+    font-size: 10px;
+  }
+  .talent-board .reward-grid {
+    margin-top: 25px;
+  }
+  .talent-card h3 {
+    font-size: 24px;
+  }
+}
+@media (max-width: 420px) {
+  .waylight-list {
+    grid-template-columns: 1fr;
+  }
+  .route-site-benefit {
+    font-size: 8px;
+  }
+  .scout-meta {
+    font-size: 9px;
+  }
+  .scout-rewards > span {
+    font-size: 9px;
+  }
+  .scout-pattern > li {
+    padding: 11px;
+  }
+  .scout-pattern strong {
+    font-size: 19px;
+  }
+  .scout-pattern p {
+    font-size: 9px;
+  }
+  .scout-site h3 {
+    font-size: 25px;
+  }
+  .scout-site p {
+    font-size: 17px;
+  }
+  .scout-site strong {
+    font-size: 10px;
+  }
+}
+.reward-waylight {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid #7a8350;
+  border-radius: 4px;
+  background: #34452d77;
+  padding: 13px 18px;
+  text-align: left;
+  max-width: 100%;
+  margin-bottom: 22px;
+  color: #cdb880;
+}
+.reward-waylight > svg {
+  flex-shrink: 0;
+}
+.reward-waylight strong {
+  display: block;
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 500;
+  color: #e0cea1;
+}
+.reward-waylight small {
+  display: block;
+  font-size: 10px;
+  line-height: 1.8;
+  color: #b3c29b;
+  margin-top: 4px;
+}
+.journal-classic {
+  font-size: 10px !important;
+  line-height: 1.9;
+  color: #c2cba9 !important;
+  margin-top: 10px;
+}
+.run-supplies {
+  grid-column: 1/-1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+  background: #142526;
+  margin-top: -5px;
+}
+.run-supplies > .relic-inventory {
+  grid-column: auto;
+  border-top: 0;
+  padding: 23px;
+}
+.run-supplies > .waylight-ledger,
+.run-supplies > .classic-notice {
+  grid-column: auto;
+  border-top: 0;
+  border-left: 1px solid var(--line);
+}
+.run-supplies .relic-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px 15px;
+}
+.run-supplies .inventory-relic {
+  align-items: start;
+}
+.run-supplies .inventory-relic > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.run-supplies .inventory-relic small {
+  font-size: 9px;
+}
+.run-supplies .waylight-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.run-supplies .waylight-list > div {
+  align-items: start;
+  gap: 8px;
+}
+.run-supplies .waylight-list > div > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  width: 17px;
+}
+.run-supplies .waylight-list strong {
+  font-size: 16px;
+  line-height: 1.3;
+}
+.run-supplies .lesson-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+.run-supplies .lesson-list > .eyebrow {
+  grid-column: 1/-1;
+}
+@media (max-width: 950px) {
+  .run-supplies {
+    grid-template-columns: 1fr 1fr;
+  }
+  .run-supplies .relic-list {
+    grid-template-columns: 1fr 1fr;
+  }
+  .run-supplies .waylight-list {
+    grid-template-columns: 1fr;
+  }
+  .run-supplies .lesson-list {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 740px) {
+  .run-supplies {
+    grid-template-columns: 1fr;
+    margin-top: 7px;
+  }
+  .run-supplies > .relic-inventory {
+    padding: 22px 20px;
+  }
+  .run-supplies > .waylight-ledger,
+  .run-supplies > .classic-notice {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .run-supplies .waylight-list {
+    grid-template-columns: 1fr 1fr;
+  }
+  .run-supplies .lesson-list {
+    grid-template-columns: 1fr 1fr;
+  }
+  .run-supplies .inventory-relic small {
+    font-size: 9px;
+  }
+}
+@media (max-width: 420px) {
+  .run-supplies .waylight-list,
+  .run-supplies .lesson-list {
+    grid-template-columns: 1fr;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   *,

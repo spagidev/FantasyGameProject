@@ -1,6 +1,8 @@
-# Emberwake rules · v1
+# Emberwake rules · Roads Rekindled (ruleset 2)
 
 This document is the contract for the pure state engine in `src/game/engine.ts`.
+
+New expeditions use ruleset 2. Imported or resumed version 1 expeditions keep the classic ruleset for their entire run. Base actions, chapter structure, relics, bosses, and prices are shared; the new waylights, lessons, and lane patterns below apply only to ruleset 2.
 
 ## Expedition
 
@@ -10,7 +12,7 @@ Runs start at full health, with 35 coins, two flasks, no relics, and no upgrades
 
 ## Turn order
 
-Combat is deterministic and turn based: no accuracy rolls, critical hits, hidden dice, or timers. A battle starts with 2 focus (maximum 5), no guard, and no poison. The enemy's next move and exact raw damage are visible. Each valid player action consumes one turn, including a flask. Invalid/unaffordable actions do nothing.
+Combat is deterministic and turn based: no accuracy rolls, critical hits, hidden dice, or timers. A battle starts with 2 focus plus any observatory and lesson bonuses (maximum 5), no guard, and no poison. The enemy's next move and exact raw damage are visible. Each valid player action consumes one turn, including a flask. Invalid/unaffordable actions do nothing.
 
 1. Resolve the player's action. Damage consumes enemy guard before health.
 2. If the enemy survives, poison deals its full stack as direct health loss, then loses one stack. If it dies, combat ends before its action.
@@ -42,7 +44,18 @@ Combat is deterministic and turn based: no accuracy rolls, critical hits, hidden
 
 Enemies cycle through a fixed, visible pattern. Chapter scales base health and damage. Elite enemies have more health/damage and give 32 coins plus a relic choice. Ordinary enemies give 18 coins plus a relic choice. Bosses have distinct patterns, give 45 coins plus a relic choice, and ring their chapter's bell. Damage and maximum health are fixed at battle creation; enemy guard and healing do not change the damage telegraph.
 
-Chapters use zero-based index `c = 0, 1, 2`; lanes use `l = 0, 1, 2`. Ordinary enemies have `24 + 11c + 2l` health and base damage `6 + 3c`. Elites have `35 + 13c` health and base damage `8 + 3c`. Both repeat: base-damage strike → gain `5 + 2c` enemy guard (no damage) → base-damage + 5 heavy strike. Names vary by seed; their numeric rules do not.
+Chapters use zero-based index `c = 0, 1, 2`; lanes use `l = 0, 1, 2`. Ordinary enemies have `24 + 11c + 2l` health and base damage `6 + 3c`. Elites have `35 + 13c` health and base damage `8 + 3c`. The classic ruleset uses the same pattern for both: base-damage strike → gain `5 + 2c` enemy guard (no damage) → base-damage + 5 heavy strike. Names vary by seed; their numeric rules do not.
+
+In ruleset 2, use `D` for the enemy's base damage:
+
+| Route                                    | Repeating intentions (raw values)                                       |
+| ---------------------------------------- | ----------------------------------------------------------------------- |
+| Dawnwell (left ordinary battle)          | `D` damage → gain `5 + 2c` guard → `D + 5` damage                       |
+| Cinder Kiln (center ordinary battle)     | `D − 1` damage → `D − 1` damage → `D + 3` damage                        |
+| Moth Observatory (right ordinary battle) | `D − 1` damage and drain 1 focus → gain `6 + 2c` guard → `D + 4` damage |
+| Elite encounter                          | `D` damage and drain 1 focus → gain `8 + 2c` guard → `D + 6` damage     |
+
+Scouting any visible map node is free and shows the full repeating pattern before commitment. Only the currently reachable next-depth nodes allow travel from their scout preview. Scouting does not advance the seed, trigger income, spend supplies, or advance the expedition.
 
 | Guardian              | Health | Repeating intentions (raw values)                |
 | --------------------- | ------ | ------------------------------------------------ |
@@ -53,6 +66,36 @@ Chapters use zero-based index `c = 0, 1, 2`; lanes use `l = 0, 1, 2`. Ordinary e
 Focus drain resolves even if all damage is guarded, but a player kill or poison kill prevents the entire enemy action. All enemy patterns start at their first intention when entering battle.
 
 After a nonfinal victory choose exactly one available unique relic or recover 12 health. Three relics are deterministically offered from the remaining pool. If all are owned, only recovery remains. Final victory leads directly to the ending choice.
+
+## Waylights · ruleset 2
+
+The ordinary battle at the first depth of each realm guards a waylight. Its type is determined by lane and visible before travel. Winning frees that site automatically, in addition to the normal coins and relic choice. There are exactly three opportunities per run. Sites of the same type stack; losing to a guardian never grants its site.
+
+| Site             | Recurring benefit                                                                 |
+| ---------------- | --------------------------------------------------------------------------------- |
+| Dawnwell         | Restore 2 health on each future legal crossing, capped at maximum health          |
+| Cinder Kiln      | Gain 4 coins on each future legal crossing                                        |
+| Moth Observatory | Start each future battle with 1 extra focus, with total opening focus capped at 5 |
+
+Health and coin benefits resolve once when entering an encounter, before combat initializes. A newly freed site begins contributing on the **next** crossing. Rewards, lesson choices, purchases, rest actions, rejected moves, scouting, reloads, and time spent away produce no income. Site ownership resets with the expedition.
+
+## Remembered lessons · ruleset 2
+
+After the first and second bell guardians, choose the normal relic/recovery reward, then choose exactly one unlearned lesson belonging to your keeper before moving on. Three are initially available; the second choice has two remaining alternatives. A lesson lasts this expedition and cannot be learned twice. The final guardian leads to the ending instead of another lesson.
+
+| Keeper   | Lesson                  | Exact effect                                                                                                              |
+| -------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Warden   | The living gate         | Guard absorbs 4 additional damage                                                                                         |
+| Warden   | Sunsteel resolve        | Sundering blow deals 5 additional damage                                                                                  |
+| Warden   | An unbroken vow         | Strike generates 1 additional focus, stacking with Mothglass before the cap of 5                                          |
+| Seer     | The first constellation | Start battles with 1 additional focus, stacking with observatories before the cap of 5                                    |
+| Seer     | A falling star          | Starfire deals 5 additional piercing damage                                                                               |
+| Seer     | The quiet moon          | Gain 1 armor immediately and permanently for this run; Guard absorbs 2 additional damage on top of its armor contribution |
+| Wayfarer | A patient garden        | Nightbloom applies 7 poison instead of 5                                                                                  |
+| Wayfarer | Sap of the old wood     | Strike heals 3 instead of 2, even when it hits enemy guard                                                                |
+| Wayfarer | A road shared           | Each later victory gives 6 additional coins and heals 2, stacking with Pilgrim's Thread                                   |
+
+UI action values use the engine's `guardAmount`, `skillDamage`, `strikeFocus`, `strikeHealing`, and `poisonAmount` helpers. Lesson effects are applied once per valid transition; reloading an unchosen lesson never applies its effect.
 
 ## Encounters and economy
 
@@ -72,4 +115,6 @@ At camp choose one: heal 18, gain 1 flask (cap 5), or forge +2 attack for 30 coi
 
 Every successful state transition autosaves locally in the browser, alongside discovered lore, completed runs, and victories. Refreshing resumes the same encounter and seed. Saves are versioned and validated on load; incompatible/corrupt run saves are ignored without crashing. Storage failures show a warning and allow play to continue in memory. Abandoning a run requires confirmation. There is no server, account, telemetry, or paid mechanic. Local saves are editable and are not a competitive scoreboard.
 
-The journal menu exports the complete local save as JSON. Import accepts version 1 journals up to 64 KB, validates the same invariants as local saves, and previews the keeper and profile before replacement. Selecting a file never replaces progress; the player must choose **Restore this journal**. Imported histories replace rather than merge, avoiding duplicate completed-run counts. Nothing is uploaded. A player with blocked storage can still export the current in-memory journal.
+The journal menu exports the complete local save as JSON. Import accepts version 1 and version 2 journals up to 64 KB, validates the same invariants as local saves, and previews the keeper and profile before replacement. Selecting a file never replaces progress; the player must choose **Restore this journal**. Imported histories replace rather than merge, avoiding duplicate completed-run counts. Nothing is uploaded. A player with blocked storage can still export the current in-memory journal.
+
+Current saves use `emberwake.save.v2`. If that slot does not exist, the game checks the previous `emberwake.save.v1` slot. A valid old save is normalized to format 2 with `ruleset: 1`, empty site/lesson lists, and unchanged health, coins, enemy, focus, turn, and profile. Future battles in that run use the original patterns and original progression. The old storage slot remains untouched as a backup. Starting a new run always uses ruleset 2. Format versions are separate from the campaign ruleset so an exported classic crossing remains classic when imported elsewhere.

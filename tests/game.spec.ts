@@ -1,9 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
-import { EVENTS, KEEPERS, RELICS, type KeeperId } from '../src/game/data';
+import { EVENTS, KEEPERS, RELICS, TALENTS, type KeeperId } from '../src/game/data';
 import { nodeAt, type Action, type Run } from '../src/game/engine';
-import { SAVE_KEY } from '../src/game/storage';
+import { SAVE_KEY, LEGACY_SAVE_KEY } from '../src/game/storage';
+import legacyJournal from './fixtures/v1-journal.json' with { type: 'json' };
 import { campaignAction } from './player';
 
 async function readRun(page: Page): Promise<Run> {
@@ -13,6 +14,8 @@ async function clickAction(page: Page, run: Run, action: Action) {
   if (action.type === 'travel') {
     const node = nodeAt(run.seed, run.depth + 1, action.lane);
     await page.locator('.route-choice').filter({ hasText: node.name }).first().click();
+  } else if (action.type === 'talent') {
+    await page.locator('.talent-card').filter({ hasText: TALENTS[action.id].name }).click();
   } else if (['strike', 'guard', 'skill', 'flask'].includes(action.type)) {
     await page
       .locator('.action-button')
@@ -121,6 +124,8 @@ for (const keeper of ['warden', 'seer', 'wayfarer'] as KeeperId[]) {
     expect(run.phase).toBe('won');
     expect(run.bells).toBe(3);
     expect(run.path).toHaveLength(12);
+    expect(run.talents).toHaveLength(2);
+    expect(run.waylights).toHaveLength(3);
     await expect(page.getByRole('button', { name: /Walk another road/ })).toBeVisible();
     await page.reload();
     expect((await readRun(page)).phase).toBe('won');
@@ -148,6 +153,63 @@ test('mobile layout stays within the viewport and supports combat', async ({ pag
     true,
   );
   await page.screenshot({ path: 'test-results/mobile-combat.png', fullPage: true });
+});
+
+test('scouting is free, exposes future patterns, and only travels reachable lanes', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /Scout Bell guardian/ }).click();
+  await expect(page.getByRole('dialog')).toContainText('Antler sweep');
+  await expect(page.getByRole('button', { name: 'Take this path' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: /Begin expedition/ }).click();
+  const original = await readRun(page);
+  await page.getByRole('button', { name: /Scout Bell guardian/ }).click();
+  expect(await readRun(page)).toEqual(original);
+  await expect(page.getByRole('dialog')).toContainText('A future crossing');
+  await page.keyboard.press('Escape');
+  await page.locator('.map-stop.available button').nth(1).click();
+  await expect(page.getByRole('dialog')).toContainText('Cinder Kiln');
+  await expect(page.getByRole('dialog')).toContainText('Second ember');
+  const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(accessibility.violations).toEqual([]);
+  expect(await readRun(page)).toEqual(original);
+  await page.getByRole('button', { name: 'Take this path' }).click();
+  const entered = await readRun(page);
+  expect(entered.depth).toBe(0);
+  expect(entered.lane).toBe(1);
+  expect(entered.waylights).toEqual([]);
+});
+
+test('an existing version 1 save resumes its exact turn and keeps a legacy backup', async ({
+  page,
+}) => {
+  await page.addInitScript(({ key, save }) => localStorage.setItem(key, JSON.stringify(save)), {
+    key: LEGACY_SAVE_KEY,
+    save: legacyJournal,
+  });
+  await page.goto('/');
+  const restored = await readRun(page);
+  expect(restored).toEqual({
+    ...legacyJournal.run,
+    version: 2,
+    ruleset: 1,
+    waylights: [],
+    talents: [],
+  });
+  await expect(page.locator('.classic-notice')).toContainText('original rules are preserved');
+  await page.locator('.action-button').first().click();
+  const next = await readRun(page);
+  expect(next.turn).toBe(2);
+  expect(next.health).toBe(44);
+  expect(next.enemy!.health).toBe(10);
+  expect(next.enemy!.guard).toBe(5);
+  await page.reload();
+  expect(await readRun(page)).toEqual(next);
+  expect(
+    await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), LEGACY_SAVE_KEY),
+  ).toEqual(legacyJournal);
 });
 
 test('corrupt or unavailable storage never prevents starting a game', async ({ page }) => {

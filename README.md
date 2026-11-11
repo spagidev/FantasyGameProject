@@ -23,6 +23,7 @@ npm run build           # Strict TypeScript check and production assets
 npm run test:e2e         # Real Chromium gameplay, accessibility, save/resume, mobile
 npm run check            # All of the above
 npm run format:check     # Formatting
+npm run balance          # Optional 90-campaign strategic-route regression matrix
 ```
 
 Browser tests use `/usr/bin/chromium` when present. On other machines, run `npx playwright install chromium` first. CI installs its browser and OS dependencies automatically. To inspect failures, use the screenshots and traces in `test-results/`.
@@ -43,6 +44,16 @@ Browser tests use `/usr/bin/chromium` when present. On other machines, run `npx 
 
 In combat, use the action buttons or keys **1–4**. Your action resolves first, then poison, then the enemy's visible intention. **Guard lasts one enemy action. Flasks also end your turn.** Open “How to play” for the complete introduction.
 
+## Roads Rekindled · v0.2
+
+- **A road that gives back:** free a Dawnwell, Cinder Kiln, or Moth Observatory in each realm. Choose future health, expedition income, or opening focus. Sites stack within a run and only pay when you cross into another encounter.
+- **Nine remembered lessons:** after the first two bells, choose one of your keeper's unlearned specializations. Build around defense, focus, burst damage, venom, or shared supplies.
+- **Free scouting:** inspect any map node before committing. Read its complete enemy pattern, rewards, and waylight benefit; future nodes can be inspected but cannot skip the route.
+- **Different threats:** kiln guardians attack continuously, observatory guardians drain focus, and elites pressure your preparation.
+- **Existing journals preserved:** old expeditions resume with their original rules and exact turn, while new expeditions use the expanded ruleset.
+
+[Design research](docs/DESIGN_RESEARCH.md) records the Heroes III/VCMI references and independent design decisions behind this milestone. The [90-campaign report](docs/BALANCE_REPORT.json) covers both rulesets, all keepers, and three strategic route plans. Its automated search establishes reachable winning paths; human playtesting is still needed for difficulty and enjoyment.
+
 ## Design and implementation
 
 The [lore](docs/LORE.md) was established before implementation. The [rules](docs/RULES.md) define the mechanical contract. The UI calls a pure, deterministic state engine; it does not calculate a second version of the combat rules.
@@ -57,7 +68,7 @@ The [lore](docs/LORE.md) was established before implementation. The [rules](docs
 | `src/game/engine.test.ts` | Rules and complete campaign tests                   |
 | `tests/`                  | Real-browser tests and a bounded test-player search |
 
-The save format is version 1 under `emberwake.save.v1`. Saves are local and editable; this is a single-player game, not a trusted competitive leaderboard. Profiles retain discovered memories and completed-run counts. Relics, attack upgrades, and supplies reset each run.
+The save format is version 2 under `emberwake.save.v2`. Version 1 saves are migrated without overwriting the original storage slot. A campaign's ruleset remains stable after migration. Saves are local and editable; this is a single-player game, not a trusted competitive leaderboard. Profiles retain discovered memories and completed-run counts. Relics, lessons, waylights, attack upgrades, and supplies reset each run.
 
 ## Continuing development
 

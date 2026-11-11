@@ -3,16 +3,20 @@ import {
   EVENTS,
   KEEPERS,
   RELICS,
+  TALENTS,
+  WAYLIGHTS,
   type EnemyArt,
   type EventOption,
   type Intent,
   type KeeperId,
   type NodeKind,
   type RelicId,
+  type TalentId,
+  type WaylightId,
 } from './data';
 
 export type Phase =
-  'map' | 'combat' | 'reward' | 'event' | 'camp' | 'shop' | 'ending' | 'won' | 'lost';
+  'map' | 'combat' | 'reward' | 'talent' | 'event' | 'camp' | 'shop' | 'ending' | 'won' | 'lost';
 export type Enemy = {
   name: string;
   art: EnemyArt;
@@ -31,7 +35,8 @@ export type MapNode = {
   eventIndex: number;
 };
 export type Run = {
-  version: 1;
+  version: 2;
+  ruleset: 1 | 2;
   seed: number;
   keeper: KeeperId;
   phase: Phase;
@@ -55,6 +60,8 @@ export type Run = {
   bells: number;
   purchased: string[];
   ending: 'dawn' | 'hearth' | null;
+  waylights: WaylightId[];
+  talents: TalentId[];
 };
 export type Action =
   | { type: 'travel'; lane: number }
@@ -64,6 +71,7 @@ export type Action =
   | { type: 'camp'; choice: 'rest' | 'flask' | 'forge' }
   | { type: 'buy'; item: 'flask' | 'heal' | 'forge' }
   | { type: 'leave' }
+  | { type: 'talent'; id: TalentId }
   | { type: 'ending'; choice: 'dawn' | 'hearth' };
 
 export function hash(seed: number, index: number): number {
@@ -76,7 +84,8 @@ export function hash(seed: number, index: number): number {
 export function newRun(keeper: KeeperId, seed: number): Run {
   const k = KEEPERS[keeper];
   return {
-    version: 1,
+    version: 2,
+    ruleset: 2,
     seed: seed >>> 0,
     keeper,
     phase: 'map',
@@ -100,6 +109,8 @@ export function newRun(keeper: KeeperId, seed: number): Run {
     bells: 0,
     purchased: [],
     ending: null,
+    waylights: [],
+    talents: [],
   };
 }
 
@@ -148,13 +159,13 @@ export function nextNodes(run: Run): MapNode[] {
     .map((l) => nodeAt(run.seed, d, l));
 }
 
-export function makeEnemy(node: MapNode): Enemy {
+export function makeEnemy(node: MapNode, ruleset: 1 | 2 = 2): Enemy {
   const c = Math.floor(node.depth / 4);
   const boss = node.kind === 'boss';
   const elite = node.kind === 'elite';
   const health = boss ? [48, 64, 84][c] : elite ? 35 + c * 13 : 24 + c * 11 + node.lane * 2;
   const damage = (boss ? 9 : elite ? 8 : 6) + c * 3;
-  const pattern: Intent[] = boss
+  let pattern: Intent[] = boss
     ? c === 0
       ? [
           { name: 'Antler sweep', damage },
@@ -177,15 +188,85 @@ export function makeEnemy(node: MapNode): Enemy {
         { name: 'Gathering shadow', damage: 0, guard: 5 + c * 2 },
         { name: 'Heavy strike', damage: damage + 5 },
       ];
+  if (ruleset === 2 && !boss) {
+    if (elite) {
+      pattern = [
+        { name: 'Test your resolve', damage, drain: 1 },
+        { name: 'Close ranks', damage: 0, guard: 8 + c * 2 },
+        { name: 'Break the line', damage: damage + 6 },
+      ];
+    } else if (node.lane === 1) {
+      pattern = [
+        { name: 'First ember', damage: damage - 1 },
+        { name: 'Second ember', damage: damage - 1 },
+        { name: 'Cinder storm', damage: damage + 3 },
+      ];
+    } else if (node.lane === 2) {
+      pattern = [
+        { name: 'Unravel the light', damage: damage - 1, drain: 1 },
+        { name: 'Veil of moths', damage: 0, guard: 6 + c * 2 },
+        { name: 'A stolen star', damage: damage + 4 },
+      ];
+    }
+  }
   return {
     name: node.name,
-    art: boss ? CHAPTERS[c].art : elite ? 'sentinel' : 'wraith',
+    art: boss ? CHAPTERS[c].art : elite || (ruleset === 2 && c === 1) ? 'sentinel' : 'wraith',
     health,
     maxHealth: health,
     guard: 0,
     poison: 0,
     pattern,
   };
+}
+
+export function waylightFor(node: MapNode): WaylightId | null {
+  return node.depth % 4 === 0 ? (['well', 'kiln', 'lens'] as const)[node.lane] : null;
+}
+export function roadBenefits(r: Run) {
+  return {
+    health: r.waylights.filter((id) => id === 'well').length * 2,
+    coins: r.waylights.filter((id) => id === 'kiln').length * 4,
+    focus: r.waylights.filter((id) => id === 'lens').length,
+  };
+}
+export function startingFocus(r: Run) {
+  return Math.min(5, 2 + roadBenefits(r).focus + (r.talents.includes('astral') ? 1 : 0));
+}
+export function strikeFocus(r: Run) {
+  return 1 + (r.relics.includes('mothglass') ? 1 : 0) + (r.talents.includes('vow') ? 1 : 0);
+}
+export function guardAmount(r: Run) {
+  return (
+    9 +
+    r.armor +
+    (r.keeper === 'seer' ? 4 : 0) +
+    (r.talents.includes('citadel') ? 4 : 0) +
+    (r.talents.includes('moonward') ? 2 : 0)
+  );
+}
+export function skillDamage(r: Run) {
+  return (
+    (r.keeper === 'wayfarer' ? r.attack + 2 : r.attack * 2 + (r.keeper === 'seer' ? 7 : 3)) +
+    (r.talents.includes('sunsteel') || r.talents.includes('starfall') ? 5 : 0)
+  );
+}
+export function poisonAmount(r: Run) {
+  return 5 + (r.talents.includes('bloom') ? 2 : 0);
+}
+export function strikeHealing(r: Run) {
+  return r.keeper === 'wayfarer' ? (r.talents.includes('sap') ? 3 : 2) : 0;
+}
+export function availableTalents(r: Run): TalentId[] {
+  return (Object.keys(TALENTS) as TalentId[]).filter(
+    (id) => TALENTS[id].keeper === r.keeper && !r.talents.includes(id),
+  );
+}
+export function victoryCoins(r: Run, node = nodeAt(r.seed, r.depth, r.lane)) {
+  return (
+    (node.kind === 'boss' ? 45 : node.kind === 'elite' ? 32 : 18) +
+    (r.talents.includes('trail') ? 6 : 0)
+  );
 }
 
 export function intentFor(run: Run): Intent | null {
@@ -232,10 +313,16 @@ function addRelic(r: Run, id: RelicId) {
 }
 function victory(r: Run) {
   const kind = nodeAt(r.seed, r.depth, r.lane).kind;
-  const coins = kind === 'boss' ? 45 : kind === 'elite' ? 32 : 18;
+  const coins = victoryCoins(r);
   r.coins += coins;
   r.guard = 0;
   if (r.relics.includes('thread')) heal(r, 5);
+  if (r.talents.includes('trail')) heal(r, 2);
+  const site = waylightFor(nodeAt(r.seed, r.depth, r.lane));
+  if (r.ruleset === 2 && site) {
+    r.waylights.push(site);
+    note(r, `${WAYLIGHTS[site].name} is rekindled. ${WAYLIGHTS[site].benefit}`);
+  }
   if (kind === 'boss') {
     r.bells += 1;
     r.lore.push(`bell-${r.bells}`);
@@ -256,6 +343,9 @@ export function transition(run: Run, action: Action): Run {
   const r = structuredClone(run);
   if (action.type === 'travel') {
     if (!nextNodes(r).some((n) => n.lane === action.lane)) return run;
+    const benefits = roadBenefits(r);
+    heal(r, benefits.health);
+    r.coins += benefits.coins;
     r.depth += 1;
     r.lane = action.lane;
     const node = nodeAt(r.seed, r.depth, r.lane);
@@ -263,9 +353,9 @@ export function transition(run: Run, action: Action): Run {
     r.purchased = [];
     r.enemy = null;
     if (['battle', 'elite', 'boss'].includes(node.kind)) {
-      r.enemy = makeEnemy(node);
+      r.enemy = makeEnemy(node, r.ruleset);
       r.turn = 0;
-      r.focus = 2;
+      r.focus = startingFocus(r);
       r.guard = 0;
       r.phase = 'combat';
       r.log = [`${node.name} stands between you and the next bell.`];
@@ -283,10 +373,10 @@ export function transition(run: Run, action: Action): Run {
     r.guard = 0;
     if (action.type === 'strike') {
       hitEnemy(r, r.attack);
-      r.focus = Math.min(5, r.focus + (r.relics.includes('mothglass') ? 2 : 1));
-      if (r.keeper === 'wayfarer') heal(r, 2);
+      r.focus = Math.min(5, r.focus + strikeFocus(r));
+      if (strikeHealing(r)) heal(r, strikeHealing(r));
     } else if (action.type === 'guard') {
-      r.guard = 9 + r.armor + (r.keeper === 'seer' ? 4 : 0);
+      r.guard = guardAmount(r);
       r.focus = Math.min(5, r.focus + 2);
       note(r, `You brace with ${r.guard} guard.`);
       if (r.relics.includes('briar')) hitEnemy(r, 3);
@@ -294,13 +384,13 @@ export function transition(run: Run, action: Action): Run {
       r.focus -= k.cost;
       note(r, `${k.skill}.`);
       if (r.keeper === 'warden') {
-        hitEnemy(r, r.attack * 2 + 3);
+        hitEnemy(r, skillDamage(r));
         r.guard = 5;
       }
-      if (r.keeper === 'seer') hitEnemy(r, r.attack * 2 + 7, true);
+      if (r.keeper === 'seer') hitEnemy(r, skillDamage(r), true);
       if (r.keeper === 'wayfarer') {
-        hitEnemy(r, r.attack + 2);
-        r.enemy.poison += 5;
+        hitEnemy(r, skillDamage(r));
+        r.enemy.poison += poisonAmount(r);
       }
     } else {
       r.flasks -= 1;
@@ -354,6 +444,14 @@ export function transition(run: Run, action: Action): Run {
       note(r, `You carry the ${RELICS[action.id].name}. ${RELICS[action.id].flavor}`);
     } else return run;
     r.rewards = [];
+    r.phase = r.ruleset === 2 && r.depth % 4 === 3 ? 'talent' : 'map';
+    return r;
+  }
+  if (action.type === 'talent' && r.phase === 'talent') {
+    if (!availableTalents(r).includes(action.id) || r.talents.length >= 2) return run;
+    r.talents.push(action.id);
+    if (action.id === 'moonward') r.armor += 1;
+    note(r, `${TALENTS[action.id].name}: ${TALENTS[action.id].description}`);
     r.phase = 'map';
     return r;
   }

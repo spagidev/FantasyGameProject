@@ -1,13 +1,14 @@
-import { KEEPERS, LORE, RELICS, type KeeperId } from './data';
+import { KEEPERS, LORE, RELICS, TALENTS, WAYLIGHTS, type KeeperId } from './data';
 import type { Run } from './engine';
 
-export const SAVE_KEY = 'emberwake.save.v1';
+export const SAVE_KEY = 'emberwake.save.v2';
+export const LEGACY_SAVE_KEY = 'emberwake.save.v1';
 export const MAX_SAVE_BYTES = 64 * 1024;
 export type Profile = { runs: number; wins: number; lore: string[]; lastKeeper: KeeperId };
-export type Save = { version: 1; run: Run | null; profile: Profile };
+export type Save = { version: 2; run: Run | null; profile: Profile };
 export function emptySave(): Save {
   return {
-    version: 1,
+    version: 2,
     run: null,
     profile: { runs: 0, wins: 0, lore: ['beginning'], lastKeeper: 'warden' },
   };
@@ -25,15 +26,25 @@ const knownLore = (x: unknown): x is string[] =>
 export function validRun(x: unknown): x is Run {
   if (
     !record(x) ||
-    x.version !== 1 ||
+    x.version !== 2 ||
+    (x.ruleset !== 1 && x.ruleset !== 2) ||
     typeof x.keeper !== 'string' ||
     !Object.hasOwn(KEEPERS, x.keeper)
   )
     return false;
   if (
-    !['map', 'combat', 'reward', 'event', 'camp', 'shop', 'ending', 'won', 'lost'].includes(
-      String(x.phase),
-    )
+    ![
+      'map',
+      'combat',
+      'reward',
+      'talent',
+      'event',
+      'camp',
+      'shop',
+      'ending',
+      'won',
+      'lost',
+    ].includes(String(x.phase))
   )
     return false;
   if (!integer(x.seed, 0, 0xffffffff) || !integer(x.depth, -1, 11) || !integer(x.lane, 0, 2))
@@ -62,6 +73,21 @@ export function validRun(x: unknown): x is Run {
     )
       return false;
   }
+  if (!strings(x.waylights, 3) || !x.waylights.every((id) => Object.hasOwn(WAYLIGHTS, id)))
+    return false;
+  if (
+    !strings(x.talents, 2) ||
+    new Set(x.talents).size !== x.talents.length ||
+    !x.talents.every(
+      (id) => Object.hasOwn(TALENTS, id) && TALENTS[id as keyof typeof TALENTS].keeper === x.keeper,
+    )
+  )
+    return false;
+  if (x.ruleset === 1 && (x.waylights.length || x.talents.length || x.phase === 'talent'))
+    return false;
+  if (x.talents.length > x.bells) return false;
+  if (x.phase === 'talent' && (![3, 7].includes(x.depth) || x.talents.length !== x.bells - 1))
+    return false;
   if (
     !strings(x.log, 8) ||
     !strings(x.path, 12) ||
@@ -119,8 +145,25 @@ export function validRun(x: unknown): x is Run {
 export function decodeSave(raw: string): Save | null {
   if (raw.length > MAX_SAVE_BYTES) return null;
   try {
-    const x: unknown = JSON.parse(raw);
-    if (!record(x) || x.version !== 1 || (x.run !== null && !validRun(x.run)) || !record(x.profile))
+    let x: unknown = JSON.parse(raw);
+    if (record(x) && x.version === 1) {
+      if (x.run !== null && (!record(x.run) || x.run.version !== 1)) return null;
+      x = {
+        ...x,
+        version: 2,
+        run:
+          x.run === null
+            ? null
+            : {
+                ...(x.run as Record<string, unknown>),
+                version: 2,
+                ruleset: 1,
+                waylights: [],
+                talents: [],
+              },
+      };
+    }
+    if (!record(x) || x.version !== 2 || (x.run !== null && !validRun(x.run)) || !record(x.profile))
       return null;
     const p = x.profile;
     if (
@@ -142,7 +185,7 @@ export function advanceSave(save: Save, run: Run): Save {
   const terminal = run.phase === 'won' || run.phase === 'lost';
   const alreadyTerminal = save.run?.phase === 'won' || save.run?.phase === 'lost';
   return {
-    version: 1,
+    version: 2,
     run,
     profile: {
       runs: save.profile.runs + (terminal && !alreadyTerminal ? 1 : 0),

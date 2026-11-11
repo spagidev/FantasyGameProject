@@ -5,6 +5,7 @@ import {
   nextNodes,
   nodeAt,
   transition,
+  availableTalents,
   type Action,
   type Run,
 } from '../src/game/engine';
@@ -61,6 +62,7 @@ export function bestCombatAction(run: Run): Action {
 }
 
 export function campaignAction(r: Run): Action {
+  if (r.phase === 'talent') return { type: 'talent', id: availableTalents(r)[0] };
   if (r.phase === 'combat') return bestCombatAction(r);
   if (r.phase === 'map') return { type: 'travel', lane: nextNodes(r)[0].lane };
   if (r.phase === 'reward') {

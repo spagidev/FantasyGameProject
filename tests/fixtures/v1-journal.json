@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "run": {
+    "version": 1,
+    "seed": 123,
+    "keeper": "warden",
+    "phase": "combat",
+    "depth": 0,
+    "lane": 0,
+    "health": 44,
+    "maxHealth": 48,
+    "attack": 7,
+    "armor": 2,
+    "coins": 35,
+    "flasks": 2,
+    "focus": 3,
+    "guard": 0,
+    "turn": 1,
+    "enemy": {
+      "name": "Mire Revenant",
+      "art": "wraith",
+      "health": 17,
+      "maxHealth": 24,
+      "guard": 0,
+      "poison": 0,
+      "pattern": [
+        { "name": "Lunging strike", "damage": 6 },
+        { "name": "Gathering shadow", "damage": 0, "guard": 5 },
+        { "name": "Heavy strike", "damage": 11 }
+      ]
+    },
+    "relics": [],
+    "rewards": [],
+    "log": [
+      "Mire Revenant stands between you and the next bell.",
+      "7 damage dealt.",
+      "Lunging strike: 4 damage taken."
+    ],
+    "path": ["0-0"],
+    "lore": ["beginning"],
+    "bells": 0,
+    "purchased": [],
+    "ending": null
+  },
+  "profile": { "runs": 0, "wins": 0, "lore": ["beginning"], "lastKeeper": "warden" }
+}
