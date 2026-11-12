@@ -258,7 +258,12 @@ export default function App() {
               </div>
               <div className="journey-metadata">
                 <span className="edition-badge">
-                  <i /> {run?.ruleset === 1 ? 'THE FIRST CROSSING' : 'ROADS REKINDLED'}
+                  <i />{' '}
+                  {run?.atlas || (!run && expedition === 'atlas')
+                    ? 'THE LOST ATLAS'
+                    : run?.ruleset === 1
+                      ? 'THE FIRST CROSSING'
+                      : 'ROADS REKINDLED'}
                 </span>
                 <div className="meta-items">
                   <span>

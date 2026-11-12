@@ -30,6 +30,8 @@ describe('Lost Atlas expedition', () => {
   it('makes every authored landmark reachable on real, connected road geometry', () => {
     const run = newRun('warden', 123, true);
     for (const site of ATLAS_SITES) {
+      const neighbours = atlasNeighbours({ ...run.atlas!, position: site.id });
+      expect(new Set(neighbours.map((n) => n.id)).size).toBe(neighbours.length);
       const reached = walk(run, site.id);
       expect(reached.atlas!.position).toBe(site.id);
       expect(validRun(reached)).toBe(true);

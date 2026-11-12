@@ -377,7 +377,7 @@ test('Lost Atlas completes a real-road campaign, persists its fog, and keeps map
   expect(run.phase).toBe('won');
   expect(run.bells).toBe(3);
   expect(run.atlas?.recognized).toBe(false);
-  await page.locator('.atlas-fold summary').click();
+  await page.locator('.atlas-fold > summary').click();
   await page.getByRole('button', { name: 'Show whole chart' }).click();
   await page.screenshot({ path: 'test-results/atlas-complete.png', fullPage: true });
   expect(errors).toEqual([]);

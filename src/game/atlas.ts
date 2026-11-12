@@ -125,7 +125,7 @@ export const ATLAS_SITES: AtlasSite[] = [
     kind: 'encounter',
     depth: 11,
     lane: 1,
-    clue: 'Fortune once ruled this terrace. Now only the Hollow King remembers the name Monte Carlo.',
+    clue: 'Fortune once ruled this terrace. The Hollow King wears a crown borrowed from a game of chance.',
   },
   {
     id: 'cache',

@@ -249,20 +249,17 @@ export function AtlasMap({
               strokeWidth="1.5"
             />
           </g>
-          <g transform="translate(914 80)" fill="#c4b787" stroke="#c4b787" aria-hidden="true">
-            <path d="M0-29L6 0 0 23-6 0z" fill="none" />
-            <path d="M-18 0h36" />
-            <text y="-39" textAnchor="middle" stroke="none" fontSize="15">
-              N
-            </text>
-          </g>
-          <g transform="translate(730 755)" fill="#c6c4a5" stroke="#c6c4a5" aria-hidden="true">
-            <path d="M0 0h142M0-5v10M142-5v10" />
-            <text x="71" y="23" textAnchor="middle" stroke="none" fontSize="13">
-              500 paces · approximate
-            </text>
-          </g>
         </svg>
+        <span className="atlas-north" aria-label="North is up">
+          N<br />↑
+        </span>
+        <span
+          className="atlas-scale"
+          style={{ width: zoom ? '28.4%' : '14.2%' }}
+          aria-label="Map scale: approximately 500 paces"
+        >
+          500 paces
+        </span>
         <div className="atlas-tools">
           <button
             onClick={() => setZoom((z) => !z)}
