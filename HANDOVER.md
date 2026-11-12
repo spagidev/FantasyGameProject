@@ -1,8 +1,17 @@
-# Emberwake · The illuminated atlas checkpoint (v0.5.0)
+# Emberwake · Bundled Slovak maps checkpoint (v0.6.0)
 
 ## Latest user request
 
-Rework all UI and UX with a beautiful, premium fantasy presentation while retaining every feature. This continues the authorization to save GitHub checkpoints and publish to the existing owner-only Site. The earlier regional Atlas priority remains Slovakia and its eight kraje, with worldwide lookup supported by the existing pipeline. Do not publish cloud environment configuration. No reliable quota telemetry is exposed; do not invent readings and obey any user stop signal.
+Live regional preparation failed first on the private Worker's denied default cache, then on non-success Overpass responses. The user asked for roughly 15 downloaded real maps that work without the provider, and asked how Mapy.com handles this. Authorization continues to implement, save GitHub checkpoints and publish to the existing owner-only Site. The 16-chart Slovak collection below is the completed alternative. Mapy explanation and design references are in `docs/BUNDLED_ATLAS.md`.
+
+## Implemented in v0.6
+
+- **16 real historical Slovak city road charts, two per kraj**, compiled through the existing connected-road pipeline. The city remains hidden until recognition; country/kraj/aliases/ISO codes constrain selection and show available counts. Seeds choose deterministically.
+- **Bundled maps** is the default and makes no map-provider request. The collection is a separate local application chunk. **Live map** retains the regional API and falls back inside the chosen area if the provider fails and there is bundled coverage. Other countries show a clear coverage limit. Cancellation never triggers fallback. Original offline Saltbound Coast is retained.
+- Road source is an OSM/Geofabrik-derived historical dataset in GISAdamToth's transport-network sample repository at `f4610ed1dc823788f7fe7cbf1cd0a9074be00327`. Published April 2022; exact OSM extract date unknown. Place centres/node IDs use drakh's OSM-derived Slovak place catalogue at `846fe1c3b1bac53dc1b7ba09f16ccbca7748e424`. The collection contains roads, not complete modern water/buildings/terrain.
+- Separately licensed ODbL cropped source and complete compiled geography downloads in `public/atlas/`. Full pinned attribution and reproduction in `NOTICE.md`. Run `node scripts/build-bundled-atlas.mjs` without network or GIS dependencies. Optional original extraction uses `scripts/extract-slovakia.py` with Fiona/PyProj and the pinned repositories.
+- Save format 2 stays compatible. Source validation additionally accepts explicit Geofabrik provenance with null administrative area ID; genuine source city node IDs are retained. Selected charts are embedded in journals. Opening the private site still requires access to the game; this is provider-independent map data, not an installed offline website.
+- Default-cache access, read/decode and writes are all optional. Provider rejection logs record HTTP status and hostname for diagnosis. The current live provider is still unverified/unavailable in production; do not claim worldwide generation works reliably.
 
 ## Implemented in v0.5
 
@@ -26,9 +35,9 @@ Rework all UI and UX with a beautiful, premium fantasy presentation while retain
 
 ## Validation and limits
 
-53 unit/engine/service/storage tests passed. All 18 browser cases are validated: 17 passed in the full run, followed by the affected mobile Atlas case and the expanded presentation case passing after its seal contrast correction. The presentation case checks 17 desktop/mobile scenes with WCAG 2 A/AA Axe checks and no horizontal overflow, including combat, reward, event, camp, shop, talents, both ending states, Chronicle and dialogs. All three keeper campaigns and the Atlas campaign complete through real Chromium. Existing save migration, import/export, regional setup, cancellation and recognition tests are preserved. Strict TypeScript, production Worker asset verification, formatting and diff checks pass. Screenshots are generated in `test-results/`; README shows the redesigned lobby.
+59 unit/engine/service/storage tests pass, including playable full campaigns on every bundled chart, geographic validation and journal round-trips, all kraj aliases and area limits, zero provider calls for bundled setup, live fallback and cancellation, and the denied-cache regressions. All 20 Chromium cases are validated: 19 passed in the full run, then both bundled cases passed after a mobile sticky-header contrast correction. Browser checks cover blocked-provider startup, hidden city, recognition, persistence, mobile availability/error/fallback states, existing campaigns, original Atlas and previous journal formats. Strict TypeScript/build, standalone Worker assets/geographic-download checks, formatting and diff checks pass. The 16-chart chunk is about 573 kB gzipped; it loads separately from the opening game bundle.
 
-The Sites preview relay still times out. Existing Playwright tests exercise the app; new service/UI integration tests use controlled OSM fixtures. The managed environment blocks live Overpass access, so live regional map generation is not established by these fixture tests. Production deployment success is verified separately. Do not claim every city worldwide works. Human Slovak playtesting is the next useful check.
+The Sites preview relay still times out. Existing Playwright tests exercise the app; live service/UI integration tests use controlled OSM fixtures; bundled-map tests use the shipped real historical data. The managed environment blocks live Overpass access, so live regional map generation is not established by these fixture tests. Production deployment success is verified separately. Do not claim every city worldwide works. Human Slovak playtesting is the next useful check.
 
 ## Locations and publishing
 

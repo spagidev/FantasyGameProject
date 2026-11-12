@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 import { readFile, writeFile, readdir, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { build } from 'esbuild';
+import { gunzipSync } from 'node:zlib';
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -71,4 +72,22 @@ for (const file of ['emberwake-world', 'keepers', 'adversaries', 'realms']) {
   assert.equal(art.headers.get('Content-Type'), 'image/webp');
   assert.ok((await art.arrayBuffer()).byteLength > 1000, 'Bundled art must not be empty');
 }
-console.log('Verified Worker HTML, JavaScript, original artwork, and API routing.');
+const bundledPath = Object.keys(assets).find((url) =>
+  /\/assets\/bundled-charts-[^/]+\.js$/.test(url),
+);
+assert.ok(bundledPath, 'Worker must include the bundled city collection');
+const bundled = await worker.fetch(new Request('https://emberwake.example' + bundledPath), {});
+assert.equal(bundled.status, 200);
+assert.match(bundled.headers.get('Content-Type'), /javascript/);
+const database = await worker.fetch(
+  new Request('https://emberwake.example/atlas/slovakia-charts.json.gz'),
+  {},
+);
+assert.equal(database.status, 200, 'ODbL geographic database must be downloadable');
+assert.equal(
+  Object.keys(JSON.parse(gunzipSync(Buffer.from(await database.arrayBuffer())))).length,
+  16,
+);
+console.log(
+  'Verified Worker HTML, JavaScript, artwork, 16 bundled charts, geographic download, and API routing.',
+);

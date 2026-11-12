@@ -23,3 +23,7 @@ The 16 charts load together as a separate application chunk, leaving the opening
 ## Relation to Mapy.com
 
 Mapy provides its own [tile service](https://developer.mapy.com/rest-api-mapy-cz/function/map-tiles/) and prepared [offline country/regional downloads](https://help.mapy.com/offline-maps/). Its [developer overview](https://developer.mapy.com/) describes applying its own styling to OSM data outside Czechia. Emberwake follows the same useful principle at a smaller scale: prepare the geographic game boards ahead of play and distribute them from the game's own host. A worldwide version should grow a periodically refreshed catalogue and ingestion pipeline, rather than make every new expedition depend on a public query service.
+
+## Validation
+
+59 unit/engine/service/storage checks pass, including full three-bell campaigns on all 16 shipped charts, valid topology and journal round-trips, coverage/alias/seed selection, provider-free setup, in-area fallback and cancellation. Both default-cache denial paths are covered. All 20 browser cases are validated: 19 passed in the full run; both bundled cases passed after the mobile header contrast correction. Browser coverage includes a blocked provider, city concealment/recognition and persistence, mobile coverage and fallback, existing campaigns and original journals. Production packaging verifies the shipped chart chunk and downloadable 16-chart ODbL database. Regenerating the charts from the pinned source produces identical files.
