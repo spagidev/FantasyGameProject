@@ -1155,7 +1155,9 @@ function Ending({
             ? 'NOT ALL ROADS END AT DAWN'
             : choosing
               ? 'THE LAST BELL RINGS'
-              : 'THE FIRST CROSSING · COMPLETE'}
+              : run.atlas
+                ? 'THE LOST ATLAS · COMPLETE'
+                : 'THE FIRST CROSSING · COMPLETE'}
         </span>
         <h2>
           {lost

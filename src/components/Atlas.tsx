@@ -509,11 +509,13 @@ export function AtlasJournal({ run, dispatch }: { run: Run; dispatch: (a: Action
             Remember its name
           </button>
           <small>
-            {canGuess
-              ? 'One attempt per bell stage. No penalty for a wrong name.'
-              : run.phase !== 'map'
-                ? 'Finish this encounter before naming the land.'
-                : 'Ring another bell for another attempt.'}
+            {run.phase === 'won' || run.phase === 'lost'
+              ? 'This expedition has ended. Name the coast on another journey.'
+              : canGuess
+                ? 'One attempt per bell stage. No penalty for a wrong name.'
+                : run.phase !== 'map'
+                  ? 'Finish this encounter before naming the land.'
+                  : 'Ring another bell for another attempt.'}
           </small>
         </form>
       )}
