@@ -41,7 +41,7 @@ import {
   LEGACY_SAVE_KEY,
   type Save,
 } from './game/storage';
-import { EnemyFigure, KeeperArt, Landscape } from './components/Art';
+import { EnemyPortrait, KeeperPortrait, Landscape } from './components/Art';
 import { Icon, type IconName } from './components/Icon';
 import { Modal } from './components/Modal';
 import { RouteMap } from './components/RouteMap';
@@ -119,7 +119,7 @@ export default function App() {
 
   useEffect(() => {
     if (run && view === 'journey' && window.matchMedia('(max-width: 740px)').matches) {
-      boardRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' });
+      boardRef.current?.parentElement?.scrollIntoView({ behavior: 'instant', block: 'start' });
     }
   }, [run?.phase, run?.depth, view]);
 
@@ -212,7 +212,10 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div
+      className={`app-shell ${run ? 'is-playing' : 'is-lobby'} ${view === 'chronicle' ? 'show-chronicle' : ''}`}
+      data-phase={run?.phase ?? 'setup'}
+    >
       <header className="site-header">
         <a
           className="brand"
@@ -252,10 +255,20 @@ export default function App() {
             </small>
           </button>
         </nav>
-        <button aria-label="How to play" className="help-button" onClick={() => setModal('help')}>
-          <Icon name="info" size={17} />
-          <span>How to play</span>
-        </button>
+        <div className="header-tools">
+          <button
+            aria-label="Open journal"
+            className="journal-shortcut"
+            onClick={() => setModal('journal')}
+          >
+            <Icon name="book" size={17} />
+            <span>Journal</span>
+          </button>
+          <button aria-label="How to play" className="help-button" onClick={() => setModal('help')}>
+            <Icon name="info" size={17} />
+            <span>How to play</span>
+          </button>
+        </div>
       </header>
 
       {warning && (
@@ -279,9 +292,13 @@ export default function App() {
         ) : (
           <>
             <section className="page-intro">
+              {!run && <div className="hero-atmosphere" aria-hidden="true" />}
               <div>
                 <div className="eyebrow intro-eyebrow">
-                  <span className="tiny-line" /> A TURN-BASED TALE OF THE LAST LIGHT
+                  <span className="tiny-line" />{' '}
+                  {run
+                    ? `${CHAPTERS[chapter].name.toUpperCase()} · ${run.phase === 'combat' ? 'THE ENCOUNTER' : 'THE EXPEDITION'}`
+                    : 'A TURN-BASED TALE OF THE LAST LIGHT'}
                 </div>
                 <h1>
                   {!run ? (
@@ -313,6 +330,26 @@ export default function App() {
                         ? CHAPTERS[chapter].memory
                         : CHAPTERS[chapter].passage}
                 </p>
+                {!run && (
+                  <div className="hero-actions">
+                    <button
+                      className="primary-button"
+                      onClick={() =>
+                        document.getElementById('expedition-builder')?.scrollIntoView({
+                          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                            ? 'instant'
+                            : 'smooth',
+                          block: 'start',
+                        })
+                      }
+                    >
+                      Prepare your journey <Icon name="arrow" size={17} />
+                    </button>
+                    <button className="hero-rules" onClick={() => setModal('help')}>
+                      <Icon name="book" size={17} /> A keeper’s guide
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="journey-metadata">
                 <span className="edition-badge">
@@ -356,7 +393,19 @@ export default function App() {
               </div>
             )}
 
-            <div className="game-layout">
+            {!run && (
+              <div className="builder-heading" id="expedition-builder">
+                <div>
+                  <span className="eyebrow">THE NEXT CHAPTER IS YOURS</span>
+                  <h2>A road worth remembering.</h2>
+                </div>
+                <span>
+                  <Icon name="flame" size={16} />
+                  Every choice leaves a little light.
+                </span>
+              </div>
+            )}
+            <div className={`game-layout ${run ? 'play-layout' : 'launch-layout'}`}>
               <div className="game-main" ref={boardRef}>
                 {run?.atlas && run.phase !== 'map' && (
                   <details className="atlas-fold">
@@ -409,6 +458,13 @@ export default function App() {
               >
                 {!run ? (
                   <>
+                    <div className="setup-section-label">
+                      <span>01</span>
+                      <div>
+                        <small>CHOOSE YOUR JOURNEY</small>
+                        <h2>Where does your story begin?</h2>
+                      </div>
+                    </div>
                     <div className="expedition-picker" role="group" aria-label="Choose expedition">
                       <button
                         aria-pressed={expedition === 'classic'}
@@ -433,7 +489,7 @@ export default function App() {
                       >
                         <Icon name="compass" size={19} />
                         <span>
-                          The Lost Atlas <i>NEW</i>
+                          The Lost Atlas <i>EXPLORE</i>
                           <small>Real terrain. A hidden world.</small>
                         </span>
                       </button>
@@ -456,7 +512,7 @@ export default function App() {
                       />
                     )}
                     <div className="sidebar-heading">
-                      <span className="eyebrow">EVERY STORY NEEDS A KEEPER</span>
+                      <span className="eyebrow">02 · CHOOSE YOUR KEEPER</span>
                       <h2>Who carries the ember?</h2>
                     </div>
                     <div className="keeper-picker" role="group" aria-label="Choose your keeper">
@@ -464,12 +520,16 @@ export default function App() {
                         <button
                           key={id}
                           className={`keeper-option ${keeper === id ? 'selected' : ''}`}
+                          aria-label={KEEPERS[id].title.replace('The ', '')}
                           aria-pressed={keeper === id}
                           disabled={atlasLoading}
                           onClick={() => setKeeper(id)}
                         >
-                          <KeeperArt keeper={id} />
-                          <span>{KEEPERS[id].title.replace('The ', '')}</span>
+                          <KeeperPortrait keeper={id} />
+                          <span>
+                            <small>{KEEPERS[id].name}</small>
+                            {KEEPERS[id].title.replace('The ', '')}
+                          </span>
                           <i>{keeper === id ? <Icon name="check" size={10} /> : null}</i>
                         </button>
                       ))}
@@ -505,20 +565,8 @@ export default function App() {
                       <span className="keeper-style">{KEEPERS[keeper].style}</span>
                     </div>
                     <div className="start-section">
-                      <button
-                        className="primary-button"
-                        onClick={start}
-                        disabled={
-                          atlasLoading ||
-                          (expedition === 'atlas' && !offlineAtlas && atlasArea.trim().length < 2)
-                        }
-                      >
-                        {atlasLoading ? 'Preparing your atlas…' : 'Begin expedition'}{' '}
-                        <Icon name="arrow" size={18} />
-                      </button>
-                      <span className="start-note">A complete adventure · saved as you play</span>
                       <label className="seed-label" htmlFor="journey-seed">
-                        Journey seed <span>optional</span>
+                        Journey seed <span>optional · the same word, the same road</span>
                       </label>
                       <input
                         disabled={atlasLoading}
@@ -528,6 +576,20 @@ export default function App() {
                         value={seed}
                         onChange={(e) => setSeed(e.target.value)}
                       />
+                      <button
+                        className="primary-button"
+                        onClick={start}
+                        disabled={
+                          atlasLoading ||
+                          (expedition === 'atlas' && !offlineAtlas && atlasArea.trim().length < 2)
+                        }
+                      >
+                        {atlasLoading ? 'Preparing your atlas…' : 'Begin expedition'}
+                        <Icon name="arrow" size={18} />
+                      </button>
+                      <span className="start-note">
+                        <Icon name="check" size={13} /> Your progress is saved after every move.
+                      </span>
                     </div>
                     <div className="lore-note">
                       <Icon name="book" size={18} />
@@ -693,7 +755,10 @@ export default function App() {
               setView('journey');
               setModal(null);
               requestAnimationFrame(() =>
-                boardRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' }),
+                boardRef.current?.parentElement?.scrollIntoView({
+                  behavior: 'instant',
+                  block: 'start',
+                }),
               );
             }}
           />
@@ -730,7 +795,7 @@ function KeeperPanel({ run }: { run: Run }) {
     <div className="keeper-panel">
       <div className="keeper-mini">
         <div className="portrait-frame">
-          <KeeperArt keeper={run.keeper} />
+          <KeeperPortrait keeper={run.keeper} />
         </div>
         <div>
           <span className="eyebrow">YOUR KEEPER</span>
@@ -839,12 +904,12 @@ function Combat({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) 
         </div>
         <div className="combat-figures">
           <div className="hero-figure">
-            <KeeperArt keeper={run.keeper} />
+            <KeeperPortrait keeper={run.keeper} />
             <span>{k.name}</span>
           </div>
           <div className="versus">✧</div>
           <div className="enemy-display">
-            <EnemyFigure key={`${run.depth}-${run.turn}`} art={e.art} />
+            <EnemyPortrait art={e.art} />
             <div className="enemy-vitals">
               <div>
                 <span>{e.name}</span>

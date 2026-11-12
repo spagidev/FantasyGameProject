@@ -9,6 +9,7 @@ const types = {
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.md': 'text/plain; charset=utf-8',
@@ -64,4 +65,10 @@ assert.equal(
   (await worker.fetch(new Request('https://emberwake.example/api/atlas'), {})).status,
   405,
 );
-console.log('Verified Worker HTML, JavaScript assets, and API routing.');
+for (const file of ['emberwake-world', 'keepers', 'adversaries', 'realms']) {
+  const art = await worker.fetch(new Request(`https://emberwake.example/art/${file}.webp`), {});
+  assert.equal(art.status, 200, `Worker must bundle ${file} artwork`);
+  assert.equal(art.headers.get('Content-Type'), 'image/webp');
+  assert.ok((await art.arrayBuffer()).byteLength > 1000, 'Bundled art must not be empty');
+}
+console.log('Verified Worker HTML, JavaScript, original artwork, and API routing.');

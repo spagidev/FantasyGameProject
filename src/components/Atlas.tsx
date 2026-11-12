@@ -85,6 +85,19 @@ export function AtlasMap({
           <small>VEYR</small>
         </span>
       </div>
+      {next && movable && (
+        <p className="atlas-next">
+          <Icon name="flag" size={15} />
+          {canEnter ? (
+            'Your next encounter is here.'
+          ) : (
+            <>
+              Next: {charted(state, next.id) ? next.name : 'an echo in the mist'} ·{' '}
+              {bearing(state.position, next.id, state)}. Walk the connected roads to reach it.
+            </>
+          )}
+        </p>
+      )}
       <div className={`atlas-canvas ${zoom ? 'atlas-zoomed' : ''}`}>
         <svg
           viewBox={viewBox}
@@ -424,19 +437,6 @@ export function AtlasMap({
               {run.phase === 'won' || run.phase === 'lost'
                 ? 'This expedition has ended. Its chart remains in your journal.'
                 : 'Resolve the encounter to walk the roads again.'}
-            </p>
-          )}
-          {next && movable && (
-            <p className="atlas-next">
-              <Icon name="flag" size={15} />
-              {canEnter ? (
-                'Your next encounter is here.'
-              ) : (
-                <>
-                  Next: {charted(state, next.id) ? next.name : 'an echo in the mist'} ·{' '}
-                  {bearing(state.position, next.id, state)}. Walk the connected roads to reach it.
-                </>
-              )}
             </p>
           )}
           <details className="atlas-index">

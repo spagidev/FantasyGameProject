@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import type { EnemyArt, KeeperId } from '../game/data';
 
+/** Each realm occupies one strip of the locally bundled painted atlas. */
 export function Landscape({
   chapter = 0,
   className = '',
@@ -8,96 +9,19 @@ export function Landscape({
   chapter?: number;
   className?: string;
 }) {
-  const id = useId().replace(/:/g, '');
-  const palette =
-    chapter === 0
-      ? ['#637c72', '#203d3a', '#132e2c', '#0f2426']
-      : chapter === 1
-        ? ['#787a93', '#353f57', '#243042', '#192735']
-        : ['#8b7964', '#4b453c', '#31362f', '#1b2b29'];
   return (
     <svg
       className={`landscape ${className}`}
-      viewBox="0 0 1000 680"
+      viewBox="0 0 1024 512"
       preserveAspectRatio="xMidYMid slice"
       aria-hidden="true"
     >
-      <defs>
-        <linearGradient id={`${id}sky`} x2="0" y2="1">
-          <stop stopColor={palette[0]} stopOpacity=".4" />
-          <stop offset="1" stopColor="#122628" />
-        </linearGradient>
-        <radialGradient id={`${id}sun`}>
-          <stop stopColor="#f2d29a" stopOpacity=".45" />
-          <stop offset=".28" stopColor="#d6be8d" stopOpacity=".15" />
-          <stop offset="1" stopColor="#d6be8d" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id={`${id}water`} x2="0" y2="1">
-          <stop stopColor="#578078" stopOpacity=".2" />
-          <stop offset="1" stopColor="#122427" stopOpacity="0" />
-        </linearGradient>
-        <filter id={`${id}mist`}>
-          <feGaussianBlur stdDeviation="14" />
-        </filter>
-      </defs>
-      <rect width="1000" height="680" fill={`url(#${id}sky)`} />
-      <ellipse cx="540" cy="180" rx="260" ry="240" fill={`url(#${id}sun)`} />
-      <circle cx="540" cy="170" r="56" fill="#dabd83" opacity=".24" />
-      <circle cx="540" cy="170" r="72" fill="none" stroke="#dbc38e" opacity=".13" />
-      <path
-        d="M0 260 60 240 105 280 170 200 230 256 297 175 345 236 423 190 480 258 557 210 600 256 667 169 737 240 800 180 872 240 950 198 1000 252V680H0Z"
-        fill={palette[1]}
+      <image
+        href="/art/realms.webp"
+        width="1024"
+        height="1536"
+        y={-512 * Math.max(0, Math.min(2, chapter))}
       />
-      <path
-        d="M0 332 80 288 160 346 235 309 319 351 390 285 443 337 517 301 604 360 679 300 752 323 848 275 930 320 1000 290V680H0Z"
-        fill={palette[2]}
-      />
-      <g fill={palette[1]} opacity=".8">
-        <path d="M448 320V175h24v-33h23v33h22v145h-16V205h-36v115Z" />
-        <path d="M456 175 482 116 509 175Z" />
-        <path d="M663 325V208h14v-18h19v18h19v132h-13V235h-25v90Z" />
-        <path d="M517 287Q586 214 663 274v21Q590 247 517 310Z" />
-      </g>
-      <path d="M380 380Q540 330 706 393L879 680H170Z" fill={`url(#${id}water)`} />
-      <g stroke="#c8d1aa" strokeWidth="1" opacity=".13">
-        <path d="M429 422h173m-215 21h264m-227 33h200m-310 34h360m-389 46h435m-406 32h380m-448 42h500" />
-      </g>
-      <g fill={palette[3]}>
-        {Array.from({ length: 18 }, (_, i) => {
-          const x = i < 9 ? i * 35 - 35 : 700 + (i - 9) * 42;
-          const h = 100 + ((i * 47) % 130);
-          const y = 365 + ((i * 17) % 70);
-          return (
-            <g key={i}>
-              <path d={`M${x} ${y}l28 -${h} 28 ${h - 15}h-15l28 48h-72l25 -44Z`} />
-              <path d={`M${x + 26} ${y - 50}v150h5v-150Z`} />
-            </g>
-          );
-        })}
-        <path d="M0 485Q115 440 271 530L330 680H0Z" />
-        <path d="M1000 460Q846 483 766 570L710 680h290Z" />
-      </g>
-      <g fill="#091c20">
-        <path d="M0 0h38l18 150 39 115-35-34 39 180-37-38 18 307H0Z" />
-        <path d="M1000 0h-37l-17 150-65 97 49-28-34 156 32-37-18 342h90Z" />
-      </g>
-      <g fill="none" stroke="#0a1e20" strokeWidth="9">
-        <path d="m35 154 85-74 53-12m-68 23 4-60M953 123l-70-75-66-21m73 35-2-62" />
-      </g>
-      <g filter={`url(#${id}mist)`} fill="#a3bfb0" opacity=".065">
-        <ellipse cx="380" cy="385" rx="240" ry="18" />
-        <ellipse cx="730" cy="480" rx="240" ry="20" />
-      </g>
-      <g fill="#e9c38c" opacity=".65">
-        {Array.from({ length: 22 }, (_, i) => (
-          <circle
-            key={i}
-            cx={80 + ((i * 137) % 860)}
-            cy={110 + ((i * 79) % 500)}
-            r={i % 3 === 0 ? 1.8 : 0.9}
-          />
-        ))}
-      </g>
     </svg>
   );
 }
@@ -288,4 +212,18 @@ export function EnemyFigure({ art }: { art: EnemyArt }) {
       </g>
     </svg>
   );
+}
+
+/** Decorative original painted portraits; adjacent UI provides names and statistics. */
+export function KeeperPortrait({
+  keeper,
+  className = '',
+}: {
+  keeper: KeeperId;
+  className?: string;
+}) {
+  return <span aria-hidden="true" className={`keeper-portrait portrait-${keeper} ${className}`} />;
+}
+export function EnemyPortrait({ art }: { art: EnemyArt }) {
+  return <span aria-hidden="true" className={`enemy-portrait enemy-portrait-${art}`} />;
 }
