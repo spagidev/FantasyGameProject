@@ -1,4 +1,4 @@
-import geography from '../../public/atlas/saltbound.json';
+import geography from './atlas-geography.json' with { type: 'json' };
 import type { Run } from './engine';
 
 export type Point = [number, number];

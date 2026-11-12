@@ -61,8 +61,15 @@ def route(a,b):
     return {'a':a,'b':b,'metres':round(cost[end]),'points':[project(nodes[n]) for n in reversed(path)]}
 pairs=list(zip([p[0] for p in locations[:12]],[p[0] for p in locations[1:13]]))
 pairs += [('origin','cache'),('cache','haven'),('haven','hearth'),('cache','bell1'),('watch','market'),('market','kiln'),('ferry','watch'),('bell2','ferry'),('bell2','moths'),('lens','bell3'),('bell3','garden'),('garden','spring'),('spring','lookout')]
+unique=[]; seen_pairs=set()
+for a,b in pairs:
+    key=tuple(sorted([a,b]))
+    if key not in seen_pairs: unique.append((a,b));seen_pairs.add(key)
+pairs=unique
 pack={'version':1,'bounds':bounds,'width':1000,'height':810,'land':land,'features':features,'points':points,'anchors':anchors,'edges':[route(a,b) for a,b in pairs], 'source':{'project':'OpenStreetMap','mirror':'https://github.com/graphhopper/graphhopper/blob/a1f15bac86c14457f31655c822e8ed4f018d2dc7/core/files/monaco.osm.gz','sha256':hashlib.sha256(source.read_bytes()).hexdigest(),'snapshot':'2012-06','licence':'ODbL-1.0'}}
 out=Path('public/atlas');out.mkdir(parents=True,exist_ok=True)
 (out/'saltbound.json').write_text(json.dumps(pack,separators=(',',':'))+'\n')
 (out/'source.osm.gz').write_bytes(source.read_bytes())
 print(f'{len(features)} features, {len(points)} sites, {len(pairs)} connected roads; {(out/"saltbound.json").stat().st_size} bytes')
+# Vite source import and directly downloadable ODbL database use identical bytes.
+Path('src/game/atlas-geography.json').write_bytes((out/'saltbound.json').read_bytes())

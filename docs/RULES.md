@@ -118,3 +118,17 @@ Every successful state transition autosaves locally in the browser, alongside di
 The journal menu exports the complete local save as JSON. Import accepts version 1 and version 2 journals up to 64 KB, validates the same invariants as local saves, and previews the keeper and profile before replacement. Selecting a file never replaces progress; the player must choose **Restore this journal**. Imported histories replace rather than merge, avoiding duplicate completed-run counts. Nothing is uploaded. A player with blocked storage can still export the current in-memory journal.
 
 Current saves use `emberwake.save.v2`. If that slot does not exist, the game checks the previous `emberwake.save.v1` slot. A valid old save is normalized to format 2 with `ruleset: 1`, empty site/lesson lists, and unchanged health, coins, enemy, focus, turn, and profile. Future battles in that run use the original patterns and original progression. The old storage slot remains untouched as a backup. Starting a new run always uses ruleset 2. Format versions are separate from the campaign ruleset so an exported classic crossing remains classic when imported elsewhere.
+
+## The Lost Atlas · optional format-2 exploration state
+
+Selecting Lost Atlas starts a ruleset-2 run with an additional version-1 `atlas` object. The original First Crossing omits that object and retains its existing lane choices. Existing v1 and v2 journals are accepted unchanged.
+
+On the Atlas, `atlas-move` is legal only in the map phase and only along an edge adjacent to the current location. Movement increments roads walked and records newly visited sites/road IDs, but gives no health, coins, focus or waylight income. Fog is derived deterministically from the visited positions and traversed road geometry. A charted site may be inspected; it cannot be entered from a distance.
+
+Each of the twelve encounters has a geographic location, depth and lane. The next encounter is enterable only at its location; later encounters are sealed, and earlier ones cannot be replayed. Actual encounter entry uses the existing engine, including one-time waylight crossing income, combat, rewards, talents, camp and trader rules. Movement and map naming/collection are blocked during encounters and after the ending. The Atlas can be unfolded during an encounter without advancing it.
+
+The Arena of Echoes gives 18 coins once; the Porcelain Spring gives one flask once (requires fewer than five flasks); the Rose Hearth heals up to 12 and adds one attack once. Walking past a gift does not collect it. Collected sites remain exhausted across revisits and journal reloads.
+
+Players may submit one nonempty place name per bell count (0, 1, 2, 3) while in the map phase. Correct recognition, including supported alternative spelling, gives two attack once and reveals the hidden haven’s location. Wrong guesses change no stats; the next bell opens another attempt. Recognition does not collect the haven or move the player. It is optional; all three keepers have a tested complete path without it.
+
+The region, positions, site IDs, road IDs, collection IDs, attempt stages, strings and counters are bounded and validated when reading a journal. The entire format-2 journal remains under the existing 64 KB import limit. Map data is a checked-in OSM-derived historical chart; it is never downloaded from community tile services during play.

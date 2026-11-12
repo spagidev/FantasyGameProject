@@ -11,7 +11,11 @@ async function readRun(page: Page): Promise<Run> {
   return page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).run, SAVE_KEY);
 }
 async function clickAction(page: Page, run: Run, action: Action) {
-  if (action.type === 'travel') {
+  if (action.type === 'atlas-move') {
+    await page.locator(`[data-destination="${action.to}"]`).click();
+  } else if (action.type === 'travel' && run.atlas) {
+    await page.getByRole('button', { name: 'Enter encounter' }).click();
+  } else if (action.type === 'travel') {
     const node = nodeAt(run.seed, run.depth + 1, action.lane);
     await page.locator('.route-choice').filter({ hasText: node.name }).first().click();
   } else if (action.type === 'talent') {
@@ -337,4 +341,74 @@ test('journal export/import restores an exact turn and rejects invalid files', a
   await restoredPage.reload();
   expect(await readRun(restoredPage)).toEqual(original);
   await newContext.close();
+});
+
+test('Lost Atlas completes a real-road campaign, persists its fog, and keeps maps local', async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  const errors: string[] = [],
+    external: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('request', (req) => {
+    if (!req.url().startsWith('http://127.0.0.1:4173') && !req.url().startsWith('data:'))
+      external.push(req.url());
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: /The Lost Atlas/ }).click();
+  await expect(page.getByRole('heading', { name: 'The Saltbound Coast' })).toBeVisible();
+  await page.getByLabel('Journey seed').fill('the-atlas-crossing');
+  await page.getByRole('button', { name: /Begin expedition/ }).click();
+  await expect(page.locator('.atlas-discovery')).toContainText('1/17');
+  await page.locator('[data-destination="watch"]').click();
+  const explored = await readRun(page);
+  await page.screenshot({ path: 'test-results/atlas-first-discovery.png', fullPage: true });
+  await page.reload();
+  expect(await readRun(page)).toEqual(explored);
+  let run = await readRun(page),
+    moves = 0;
+  while (!['won', 'lost'].includes(run.phase) && moves++ < 240) {
+    const action = campaignAction(run);
+    await clickAction(page, run, action);
+    const next = await readRun(page);
+    expect(next).not.toEqual(run);
+    run = next;
+  }
+  expect(run.phase).toBe('won');
+  expect(run.bells).toBe(3);
+  expect(run.atlas?.recognized).toBe(false);
+  await page.locator('.atlas-fold summary').click();
+  await page.getByRole('button', { name: 'Show whole chart' }).click();
+  await page.screenshot({ path: 'test-results/atlas-complete.png', fullPage: true });
+  expect(errors).toEqual([]);
+  expect(external).toEqual([]);
+});
+
+test('Lost Atlas recognition, keyboard roads, mobile layout and accessible controls', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await page.getByRole('button', { name: /The Lost Atlas/ }).click();
+  await page.getByRole('button', { name: /Begin expedition/ }).click();
+  await page.getByLabel('Does this coast feel familiar?').fill('Monaco');
+  await page.getByRole('button', { name: 'Remember its name' }).click();
+  const recognized = await readRun(page);
+  expect(recognized.atlas?.recognized).toBe(true);
+  expect(recognized.attack).toBe(9);
+  await expect(page.getByRole('heading', { name: 'Monaco remembers.' })).toBeVisible();
+  const road = page.locator('[data-destination="cache"]');
+  await road.focus();
+  await page.keyboard.press('Enter');
+  expect((await readRun(page)).atlas?.position).toBe('cache');
+  await page.getByRole('button', { name: 'Gather this kindness' }).click();
+  expect((await readRun(page)).coins).toBe(53);
+  await expect(page.getByText('This kindness is already gathered.')).toBeVisible();
+  await page.screenshot({ path: 'test-results/atlas-mobile.png', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(accessibility.violations).toEqual([]);
+  const saved = await readRun(page);
+  await page.reload();
+  expect(await readRun(page)).toEqual(saved);
 });

@@ -2,7 +2,7 @@
 
 A browser fantasy adventure about the things worth remembering. Carry a stolen ember through three fallen realms, awaken their bells, and choose what becomes of a world without a sun.
 
-**Play at your own pace.** Every battle is turn based, every enemy intention is visible, and every move is saved on your device. No account, server, paid mechanics, or external runtime services.
+**Play at your own pace.** Every battle is turn based, every enemy intention is visible, and every move is saved on your device. No paid mechanics or external gameplay services. The private hosted version requires your ChatGPT sign-in.
 
 ![Emberwake: the Sunken Reach expedition map](docs/emberwake.png)
 
@@ -43,6 +43,18 @@ Browser tests use `/usr/bin/chromium` when present. On other machines, run `npx 
 - Responsive layouts, keyboard controls, reduced-motion support, native accessible dialogs, and locally bundled fonts and original SVG artwork.
 
 In combat, use the action buttons or keys **1–4**. Your action resolves first, then poison, then the enemy's visible intention. **Guard lasts one enemy action. Flasks also end your turn.** Open “How to play” for the complete introduction.
+
+## The Lost Atlas · v0.3
+
+Select **The Lost Atlas** above the keeper choices, then **Begin expedition**. Existing journeys resume as before; use **Leave this expedition** and confirm if you want to start the new mode instead. Export your current Journal first to keep both journeys.
+
+The Saltbound Coast is a complete new expedition on a real OpenStreetMap region, rendered as a forgotten fantasy realm. Walk the connected roads to uncover the terrain. Reach and resolve twelve encounters, awaken three bells, and collect optional supplies on side paths. Your road history and uncovered chart save with the expedition. Previously explored terrain stays visible; walking back does not generate income.
+
+Shorelines, harbours, old streets and gardens preserve their real shapes, but every landmark has a fantasy identity. Field notes offer clues. If you recognize the place beneath the veil, name it in the journal: a correct answer grants +2 attack once and charts a hidden hearth. There is one attempt per bell stage, no damage for a wrong answer, and the full campaign is winnable without recognition. The haven can also be found by exploring.
+
+The map has a keeper zoom and a whole-chart view. Direction/distance road buttons and a landmark index support keyboard and mobile play. All terrain is bundled: no tile API, GPS permission, external map requests or API key is needed during play. See [the concept and implementation plan](docs/LOST_ATLAS.md) for research and future charts. The first chart is deliberately curated; this release does not support arbitrary worldwide locations.
+
+Geographic data: © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/). The downloadable [geographic database, source and provenance](public/atlas/NOTICE.md) are distributed separately from the original fiction and game code. The chart uses a historical snapshot, not current navigation data. Rebuild deterministically with `python3 scripts/build-atlas.py public/atlas/source.osm.gz`.
 
 ## Roads Rekindled · v0.2
 

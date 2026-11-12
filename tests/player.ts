@@ -1,3 +1,4 @@
+import { atlasObjective, atlasPack } from '../src/game/atlas';
 import { EVENTS, type EventOption, type RelicId } from '../src/game/data';
 import {
   canBuy,
@@ -64,7 +65,27 @@ export function bestCombatAction(run: Run): Action {
 export function campaignAction(r: Run): Action {
   if (r.phase === 'talent') return { type: 'talent', id: availableTalents(r)[0] };
   if (r.phase === 'combat') return bestCombatAction(r);
-  if (r.phase === 'map') return { type: 'travel', lane: nextNodes(r)[0].lane };
+  if (r.phase === 'map') {
+    if (r.atlas && !nextNodes(r).length) {
+      const target = atlasObjective(r)!.id;
+      const queue = [[r.atlas.position]],
+        seen = new Set(queue[0]);
+      while (queue.length) {
+        const path = queue.shift()!,
+          last = path.at(-1)!;
+        if (last === target) return { type: 'atlas-move', to: path[1] };
+        for (const edge of atlasPack.edges) {
+          const next = edge.a === last ? edge.b : edge.b === last ? edge.a : null;
+          if (next && !seen.has(next)) {
+            seen.add(next);
+            queue.push([...path, next]);
+          }
+        }
+      }
+      throw new Error('Atlas objective is unreachable');
+    }
+    return { type: 'travel', lane: nextNodes(r)[0].lane };
+  }
   if (r.phase === 'reward') {
     const priority: RelicId[] = ['dawn', 'thread', 'hearthseed', 'mothglass', 'psalm', 'briar'];
     return { type: 'reward', id: priority.find((id) => r.rewards.includes(id)) ?? 'heal' };

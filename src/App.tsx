@@ -45,6 +45,7 @@ import { Modal } from './components/Modal';
 import { RouteMap } from './components/RouteMap';
 import { Journal } from './components/Journal';
 import { Scout, TalentChoice, WaylightsPanel } from './components/Strategy';
+import { AtlasMap, AtlasJournal } from './components/Atlas';
 
 function load(): { save: Save; warning: string } {
   try {
@@ -75,6 +76,9 @@ export default function App() {
   const [warning, setWarning] = useState(loaded.warning);
   const [keeper, setKeeper] = useState<KeeperId>(loaded.save.profile.lastKeeper);
   const [seed, setSeed] = useState('');
+  const [expedition, setExpedition] = useState<'classic' | 'atlas'>(
+    loaded.save.run?.atlas ? 'atlas' : 'classic',
+  );
   const [view, setView] = useState<'journey' | 'chronicle'>('journey');
   const [modal, setModal] = useState<'help' | 'abandon' | 'journal' | null>(null);
   const [saved, setSaved] = useState(false);
@@ -146,7 +150,7 @@ export default function App() {
       : crypto.getRandomValues(new Uint32Array(1))[0];
     setSave((s) => ({
       ...s,
-      run: newRun(keeper, newSeed),
+      run: newRun(keeper, newSeed, expedition === 'atlas'),
       profile: { ...s.profile, lastKeeper: keeper },
     }));
     setView('journey');
@@ -190,7 +194,7 @@ export default function App() {
             </small>
           </button>
         </nav>
-        <button className="help-button" onClick={() => setModal('help')}>
+        <button aria-label="How to play" className="help-button" onClick={() => setModal('help')}>
           <Icon name="info" size={17} />
           <span>How to play</span>
         </button>
@@ -291,8 +295,18 @@ export default function App() {
 
             <div className="game-layout">
               <div className="game-main" ref={boardRef}>
+                {run?.atlas && run.phase !== 'map' && (
+                  <details className="atlas-fold">
+                    <summary>Unfold the atlas · return to your chart after this encounter</summary>
+                    <AtlasMap run={run} onInspect={setScouted} />
+                  </details>
+                )}
                 {!run || run.phase === 'map' ? (
-                  <RouteMap run={run} onInspect={setScouted} />
+                  run?.atlas || (!run && expedition === 'atlas') ? (
+                    <AtlasMap run={run} dispatch={dispatch} onInspect={setScouted} />
+                  ) : (
+                    <RouteMap run={run} onInspect={setScouted} />
+                  )
                 ) : run.phase === 'combat' ? (
                   <Combat run={run} dispatch={dispatch} />
                 ) : run.phase === 'reward' ? (
@@ -330,6 +344,27 @@ export default function App() {
               >
                 {!run ? (
                   <>
+                    <div className="expedition-picker" role="group" aria-label="Choose expedition">
+                      <button
+                        aria-pressed={expedition === 'classic'}
+                        onClick={() => setExpedition('classic')}
+                      >
+                        <Icon name="flame" size={18} />
+                        <span>
+                          The First Crossing<small>The original adventure</small>
+                        </span>
+                      </button>
+                      <button
+                        aria-pressed={expedition === 'atlas'}
+                        onClick={() => setExpedition('atlas')}
+                      >
+                        <Icon name="compass" size={19} />
+                        <span>
+                          The Lost Atlas <i>NEW</i>
+                          <small>Real terrain. A hidden world.</small>
+                        </span>
+                      </button>
+                    </div>
                     <div className="sidebar-heading">
                       <span className="eyebrow">EVERY STORY NEEDS A KEEPER</span>
                       <h2>Who carries the ember?</h2>
@@ -406,7 +441,9 @@ export default function App() {
                 ) : (
                   <>
                     <KeeperPanel run={run} />
-                    {run.phase === 'map' ? (
+                    {run.atlas ? (
+                      <AtlasJournal run={run} dispatch={dispatch} />
+                    ) : run.phase === 'map' ? (
                       <div className="route-choices">
                         <span className="eyebrow">THE ROAD AHEAD</span>
                         <h3>Choose your path</h3>
@@ -1250,6 +1287,20 @@ function Help() {
         You carry the last ember through three realms. Awaken their bells, discover why the sun went
         dark, and choose how the story ends.
       </p>
+      <div className="help-step">
+        <span>✦</span>
+        <div>
+          <h3>The Lost Atlas</h3>
+          <p>
+            Choose The Lost Atlas before beginning to explore a fantasy world drawn over real
+            OpenStreetMap terrain. Walk connected roads to uncover the veil. Reach the next
+            encounter, scout it, then enter. Resolve twelve encounters and awaken three bells. Side
+            paths hide supplies; each gift can be gathered once. If you recognize the real place,
+            name it in the field journal for +2 attack and a hidden hearth’s location. One guess per
+            bell stage; recognition is optional. Your atlas saves with your journal.
+          </p>
+        </div>
+      </div>
       <div className="help-step">
         <span>01</span>
         <div>
