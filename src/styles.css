@@ -1756,11 +1756,11 @@ input::placeholder {
   padding: 15px;
   border: 1px solid #9ba685;
   border-radius: 50%;
-  color: #826a3f;
+  color: #6b5636;
   flex-shrink: 0;
 }
 .atlas-seal small {
-  font-size: 7px;
+  font-size: 8px;
   letter-spacing: 3px;
 }
 .atlas-area-hint {
@@ -4610,7 +4610,7 @@ input::placeholder {
     height: 24px;
   }
   .atlas-seal small {
-    font-size: 6px;
+    font-size: 8px;
   }
   .atlas-next {
     font-size: 10px;

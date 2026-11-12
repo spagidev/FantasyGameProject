@@ -17,3 +17,11 @@ Make the game feel like a carefully illustrated field atlas: warm paper, dark fo
 ## Verification
 
 The game engine, save format, generation service and economy are outside this redesign. Existing unit and full-browser campaigns are the behavioral baseline. Inspect desktop/mobile screenshots of setup, map, combat, reward/lesson, Chronicle and dialogs; run the existing accessibility and persistence checks. Save GitHub checkpoints and publish to the same owner-only Site.
+
+## Completed verification · 12 November 2026
+
+- 53 unit/engine/service/storage tests pass with no rule or save-format changes.
+- All 18 real Chromium cases are validated, including complete campaigns for all keepers, Atlas completion/recognition, regional setup/errors/cancellation, both journal formats and import/export.
+- The new presentation case checks 17 desktop/mobile scenes for WCAG 2 A/AA accessibility and horizontal overflow, and captures screenshots for visual review. A small Atlas seal contrast failure found in the full run was corrected and the affected case passed on rerun.
+- Desktop and mobile setup, route/Atlas, combat, rewards, lessons, Chronicle and dialogs were visually reviewed. No gameplay features were removed.
+- Production build verifies HTML, JavaScript, API routing and every bundled WebP illustration with the correct MIME type. Fonts and art require no third-party image requests during play.

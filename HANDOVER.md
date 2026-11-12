@@ -1,8 +1,17 @@
-# Emberwake · Regional Atlas checkpoint (v0.4.0)
+# Emberwake · The illuminated atlas checkpoint (v0.5.0)
 
 ## Latest user request
 
-The user asked to name a country or administrative region before starting, with an unknown city inside it still requiring recognition. They prioritized **Slovakia and all eight kraje**, with eventual worldwide coverage. This continues the earlier authorization to implement, save GitHub checkpoints, and publish to the existing owner-only Site. Do not publish cloud environment configuration. No reliable quota telemetry is exposed; do not invent readings and obey any user stop signal.
+Rework all UI and UX with a beautiful, premium fantasy presentation while retaining every feature. This continues the authorization to save GitHub checkpoints and publish to the existing owner-only Site. The earlier regional Atlas priority remains Slovakia and its eight kraje, with worldwide lookup supported by the existing pipeline. Do not publish cloud environment configuration. No reliable quota telemetry is exposed; do not invent readings and obey any user stop signal.
+
+## Implemented in v0.5
+
+- Replaced the accumulated stylesheet with a coherent parchment / forest ink / copper system, Cormorant display type, responsive layouts and accessible interactive states.
+- Original locally bundled WebP paintings: opening world scene, three keeper portraits, four adversary portraits and three realm landscapes. Masters remain in `/workspace/generated_images`; provenance is in `public/art/NOTICE.md`. The SVG landscape uses a clipped sprite strip to preserve the correct realm painting at every aspect ratio.
+- Cinematic lobby, direct prepare action, numbered setup, portrait keeper selection, seed before departure. Both campaigns, country/region setup, eight kraje, offline source, loading/cancellation/errors remain intact.
+- Compact active-run introduction, larger working board and keeper sidebar. Mobile keeper condition sits before the board and stays visible while scrolling. Atlas objective is above the chart. Header Journal shortcut complements the existing footer action.
+- Reworked combat arena, readable exact intent, action cards, all encounter/reward/talent/end screens, inventory, Chronicle and every dialog. Engine, service, economy and save format are unchanged.
+- `tests/presentation.spec.ts` exercises actual saved campaign scenes on desktop/mobile, takes screenshots and checks accessibility/overflow. Existing behavioral tests remain unchanged. Worker packaging now validates all four artwork assets and their MIME types.
 
 ## Implemented in v0.4
 
@@ -17,7 +26,7 @@ The user asked to name a country or administrative region before starting, with 
 
 ## Validation and limits
 
-53 unit/engine/service/storage tests passed, including all eight region aliases, area-membership queries, caching, source errors, generated topology, city-only recognition, journal round-trips and full campaigns. Browser cases cover all original campaigns plus regional setup, hidden city, reload/export, provider errors, cancellation and mobile accessibility; all 17 browser cases passed (14 unchanged cases plus the three affected cases rerun after fixes).
+53 unit/engine/service/storage tests passed. All 18 browser cases are validated: 17 passed in the full run, followed by the affected mobile Atlas case and the expanded presentation case passing after its seal contrast correction. The presentation case checks 17 desktop/mobile scenes with WCAG 2 A/AA Axe checks and no horizontal overflow, including combat, reward, event, camp, shop, talents, both ending states, Chronicle and dialogs. All three keeper campaigns and the Atlas campaign complete through real Chromium. Existing save migration, import/export, regional setup, cancellation and recognition tests are preserved. Strict TypeScript, production Worker asset verification, formatting and diff checks pass. Screenshots are generated in `test-results/`; README shows the redesigned lobby.
 
 The Sites preview relay still times out. Existing Playwright tests exercise the app; new service/UI integration tests use controlled OSM fixtures. The managed environment blocks live Overpass access, so live regional map generation is not established by these fixture tests. Production deployment success is verified separately. Do not claim every city worldwide works. Human Slovak playtesting is the next useful check.
 

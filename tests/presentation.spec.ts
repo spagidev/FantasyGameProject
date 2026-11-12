@@ -10,6 +10,8 @@ function scenes() {
     steps = 0;
   while (!['won', 'lost'].includes(run.phase) && steps++ < 220) {
     if (!found.has(run.phase)) found.set(run.phase, run);
+    if (run.phase === 'map' && run.depth === 1)
+      found.set('camp', transition(run, { type: 'travel', lane: run.lane === 2 ? 2 : 0 }));
     run = transition(
       run,
       run.phase === 'map' && run.depth === 1 ? { type: 'travel', lane: 1 } : campaignAction(run),
@@ -56,7 +58,17 @@ test('illustrated presentation keeps every decision readable and accessible acro
     await page.screenshot({ path: `test-results/redesign/${name}.png`, fullPage: true });
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
-  for (const phase of ['combat', 'reward', 'event', 'shop', 'talent', 'ending', 'won', 'lost']) {
+  for (const phase of [
+    'combat',
+    'reward',
+    'event',
+    'camp',
+    'shop',
+    'talent',
+    'ending',
+    'won',
+    'lost',
+  ]) {
     expect(states.has(phase), `fixture includes ${phase}`).toBe(true);
     await loadScene(page, states.get(phase)!);
     await inspect(phase + '-desktop');
@@ -67,7 +79,7 @@ test('illustrated presentation keeps every decision readable and accessible acro
   await inspect('journal-desktop');
   await page.keyboard.press('Escape');
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const phase of ['combat', 'reward', 'talent']) {
+  for (const phase of ['combat', 'reward', 'camp', 'talent']) {
     await loadScene(page, states.get(phase)!);
     await inspect(phase + '-mobile');
   }

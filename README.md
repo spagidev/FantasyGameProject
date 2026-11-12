@@ -4,7 +4,7 @@ A browser fantasy adventure about the things worth remembering. Carry a stolen e
 
 **Play at your own pace.** Every battle is turn based, every enemy intention is visible, and every move is saved on your device. No paid mechanics. Regional chart preparation uses OpenStreetMap services; play then uses the saved chart. The private hosted version requires your ChatGPT sign-in.
 
-![Emberwake: the Sunken Reach expedition map](docs/emberwake.png)
+![Emberwake: the illuminated atlas interface](docs/emberwake.png)
 
 ## Play and develop
 
@@ -39,10 +39,18 @@ Browser tests use `/usr/bin/chromium` when present. On other machines, run `npx 
 - **Two complete endings** and a persistent nine-entry chronicle.
 - **Reproducible journeys:** enter the same seed word for the same route, events, and relic offers.
 - **Local autosave:** reload to resume the exact turn. Browser storage failures are reported without preventing play.
-- **Portable journals:** export or restore a validated save file to carry the expedition between browsers. Open “Journal” in the footer; files stay on your device.
-- Responsive layouts, keyboard controls, reduced-motion support, native accessible dialogs, and locally bundled fonts and original SVG artwork.
+- **Portable journals:** export or restore a validated save file to carry the expedition between browsers. Open “Journal” in the header or footer; files stay on your device.
+- Responsive layouts, keyboard controls, reduced-motion support, native accessible dialogs, and locally bundled fonts, original painted landscapes and character portraits.
 
 In combat, use the action buttons or keys **1–4**. Your action resolves first, then poison, then the enemy's visible intention. **Guard lasts one enemy action. Flasks also end your turn.** Open “How to play” for the complete introduction.
+
+## The illuminated atlas · v0.5
+
+A complete interface redesign gives Emberwake the feel of an illustrated field atlas: forest-green ink, warm parchment, antique copper and generous serif typography. Original paintings depict the three realms, all three keepers and four adversary identities. Artwork and fonts are bundled locally.
+
+The opening leads into a numbered expedition builder with both journey types, regional setup, keeper portraits and the optional seed. Active expeditions use a compact context header, a larger encounter/map area and a keeper panel; on phones the keeper's health and supplies stay above the board while you scroll. The Atlas objective appears before the chart. Combat separates the arena, exact enemy intent and four action cards. Rewards, lessons, stories, traders, sanctuaries, the Chronicle and journal dialogs share the new visual system.
+
+All rules, map features, regional choices, keyboard controls and existing journals are preserved. See [the redesign plan and verification](docs/UI_REDESIGN.md).
 
 ## Choose your country or region · v0.4
 
