@@ -1,3 +1,4 @@
+import { applyAtlasAction, atlasSite, newAtlas, type AtlasAction, type AtlasState } from './atlas';
 import {
   CHAPTERS,
   EVENTS,
@@ -36,6 +37,7 @@ export type MapNode = {
 };
 export type Run = {
   version: 2;
+  atlas?: AtlasState;
   ruleset: 1 | 2;
   seed: number;
   keeper: KeeperId;
@@ -64,6 +66,7 @@ export type Run = {
   talents: TalentId[];
 };
 export type Action =
+  | AtlasAction
   | { type: 'travel'; lane: number }
   | { type: 'strike' | 'guard' | 'skill' | 'flask' }
   | { type: 'reward'; id: RelicId | 'heal' }
@@ -81,10 +84,11 @@ export function hash(seed: number, index: number): number {
   return (n ^ (n >>> 15)) >>> 0;
 }
 
-export function newRun(keeper: KeeperId, seed: number): Run {
+export function newRun(keeper: KeeperId, seed: number, atlas = false): Run {
   const k = KEEPERS[keeper];
   return {
     version: 2,
+    ...(atlas ? { atlas: newAtlas() } : {}),
     ruleset: 2,
     seed: seed >>> 0,
     keeper,
@@ -154,6 +158,10 @@ export function nodeAt(seed: number, depth: number, lane: number): MapNode {
 export function nextNodes(run: Run): MapNode[] {
   if (run.phase !== 'map' || run.depth >= 11) return [];
   const d = run.depth + 1;
+  if (run.atlas) {
+    const site = atlasSite(run.atlas.position);
+    return site.depth === d ? [nodeAt(run.seed, d, site.lane!)] : [];
+  }
   return (d % 4 === 3 ? [1] : [0, 1, 2])
     .filter((l) => d % 4 === 0 || Math.abs(l - run.lane) <= 1)
     .map((l) => nodeAt(run.seed, d, l));
@@ -340,6 +348,12 @@ function victory(r: Run) {
 }
 
 export function transition(run: Run, action: Action): Run {
+  if (
+    action.type === 'atlas-move' ||
+    action.type === 'atlas-name' ||
+    action.type === 'atlas-collect'
+  )
+    return applyAtlasAction(run, action);
   const r = structuredClone(run);
   if (action.type === 'travel') {
     if (!nextNodes(r).some((n) => n.lane === action.lane)) return run;

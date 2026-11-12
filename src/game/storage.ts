@@ -1,3 +1,4 @@
+import { validAtlas } from './atlas';
 import { KEEPERS, LORE, RELICS, TALENTS, WAYLIGHTS, type KeeperId } from './data';
 import type { Run } from './engine';
 
@@ -81,6 +82,13 @@ export function validRun(x: unknown): x is Run {
     !x.talents.every(
       (id) => Object.hasOwn(TALENTS, id) && TALENTS[id as keyof typeof TALENTS].keeper === x.keeper,
     )
+  )
+    return false;
+  if (
+    x.atlas !== undefined &&
+    (!validAtlas(x.atlas) ||
+      x.ruleset !== 2 ||
+      x.atlas.attempts.some((g) => g.bell > (x.bells as number)))
   )
     return false;
   if (x.ruleset === 1 && (x.waylights.length || x.talents.length || x.phase === 'talent'))
