@@ -30,7 +30,14 @@ export function createAtlasService(fetcher: typeof fetch = fetch) {
     if (memory.has(key)) return memory.get(key)!;
     const cache = (globalThis as unknown as { caches?: { default?: Cache } }).caches?.default;
     const cacheKey = new Request(`${origin}/__atlas-cache/${key}`);
-    const cached = await cache?.match(cacheKey);
+    // Some private Site Workers expose Cache API but do not grant default-cache access.
+    // Treat edge caching as an optimization so a denied cache read cannot block atlas lookup.
+    let cached: Response | undefined;
+    try {
+      cached = await cache?.match(cacheKey);
+    } catch {
+      /* Continue through the bounded in-memory cache and the map provider. */
+    }
     if (cached) {
       const data = (await cached.json()) as OsmResponse;
       remember(key, data);
