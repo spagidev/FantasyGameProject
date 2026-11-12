@@ -1,3 +1,5 @@
+import { validRegionalChart, type RegionalChart } from './atlas/types';
+import { AtlasSetup, RegionalAtlasPreview } from './components/AtlasSetup';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CHAPTERS,
@@ -79,6 +81,11 @@ export default function App() {
   const [expedition, setExpedition] = useState<'classic' | 'atlas'>(
     loaded.save.run?.atlas ? 'atlas' : 'classic',
   );
+  const [atlasArea, setAtlasArea] = useState('Slovakia');
+  const [offlineAtlas, setOfflineAtlas] = useState(false);
+  const [atlasLoading, setAtlasLoading] = useState(false);
+  const [atlasError, setAtlasError] = useState('');
+  const atlasRequest = useRef<AbortController | null>(null);
   const [view, setView] = useState<'journey' | 'chronicle'>('journey');
   const [modal, setModal] = useState<'help' | 'abandon' | 'journal' | null>(null);
   const [saved, setSaved] = useState(false);
@@ -144,13 +151,61 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [run?.phase, modal, scouted, view, dispatch]);
 
-  function start() {
+  function cancelAtlas() {
+    atlasRequest.current?.abort();
+    atlasRequest.current = null;
+    setAtlasLoading(false);
+  }
+  useEffect(() => () => atlasRequest.current?.abort(), []);
+  async function start() {
+    if (atlasRequest.current) return;
     const newSeed = seed.trim()
       ? seedFrom(seed.trim())
       : crypto.getRandomValues(new Uint32Array(1))[0];
+    let selectedChart: boolean | RegionalChart = expedition === 'atlas';
+    if (expedition === 'atlas' && !offlineAtlas) {
+      const controller = new AbortController();
+      atlasRequest.current = controller;
+      setAtlasLoading(true);
+      setAtlasError('');
+      const timeout = setTimeout(() => controller.abort(), 110000);
+      try {
+        const response = await fetch('/api/atlas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ region: atlasArea.trim(), seed: newSeed }),
+          signal: controller.signal,
+        });
+        const data = await response.json();
+        if (!response.ok || !validRegionalChart(data.chart))
+          throw new Error(
+            typeof data.error === 'string'
+              ? data.error
+              : 'The returned map could not be read. Please try again.',
+          );
+        if (atlasRequest.current !== controller || controller.signal.aborted) return;
+        selectedChart = data.chart;
+      } catch (error) {
+        if (atlasRequest.current === controller)
+          setAtlasError(
+            controller.signal.aborted
+              ? 'Map preparation was cancelled or timed out. Your saved journey has not changed.'
+              : error instanceof Error
+                ? error.message
+                : 'The map could not be prepared. Please try again.',
+          );
+        return;
+      } finally {
+        clearTimeout(timeout);
+        if (atlasRequest.current === controller) {
+          atlasRequest.current = null;
+          setAtlasLoading(false);
+        }
+      }
+    }
     setSave((s) => ({
       ...s,
-      run: newRun(keeper, newSeed, expedition === 'atlas'),
+      run: newRun(keeper, newSeed, selectedChart),
       profile: { ...s.profile, lastKeeper: keeper },
     }));
     setView('journey');
@@ -185,7 +240,10 @@ export default function App() {
           </button>
           <button
             className={view === 'chronicle' ? 'nav-item active' : 'nav-item'}
-            onClick={() => setView('chronicle')}
+            onClick={() => {
+              cancelAtlas();
+              setView('chronicle');
+            }}
           >
             <Icon name="book" />
             <span>Chronicle</span>
@@ -307,7 +365,9 @@ export default function App() {
                   </details>
                 )}
                 {!run || run.phase === 'map' ? (
-                  run?.atlas || (!run && expedition === 'atlas') ? (
+                  !run && expedition === 'atlas' && !offlineAtlas ? (
+                    <RegionalAtlasPreview area={atlasArea} />
+                  ) : run?.atlas || (!run && expedition === 'atlas') ? (
                     <AtlasMap run={run} dispatch={dispatch} onInspect={setScouted} />
                   ) : (
                     <RouteMap run={run} onInspect={setScouted} />
@@ -352,7 +412,11 @@ export default function App() {
                     <div className="expedition-picker" role="group" aria-label="Choose expedition">
                       <button
                         aria-pressed={expedition === 'classic'}
-                        onClick={() => setExpedition('classic')}
+                        disabled={atlasLoading}
+                        onClick={() => {
+                          setExpedition('classic');
+                          setAtlasError('');
+                        }}
                       >
                         <Icon name="flame" size={18} />
                         <span>
@@ -361,7 +425,11 @@ export default function App() {
                       </button>
                       <button
                         aria-pressed={expedition === 'atlas'}
-                        onClick={() => setExpedition('atlas')}
+                        disabled={atlasLoading}
+                        onClick={() => {
+                          setExpedition('atlas');
+                          setAtlasError('');
+                        }}
                       >
                         <Icon name="compass" size={19} />
                         <span>
@@ -370,6 +438,23 @@ export default function App() {
                         </span>
                       </button>
                     </div>
+                    {expedition === 'atlas' && (
+                      <AtlasSetup
+                        area={atlasArea}
+                        onArea={(v) => {
+                          setAtlasArea(v);
+                          setAtlasError('');
+                        }}
+                        offline={offlineAtlas}
+                        onOffline={(v) => {
+                          setOfflineAtlas(v);
+                          setAtlasError('');
+                        }}
+                        loading={atlasLoading}
+                        error={atlasError}
+                        onCancel={cancelAtlas}
+                      />
+                    )}
                     <div className="sidebar-heading">
                       <span className="eyebrow">EVERY STORY NEEDS A KEEPER</span>
                       <h2>Who carries the ember?</h2>
@@ -380,6 +465,7 @@ export default function App() {
                           key={id}
                           className={`keeper-option ${keeper === id ? 'selected' : ''}`}
                           aria-pressed={keeper === id}
+                          disabled={atlasLoading}
                           onClick={() => setKeeper(id)}
                         >
                           <KeeperArt keeper={id} />
@@ -419,14 +505,23 @@ export default function App() {
                       <span className="keeper-style">{KEEPERS[keeper].style}</span>
                     </div>
                     <div className="start-section">
-                      <button className="primary-button" onClick={start}>
-                        Begin expedition <Icon name="arrow" size={18} />
+                      <button
+                        className="primary-button"
+                        onClick={start}
+                        disabled={
+                          atlasLoading ||
+                          (expedition === 'atlas' && !offlineAtlas && atlasArea.trim().length < 2)
+                        }
+                      >
+                        {atlasLoading ? 'Preparing your atlas…' : 'Begin expedition'}{' '}
+                        <Icon name="arrow" size={18} />
                       </button>
                       <span className="start-note">A complete adventure · saved as you play</span>
                       <label className="seed-label" htmlFor="journey-seed">
                         Journey seed <span>optional</span>
                       </label>
                       <input
+                        disabled={atlasLoading}
                         id="journey-seed"
                         maxLength={64}
                         placeholder="A word to shape your road…"

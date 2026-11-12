@@ -1,3 +1,5 @@
+import { normalizePlace } from '../atlas/regions';
+import { validRegionalChart, type Geography, type RegionalChart } from '../atlas/types';
 import geography from './atlas-geography.json' with { type: 'json' };
 import type { Run } from './engine';
 
@@ -156,17 +158,46 @@ export const ATLAS_SITES: AtlasSite[] = [
     clue: 'A crescent shore, a prince’s rock, two harbours and a palace of chance: this is one of the smallest countries on Earth.',
   },
 ];
-export const atlasPack = geography as unknown as {
-  width: number;
-  height: number;
-  land: Point[];
-  features: { id: string; kind: string; points: Point[] }[];
-  points: Record<string, Point>;
-  edges: { a: string; b: string; metres: number; points: Point[] }[];
-};
+export const atlasPack = geography as unknown as Geography;
+const regionalNames = [
+  'The Ashen Gate',
+  'The Briar Watch',
+  'The House of Unsent Letters',
+  'The Quiet Hearth',
+  'The First Remembering',
+  'The Cinder Yard',
+  'The Moth Archive',
+  'The Lantern Exchange',
+  'The Glass Citadel',
+  'The Starless Observatory',
+  'The Garden of Borrowed Moons',
+  'The Rootbound Sanctuary',
+  'The Palace of Fallen Stars',
+  'The Fallen Treasury',
+  'The Rose Hearth',
+  'The Porcelain Spring',
+  'The Windward Beacon',
+];
+export const atlasGeography = (a?: AtlasState): Geography => a?.chart ?? atlasPack;
+export const atlasSites = (a?: AtlasState): AtlasSite[] =>
+  a?.chart
+    ? ATLAS_SITES.map((site, i) => ({
+        ...site,
+        name: regionalNames[i],
+        clue: a.chart!.clues[site.id],
+      }))
+    : ATLAS_SITES;
+export function cloneAtlasRun<T extends { atlas?: AtlasState }>(run: T): T {
+  const chart = run.atlas?.chart;
+  if (!chart) return structuredClone(run);
+  const copy = structuredClone({ ...run, atlas: { ...run.atlas!, chart: undefined } }) as T;
+  copy.atlas!.chart = chart; // geography is immutable; avoid copying it for every combat action
+  return copy;
+}
 export type AtlasState = {
   version: 1;
-  region: 'saltbound';
+  region: 'saltbound' | 'regional';
+  chart?: RegionalChart;
   position: string;
   visited: string[];
   roads: number[];
@@ -179,10 +210,11 @@ export type AtlasAction =
   | { type: 'atlas-move'; to: string }
   | { type: 'atlas-collect' }
   | { type: 'atlas-name'; name: string };
-export function newAtlas(): AtlasState {
+export function newAtlas(chart?: RegionalChart): AtlasState {
   return {
     version: 1,
-    region: 'saltbound',
+    region: chart ? 'regional' : 'saltbound',
+    ...(chart ? { chart } : {}),
     position: 'origin',
     visited: ['origin'],
     roads: [],
@@ -192,10 +224,12 @@ export function newAtlas(): AtlasState {
     attempts: [],
   };
 }
-export const atlasSite = (id: string) => ATLAS_SITES.find((s) => s.id === id)!;
-export const atlasObjective = (run: Run) => ATLAS_SITES.find((s) => s.depth === run.depth + 1);
+export const atlasSite = (id: string, state?: AtlasState) =>
+  atlasSites(state).find((s) => s.id === id)!;
+export const atlasObjective = (run: Run) =>
+  atlasSites(run.atlas).find((s) => s.depth === run.depth + 1);
 export function atlasNeighbours(state: AtlasState) {
-  return atlasPack.edges.flatMap((e, index) =>
+  return atlasGeography(state).edges.flatMap((e, index) =>
     e.a === state.position
       ? [{ id: e.b, index, ...e }]
       : e.b === state.position
@@ -204,17 +238,19 @@ export function atlasNeighbours(state: AtlasState) {
   );
 }
 export function charted(state: AtlasState, id: string) {
-  const p = atlasPack.points[id];
+  const pack = atlasGeography(state);
+  const p = pack.points[id];
   if (state.visited.includes(id) || (state.recognized && id === 'haven')) return true;
   const pts = [
-    ...state.visited.map((n) => atlasPack.points[n]),
-    ...state.roads.flatMap((i) => atlasPack.edges[i].points),
+    ...state.visited.map((n) => pack.points[n]),
+    ...state.roads.flatMap((i) => pack.edges[i].points),
   ];
   return pts.some((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) <= 85);
 }
-export function bearing(from: string, to: string) {
-  const a = atlasPack.points[from],
-    b = atlasPack.points[to];
+export function bearing(from: string, to: string, state?: AtlasState) {
+  const pack = atlasGeography(state);
+  const a = pack.points[from],
+    b = pack.points[to];
   const angle = ((Math.atan2(b[0] - a[0], a[1] - b[1]) * 180) / Math.PI + 360) % 360;
   return ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'][
     Math.round(angle / 45) % 8
@@ -222,7 +258,7 @@ export function bearing(from: string, to: string) {
 }
 export function applyAtlasAction(run: Run, action: AtlasAction): Run {
   if (!run.atlas || run.phase !== 'map') return run;
-  const r = structuredClone(run),
+  const r = cloneAtlasRun(run),
     a = r.atlas!;
   let message = '';
   if (action.type === 'atlas-move') {
@@ -232,13 +268,15 @@ export function applyAtlasAction(run: Run, action: AtlasAction): Run {
     a.steps++;
     if (!a.visited.includes(action.to)) a.visited.push(action.to);
     if (!a.roads.includes(edge.index)) a.roads.push(edge.index);
-    message = `You reach ${atlasSite(action.to).name}. A little more of the world returns.`;
+    message = `You reach ${atlasSite(action.to, a).name}. A little more of the world returns.`;
   } else if (action.type === 'atlas-collect') {
-    const site = atlasSite(a.position);
+    const site = atlasSite(a.position, a);
     if (a.collected.includes(site.id)) return run;
     if (site.kind === 'cache') {
       r.coins += 18;
-      message = 'The arena gives back 18 forgotten coins.';
+      message = a.chart
+        ? 'The treasury gives back 18 forgotten coins.'
+        : 'The arena gives back 18 forgotten coins.';
     } else if (site.kind === 'haven') {
       r.health = Math.min(r.maxHealth, r.health + 12);
       r.attack++;
@@ -252,19 +290,18 @@ export function applyAtlasAction(run: Run, action: AtlasAction): Run {
     const name = action.name.trim().slice(0, 80);
     if (!name || a.recognized || a.attempts.some((g) => g.bell === r.bells)) return run;
     a.attempts.push({ bell: r.bells, name });
-    const normalized = name
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z]/g, '');
-    if (
-      ['monaco', 'montecarlo', 'principalityofmonaco', 'monacoville', 'monacomontecarlo'].includes(
-        normalized,
-      )
-    ) {
+    const normalized = normalizePlace(name);
+    const aliases = a.chart?.aliases ?? [
+      'monaco',
+      'montecarlo',
+      'principalityofmonaco',
+      'monacoville',
+      'monacomontecarlo',
+    ];
+    if (aliases.some((alias) => normalizePlace(alias) === normalized)) {
       a.recognized = true;
       r.attack += 2;
-      message = 'Monaco. Beneath Veyr, the Earth remembers. +2 attack; the Rose Hearth is charted.';
+      message = `${a.chart?.city ?? 'Monaco'}. Beneath Veyr, the Earth remembers. +2 attack; the Rose Hearth is charted.`;
     } else message = 'The name does not settle. Ring another bell before naming this land again.';
   }
   r.log = [...r.log, message].slice(-8);
@@ -273,6 +310,11 @@ export function applyAtlasAction(run: Run, action: AtlasAction): Run {
 export function validAtlas(x: unknown): x is AtlasState {
   if (typeof x !== 'object' || x === null || Array.isArray(x)) return false;
   const a = x as AtlasState;
+  if (!(
+    (a.region === 'saltbound' && a.chart === undefined) ||
+    (a.region === 'regional' && validRegionalChart(a.chart))
+  ))
+    return false;
   const list = (v: unknown, max: number): v is string[] =>
     Array.isArray(v) &&
     v.length <= max &&
@@ -280,7 +322,6 @@ export function validAtlas(x: unknown): x is AtlasState {
     v.every((id) => typeof id === 'string' && ATLAS_SITES.some((s) => s.id === id));
   return (
     a.version === 1 &&
-    a.region === 'saltbound' &&
     typeof a.position === 'string' &&
     ATLAS_SITES.some((s) => s.id === a.position) &&
     list(a.visited, 17) &&
@@ -291,9 +332,9 @@ export function validAtlas(x: unknown): x is AtlasState {
       (id) => ['cache', 'haven', 'spring'].includes(id) && a.visited.includes(id),
     ) &&
     Array.isArray(a.roads) &&
-    a.roads.length <= atlasPack.edges.length &&
+    a.roads.length <= atlasGeography(a).edges.length &&
     new Set(a.roads).size === a.roads.length &&
-    a.roads.every((n) => Number.isInteger(n) && n >= 0 && n < atlasPack.edges.length) &&
+    a.roads.every((n) => Number.isInteger(n) && n >= 0 && n < atlasGeography(a).edges.length) &&
     Number.isInteger(a.steps) &&
     a.steps >= 0 &&
     a.steps <= 100000 &&

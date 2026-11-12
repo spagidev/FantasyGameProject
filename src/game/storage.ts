@@ -4,7 +4,7 @@ import type { Run } from './engine';
 
 export const SAVE_KEY = 'emberwake.save.v2';
 export const LEGACY_SAVE_KEY = 'emberwake.save.v1';
-export const MAX_SAVE_BYTES = 64 * 1024;
+export const MAX_SAVE_BYTES = 2 * 1024 * 1024;
 export type Profile = { runs: number; wins: number; lore: string[]; lastKeeper: KeeperId };
 export type Save = { version: 2; run: Run | null; profile: Profile };
 export function emptySave(): Save {

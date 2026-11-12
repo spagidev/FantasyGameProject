@@ -356,6 +356,7 @@ test('Lost Atlas completes a real-road campaign, persists its fog, and keeps map
   });
   await page.goto('/');
   await page.getByRole('button', { name: /The Lost Atlas/ }).click();
+  await page.getByRole('button', { name: 'Original offline chart', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'The Saltbound Coast' })).toBeVisible();
   await page.getByLabel('Journey seed').fill('the-atlas-crossing');
   await page.getByRole('button', { name: /Begin expedition/ }).click();
@@ -390,6 +391,7 @@ test('Lost Atlas recognition, keyboard roads, mobile layout and accessible contr
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await page.getByRole('button', { name: /The Lost Atlas/ }).click();
+  await page.getByRole('button', { name: 'Original offline chart', exact: true }).click();
   await page.getByRole('button', { name: /Begin expedition/ }).click();
   await page.getByLabel('Does this coast feel familiar?').fill('Monaco');
   await page.getByRole('button', { name: 'Remember its name' }).click();
@@ -411,4 +413,81 @@ test('Lost Atlas recognition, keyboard roads, mobile layout and accessible contr
   const saved = await readRun(page);
   await page.reload();
   expect(await readRun(page)).toEqual(saved);
+});
+
+test('a chosen Slovak kraj starts a hidden city, city-only recognition survives journal reload', async ({
+  page,
+}) => {
+  const { regionalFixture } = await import('./atlas-fixture');
+  const chart = regionalFixture();
+  const requested: string[] = [];
+  await page.route('**/api/atlas', async (route) => {
+    requested.push(route.request().postDataJSON().region);
+    await route.fulfill({ json: { chart } });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: /The Lost Atlas/ }).click();
+  await expect(page.getByLabel('Country or region', { exact: true })).toHaveValue('Slovakia');
+  await page.getByLabel('Country or region', { exact: true }).fill('Bratislavsky kraj');
+  await expect(page.locator('main')).not.toContainText('Testovce');
+  await page.getByRole('button', { name: /Begin expedition/ }).click();
+  await expect(page.getByText('Hidden city · Bratislavský kraj', { exact: true })).toBeVisible();
+  expect(requested).toEqual(['Bratislavsky kraj']);
+  await expect(page.locator('main')).not.toContainText('Testovce');
+  await expect(page.locator('main')).not.toContainText('Monaco');
+  const generated = await readRun(page);
+  expect(generated.atlas?.region).toBe('regional');
+  await page.reload();
+  expect(await readRun(page)).toEqual(generated);
+  await page.getByLabel('Which city lies beneath the veil?').fill('Test City');
+  await page.getByRole('button', { name: 'Remember its name' }).click();
+  await expect(page.getByRole('heading', { name: 'Testovce remembers.' })).toBeVisible();
+  expect((await readRun(page)).attack).toBe(generated.attack + 2);
+  await page.getByRole('button', { name: /Journal/ }).click();
+  const downloadEvent = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Download journal/ }).click();
+  const download = await downloadEvent;
+  const journal = JSON.parse(await readFile((await download.path())!, 'utf8'));
+  expect(journal.run.atlas.chart).toEqual(chart);
+});
+
+test('regional setup lists all eight kraje, handles unavailable maps and permits cancellation without creating a run', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/atlas', (route) =>
+    route.fulfill({ status: 422, json: { error: 'The map provider is busy. Try again later.' } }),
+  );
+  await page.goto('/');
+  await page.getByRole('button', { name: /The Lost Atlas/ }).click();
+  await page.getByText('Slovakia · choose one of the eight kraje', { exact: true }).click();
+  const regionButtons = page.locator('.slovak-regions button');
+  expect(await regionButtons.count()).toBe(9);
+  await page.getByRole('button', { name: 'Košický kraj', exact: true }).click();
+  await expect(page.getByLabel('Country or region', { exact: true })).toHaveValue('Košický kraj');
+  await page.getByRole('button', { name: /Begin expedition/ }).click();
+  await expect(page.getByRole('alert')).toContainText('provider is busy');
+  expect(
+    await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).run, SAVE_KEY),
+  ).toBeNull();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(accessibility.violations).toEqual([]);
+  await page.screenshot({ path: 'test-results/regional-setup-mobile.png', fullPage: true });
+  await page.unroute('**/api/atlas');
+  let pending: (() => void) | undefined;
+  await page.route('**/api/atlas', async (route) => {
+    await new Promise<void>((resolve) => {
+      pending = resolve;
+    });
+    await route.fulfill({ json: { error: 'cancelled' } }).catch(() => {});
+  });
+  await page.getByRole('button', { name: /Begin expedition/ }).click();
+  await expect(page.getByRole('status')).toContainText('Charting an unknown city');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  pending?.();
+  await expect(page.getByRole('button', { name: /Begin expedition/ })).toBeEnabled();
+  expect(
+    await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).run, SAVE_KEY),
+  ).toBeNull();
 });

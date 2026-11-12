@@ -1,4 +1,4 @@
-import { atlasObjective, atlasPack } from '../src/game/atlas';
+import { atlasObjective, atlasGeography } from '../src/game/atlas';
 import { EVENTS, type EventOption, type RelicId } from '../src/game/data';
 import {
   canBuy,
@@ -74,7 +74,7 @@ export function campaignAction(r: Run): Action {
         const path = queue.shift()!,
           last = path.at(-1)!;
         if (last === target) return { type: 'atlas-move', to: path[1] };
-        for (const edge of atlasPack.edges) {
+        for (const edge of atlasGeography(r.atlas).edges) {
           const next = edge.a === last ? edge.b : edge.b === last ? edge.a : null;
           if (next && !seen.has(next)) {
             seen.add(next);

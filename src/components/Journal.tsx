@@ -10,9 +10,7 @@ export function Journal({ save, onRestore }: { save: Save; onRestore: (save: Sav
   const request = useRef(0);
 
   function download() {
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(save, null, 2)], { type: 'application/json' }),
-    );
+    const url = URL.createObjectURL(new Blob([JSON.stringify(save)], { type: 'application/json' }));
     const link = document.createElement('a');
     link.href = url;
     link.download = `emberwake-${save.run ? save.run.seed.toString(36) : 'journal'}.json`;
@@ -32,7 +30,7 @@ export function Journal({ save, onRestore }: { save: Save; onRestore: (save: Sav
     setError('');
     setStatus('');
     if (file.size > MAX_SAVE_BYTES) {
-      setError('This file is too large. Choose an Emberwake journal smaller than 64 KB.');
+      setError('This file is too large. Choose an Emberwake journal smaller than 2 MB.');
       return;
     }
     try {
@@ -68,7 +66,7 @@ export function Journal({ save, onRestore }: { save: Save; onRestore: (save: Sav
           <Icon name="thread" size={20} />
           <strong>Choose a journal file</strong>
         </span>
-        <small>Emberwake .json · up to 64 KB · stays on your device</small>
+        <small>Emberwake .json · up to 2 MB · stays on your device</small>
         <input
           type="file"
           accept=".json,application/json"

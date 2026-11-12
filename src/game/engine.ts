@@ -1,4 +1,12 @@
-import { applyAtlasAction, atlasSite, newAtlas, type AtlasAction, type AtlasState } from './atlas';
+import type { RegionalChart } from '../atlas/types';
+import {
+  applyAtlasAction,
+  atlasSite,
+  newAtlas,
+  cloneAtlasRun,
+  type AtlasAction,
+  type AtlasState,
+} from './atlas';
 import {
   CHAPTERS,
   EVENTS,
@@ -84,11 +92,15 @@ export function hash(seed: number, index: number): number {
   return (n ^ (n >>> 15)) >>> 0;
 }
 
-export function newRun(keeper: KeeperId, seed: number, atlas = false): Run {
+export function newRun(
+  keeper: KeeperId,
+  seed: number,
+  atlas: boolean | RegionalChart = false,
+): Run {
   const k = KEEPERS[keeper];
   return {
     version: 2,
-    ...(atlas ? { atlas: newAtlas() } : {}),
+    ...(atlas ? { atlas: newAtlas(typeof atlas === 'object' ? atlas : undefined) } : {}),
     ruleset: 2,
     seed: seed >>> 0,
     keeper,
@@ -159,7 +171,7 @@ export function nextNodes(run: Run): MapNode[] {
   if (run.phase !== 'map' || run.depth >= 11) return [];
   const d = run.depth + 1;
   if (run.atlas) {
-    const site = atlasSite(run.atlas.position);
+    const site = atlasSite(run.atlas.position, run.atlas);
     return site.depth === d ? [nodeAt(run.seed, d, site.lane!)] : [];
   }
   return (d % 4 === 3 ? [1] : [0, 1, 2])
@@ -354,7 +366,7 @@ export function transition(run: Run, action: Action): Run {
     action.type === 'atlas-collect'
   )
     return applyAtlasAction(run, action);
-  const r = structuredClone(run);
+  const r = cloneAtlasRun(run);
   if (action.type === 'travel') {
     if (!nextNodes(r).some((n) => n.lane === action.lane)) return run;
     const benefits = roadBenefits(r);

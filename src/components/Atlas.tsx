@@ -1,7 +1,8 @@
 import { useEffect, useId, useState } from 'react';
 import {
   ATLAS_SITES,
-  atlasPack,
+  atlasGeography,
+  atlasSites,
   atlasSite,
   atlasObjective,
   atlasNeighbours,
@@ -41,20 +42,22 @@ export function AtlasMap({
   onInspect?: (node: MapNode) => void;
 }) {
   const state = run?.atlas ?? newAtlas();
-  const current = atlasSite(state.position);
+  const pack = atlasGeography(state);
+  const sites = atlasSites(state);
+  const current = atlasSite(state.position, state);
   const [selected, setSelected] = useState(state.position);
   const [zoom, setZoom] = useState(true);
   const uid = useId().replace(/:/g, '');
   useEffect(() => setSelected(state.position), [state.position]);
-  const site = atlasSite(selected);
-  const p = atlasPack.points[state.position];
+  const site = atlasSite(selected, state);
+  const p = pack.points[state.position];
   const neighbours = atlasNeighbours(state);
   const movable = !!run && run.phase === 'map';
   const next = run ? atlasObjective(run) : ATLAS_SITES[1];
   const canEnter = movable && current.depth === run!.depth + 1;
-  const seen = ATLAS_SITES.filter((s) => charted(state, s.id));
-  const fogPoints = state.visited.map((id) => atlasPack.points[id]);
-  if (state.recognized) fogPoints.push(atlasPack.points.haven);
+  const seen = sites.filter((s) => charted(state, s.id));
+  const fogPoints = state.visited.map((id) => pack.points[id]);
+  if (state.recognized) fogPoints.push(pack.points.haven);
   const canCollect =
     ['cache', 'haven', 'spring'].includes(current.kind) && !state.collected.includes(current.id);
   const viewBox = zoom
@@ -65,7 +68,12 @@ export function AtlasMap({
       <div className="atlas-heading">
         <div>
           <span className="eyebrow">THE LOST ATLAS · CHART I</span>
-          <h2>{state.recognized ? 'Monaco, beneath the veil' : 'The Saltbound Coast'}</h2>
+          <h2>
+            {state.recognized
+              ? `${state.chart?.city ?? 'Monaco'}, beneath the veil`
+              : (state.chart?.title ?? 'The Saltbound Coast')}
+          </h2>
+          {state.chart && <span className="atlas-area-hint">Hidden city · {state.chart.area}</span>}
           <p>
             {run
               ? 'The world has forgotten its name. Its shape remembers.'
@@ -130,7 +138,7 @@ export function AtlasMap({
                 {state.roads.map((i) => (
                   <polyline
                     key={i}
-                    points={line(atlasPack.edges[i].points)}
+                    points={line(pack.edges[i].points)}
                     fill="none"
                     stroke="white"
                     strokeWidth="170"
@@ -159,36 +167,46 @@ export function AtlasMap({
           <g mask={`url(#${uid}known)`}>
             <rect width="1000" height="810" fill="#315956" />
             <rect width="1000" height="810" fill={`url(#${uid}sea)`} />
-            <polygon
-              points={line(atlasPack.land)}
-              fill="#bcb18c"
-              stroke="#e6d1a3"
-              strokeWidth="5"
-              strokeLinejoin="round"
-            />
-            <polygon points={line(atlasPack.land)} fill={`url(#${uid}paper)`} />
-            {atlasPack.features.map((f) =>
-              f.kind === 'road' ? (
+            {(pack.lands ?? [pack.land]).map((land, i) => (
+              <g key={i}>
+                <polygon
+                  points={line(land)}
+                  fill="#bcb18c"
+                  stroke="#e6d1a3"
+                  strokeWidth="5"
+                  strokeLinejoin="round"
+                />
+                <polygon points={line(land)} fill={`url(#${uid}paper)`} />
+              </g>
+            ))}
+            {pack.features.map((f) =>
+              ['road', 'river', 'coast'].includes(f.kind) ? (
                 <polyline
                   key={f.id}
                   points={line(f.points)}
                   fill="none"
-                  stroke="#766f56"
-                  strokeWidth="1.7"
+                  stroke={f.kind === 'road' ? '#766f56' : '#315956'}
+                  strokeWidth={f.kind === 'river' ? 7 : f.kind === 'coast' ? 3 : 1.7}
                   opacity=".5"
                 />
               ) : (
                 <polygon
                   key={f.id}
                   points={line(f.points)}
-                  fill={f.kind === 'grove' ? `url(#${uid}trees)` : '#8b876a'}
+                  fill={
+                    f.kind === 'grove'
+                      ? `url(#${uid}trees)`
+                      : f.kind === 'water'
+                        ? '#315956'
+                        : '#8b876a'
+                  }
                   stroke={f.kind === 'grove' ? '#65734f' : '#79765f'}
                   strokeWidth=".6"
-                  opacity={f.kind === 'grove' ? '.9' : '.45'}
+                  opacity={f.kind === 'grove' || f.kind === 'water' ? '.9' : '.45'}
                 />
               ),
             )}
-            {atlasPack.edges.map((e, i) => (
+            {pack.edges.map((e, i) => (
               <polyline
                 key={i}
                 points={line(e.points)}
@@ -211,11 +229,11 @@ export function AtlasMap({
             aria-hidden="true"
           >
             <text x="550" y="705">
-              THE NAMELESS SEA
+              {state.chart ? 'THE UNWRITTEN WORLD' : 'THE NAMELESS SEA'}
             </text>
           </g>
           {seen.map((s) => {
-            const q = atlasPack.points[s.id],
+            const q = pack.points[s.id],
               active = selected === s.id,
               done = s.depth !== undefined && run && s.depth <= run.depth;
             return (
@@ -255,7 +273,9 @@ export function AtlasMap({
         </span>
         <span
           className="atlas-scale"
-          style={{ width: zoom ? '28.4%' : '14.2%' }}
+          style={{
+            width: `${(500 / (state.chart?.metresPerPixel ?? 3.52) / (zoom ? 500 : 1000)) * 100}%`,
+          }}
           aria-label="Map scale: approximately 500 paces"
         >
           500 paces
@@ -284,6 +304,25 @@ export function AtlasMap({
           <a href="/atlas/NOTICE.md" target="_blank" rel="noreferrer">
             ODbL · data & source
           </a>
+          {state.chart && (
+            <button
+              className="atlas-data-download"
+              onClick={() => {
+                const url = URL.createObjectURL(
+                  new Blob([JSON.stringify({ ...pack, city: undefined, aliases: undefined })], {
+                    type: 'application/json',
+                  }),
+                );
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'emberwake-geography.json';
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+              }}
+            >
+              Download this map’s data
+            </button>
+          )}
         </span>
         <span>✦ Keeper &nbsp; ◇ Landmark &nbsp; ♜ Bell</span>
       </div>
@@ -367,10 +406,10 @@ export function AtlasMap({
                     <Icon name="compass" size={17} />
                     <span>
                       <strong>
-                        {charted(state, n.id) ? atlasSite(n.id).name : 'Beyond the veil'}
+                        {charted(state, n.id) ? atlasSite(n.id, state).name : 'Beyond the veil'}
                       </strong>
                       <small>
-                        {bearing(state.position, n.id)} · {n.metres} paces
+                        {bearing(state.position, n.id, state)} · {n.metres} paces
                         {state.visited.includes(n.id) ? ' · walked' : ''}
                       </small>
                     </span>
@@ -395,7 +434,7 @@ export function AtlasMap({
               ) : (
                 <>
                   Next: {charted(state, next.id) ? next.name : 'an echo in the mist'} ·{' '}
-                  {bearing(state.position, next.id)}. Walk the connected roads to reach it.
+                  {bearing(state.position, next.id, state)}. Walk the connected roads to reach it.
                 </>
               )}
             </p>
@@ -427,7 +466,7 @@ export function AtlasJournal({ run, dispatch }: { run: Run; dispatch: (a: Action
   const canGuess =
     run.phase === 'map' && !a.recognized && !a.attempts.some((g) => g.bell === run.bells);
   const [expanded, setExpanded] = useState(false);
-  const clues = a.visited.map((id) => atlasSite(id));
+  const clues = a.visited.map((id) => atlasSite(id, a));
   return (
     <section className="atlas-journal">
       <span className="eyebrow">A GEOGRAPHY OF MEMORY</span>
@@ -470,13 +509,17 @@ export function AtlasJournal({ run, dispatch }: { run: Run; dispatch: (a: Action
       {a.recognized ? (
         <div className="atlas-recognized">
           <Icon name="sparkles" size={23} />
-          <h4>Monaco remembers.</h4>
+          <h4>{a.chart?.city ?? 'Monaco'} remembers.</h4>
           <p>
-            Your blade gained 2 attack. The Rose Hearth is charted to the southwest; walk there to
-            gather its kindness.
+            Your blade gained 2 attack. The Rose Hearth is charted; walk there to gather its
+            kindness.
           </p>
           <a
-            href="https://www.openstreetmap.org/#map=14/43.737/7.425"
+            href={
+              a.chart
+                ? `https://www.openstreetmap.org/#map=14/${a.chart.centre[1]}/${a.chart.centre[0]}`
+                : 'https://www.openstreetmap.org/#map=14/43.737/7.425'
+            }
             target="_blank"
             rel="noreferrer"
           >
@@ -492,10 +535,12 @@ export function AtlasJournal({ run, dispatch }: { run: Run; dispatch: (a: Action
             setName('');
           }}
         >
-          <label htmlFor="atlas-place">Does this coast feel familiar?</label>
+          <label htmlFor="atlas-place">
+            {a.chart ? 'Which city lies beneath the veil?' : 'Does this coast feel familiar?'}
+          </label>
           <p>
-            Name the real place for +2 attack and the location of a hidden hearth. Recognition is
-            optional.
+            Name the city for +2 attack and the location of a hidden hearth. A country or region is
+            not the answer. Recognition is optional.
           </p>
           <input
             id="atlas-place"
@@ -510,7 +555,7 @@ export function AtlasJournal({ run, dispatch }: { run: Run; dispatch: (a: Action
           </button>
           <small>
             {run.phase === 'won' || run.phase === 'lost'
-              ? 'This expedition has ended. Name the coast on another journey.'
+              ? 'This expedition has ended. Name the city on another journey.'
               : canGuess
                 ? 'One attempt per bell stage. No penalty for a wrong name.'
                 : run.phase !== 'map'
