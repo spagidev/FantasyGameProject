@@ -23,8 +23,8 @@ describe('regional mystery atlases', () => {
     expect(regionQuery('Slovensko').selector).toContain('"SK"');
   });
   it('treats arbitrary text as a literal boundary name and preserves non-Latin city names', () => {
-    expect(regionQuery('Austria').selector).toContain('["name:en"="Austria"]');
-    expect(regionQuery('x"];out;node(1);/*').selector).toContain('x\\"];out;node(1);/*');
+    expect(regionQuery('austria').selector).toContain('["name:en"~"^austria$",i]');
+    expect(regionQuery('name.*').selector).toContain('name\\\\.\\\\*');
     expect(normalizePlace('Košice')).toBe(normalizePlace('kosice'));
     expect(normalizePlace('Київ')).not.toBe('');
   });

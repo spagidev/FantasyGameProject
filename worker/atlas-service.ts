@@ -6,6 +6,11 @@ export type AtlasEnvironment = { OVERPASS_URL?: string };
 type OsmResponse = { elements: OsmElement[]; remark?: string };
 export function createAtlasService(fetcher: typeof fetch = fetch) {
   const memory = new Map<string, OsmResponse>();
+  function remember(key: string, data: OsmResponse) {
+    if (JSON.stringify(data).length > 750000) return;
+    if (memory.size >= 8) memory.delete(memory.keys().next().value!);
+    memory.set(key, data);
+  }
   let queue: Promise<unknown> = Promise.resolve(),
     lastRequest = 0;
   async function osm(
@@ -28,7 +33,7 @@ export function createAtlasService(fetcher: typeof fetch = fetch) {
     const cached = await cache?.match(cacheKey);
     if (cached) {
       const data = (await cached.json()) as OsmResponse;
-      memory.set(key, data);
+      remember(key, data);
       return data;
     }
     const result = queue.then(async () => {
@@ -79,12 +84,15 @@ export function createAtlasService(fetcher: typeof fetch = fetch) {
           throw new Error(
             'The map provider could not finish this area. Try a smaller region or retry later.',
           );
-        if (memory.size >= 24) memory.delete(memory.keys().next().value!);
-        memory.set(key, data);
-        await cache?.put(
-          cacheKey,
-          Response.json(data, { headers: { 'Cache-Control': 'public, max-age=604800' } }),
-        );
+        remember(key, data);
+        try {
+          await cache?.put(
+            cacheKey,
+            Response.json(data, { headers: { 'Cache-Control': 'public, max-age=604800' } }),
+          );
+        } catch {
+          /* Edge-cache failures must not discard usable geography. */
+        }
         return data;
       } finally {
         clearTimeout(timer);

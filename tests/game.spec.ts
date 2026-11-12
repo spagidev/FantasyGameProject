@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
 import { EVENTS, KEEPERS, RELICS, TALENTS, type KeeperId } from '../src/game/data';
 import { nodeAt, type Action, type Run } from '../src/game/engine';
-import { SAVE_KEY, LEGACY_SAVE_KEY } from '../src/game/storage';
+import { SAVE_KEY, LEGACY_SAVE_KEY, MAX_SAVE_BYTES } from '../src/game/storage';
 import legacyJournal from './fixtures/v1-journal.json' with { type: 'json' };
 import { campaignAction } from './player';
 
@@ -322,7 +322,7 @@ test('journal export/import restores an exact turn and rejects invalid files', a
   await fileInput.setInputFiles({
     name: 'too-large.json',
     mimeType: 'application/json',
-    buffer: Buffer.alloc(65537, 'x'),
+    buffer: Buffer.alloc(MAX_SAVE_BYTES + 1, 'x'),
   });
   await expect(restoredPage.getByRole('alert')).toContainText('too large');
   await fileInput.setInputFiles({
@@ -443,7 +443,7 @@ test('a chosen Slovak kraj starts a hidden city, city-only recognition survives 
   await page.getByRole('button', { name: 'Remember its name' }).click();
   await expect(page.getByRole('heading', { name: 'Testovce remembers.' })).toBeVisible();
   expect((await readRun(page)).attack).toBe(generated.attack + 2);
-  await page.getByRole('button', { name: /Journal/ }).click();
+  await page.getByRole('button', { name: 'Manage journal' }).click();
   const downloadEvent = page.waitForEvent('download');
   await page.getByRole('button', { name: /Download journal/ }).click();
   const download = await downloadEvent;
@@ -483,7 +483,7 @@ test('regional setup lists all eight kraje, handles unavailable maps and permits
     await route.fulfill({ json: { error: 'cancelled' } }).catch(() => {});
   });
   await page.getByRole('button', { name: /Begin expedition/ }).click();
-  await expect(page.getByRole('status')).toContainText('Charting an unknown city');
+  await expect(page.locator('.atlas-loading')).toContainText('Charting an unknown city');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   pending?.();
   await expect(page.getByRole('button', { name: /Begin expedition/ })).toBeEnabled();

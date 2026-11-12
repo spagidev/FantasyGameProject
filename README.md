@@ -2,7 +2,7 @@
 
 A browser fantasy adventure about the things worth remembering. Carry a stolen ember through three fallen realms, awaken their bells, and choose what becomes of a world without a sun.
 
-**Play at your own pace.** Every battle is turn based, every enemy intention is visible, and every move is saved on your device. No paid mechanics or external gameplay services. The private hosted version requires your ChatGPT sign-in.
+**Play at your own pace.** Every battle is turn based, every enemy intention is visible, and every move is saved on your device. No paid mechanics. Regional chart preparation uses OpenStreetMap services; play then uses the saved chart. The private hosted version requires your ChatGPT sign-in.
 
 ![Emberwake: the Sunken Reach expedition map](docs/emberwake.png)
 
@@ -28,7 +28,7 @@ npm run balance          # Optional 90-campaign strategic-route regression matri
 
 Browser tests use `/usr/bin/chromium` when present. On other machines, run `npx playwright install chromium` first. CI installs its browser and OS dependencies automatically. To inspect failures, use the screenshots and traces in `test-results/`.
 
-`npm run build` produces `dist/`, which can be hosted by any static web host. `npm run preview` serves that build for local testing. No environment variables or credentials are required to run the game.
+`npm run build` produces the game assets and a self-contained Worker at `dist/server/index.js`. Regional map creation needs this Worker (or the API integrated into `npm run dev`); a static host or `npm run preview` supports the original campaigns and already saved charts. The default provider needs no API key.
 
 ## The first crossing
 
@@ -44,7 +44,19 @@ Browser tests use `/usr/bin/chromium` when present. On other machines, run `npx 
 
 In combat, use the action buttons or keys **1–4**. Your action resolves first, then poison, then the enemy's visible intention. **Guard lasts one enemy action. Flasks also end your turn.** Open “How to play” for the complete introduction.
 
-## The Lost Atlas · v0.3
+## Choose your country or region · v0.4
+
+Select **The Lost Atlas → Country or region**, enter your area, then **Begin expedition**. Slovakia is the default. Expand the quick choices for **Bratislavský, Trnavský, Trenčiansky, Nitriansky, Žilinský, Banskobystrický, Prešovský or Košický kraj**; accented and unaccented Slovak names and ISO codes work. You can also enter another country's or administrative region's local/English name. Ambiguous areas require an ISO code; unsupported areas show an error instead of choosing somewhere else.
+
+The game resolves the real administrative boundary, selects a city/town **inside that area**, and builds an expedition over its connected OSM streets. Your region remains visible as a clue; the city stays hidden. Correctly guessing the **city**, including supported alternative names, earns the existing recognition bonus. Naming the country/region does not count.
+
+New regional charts need an internet connection while being prepared, usually several provider requests. The private Site proxies and caches these Overpass requests; no Nominatim or tile API is used. Provider availability, OSM coverage, connected road density and coastline complexity affect which charts can be generated. The service tries at most two city extracts per deliberate request. Retry with a different seed if a map cannot be compiled. Worldwide region lookup is supported by the pipeline, with Slovakia as the first focused test; this is not a guarantee for every administrative boundary or city worldwide.
+
+The complete generated map travels with your autosave and exported journal, so exploration and reload do not need provider calls or silently change the chosen city. Journal import is now capped at **2 MB** to carry geometry, while all previous journals remain accepted. **Original offline chart** keeps the original bundled Saltbound Coast available without map downloads.
+
+`npm run build` now builds and validates a standalone Worker serving the game assets and `/api/atlas`. The existing owner-only Site identity is preserved; `.openai/hosting.json` omits `static` for this Worker deployment. `OVERPASS_URL` may select a compatible provisioned Overpass endpoint without changing the game. See [the regional design](docs/REGIONAL_ATLAS.md).
+
+## The original Lost Atlas · v0.3
 
 Select **The Lost Atlas** above the keeper choices, then **Begin expedition**. Existing journeys resume as before; use **Leave this expedition** and confirm if you want to start the new mode instead. Export your current Journal first to keep both journeys.
 
@@ -52,7 +64,7 @@ The Saltbound Coast is a complete new expedition on a real OpenStreetMap region,
 
 Shorelines, harbours, old streets and gardens preserve their real shapes, but every landmark has a fantasy identity. Field notes offer clues. If you recognize the place beneath the veil, name it in the journal: a correct answer grants +2 attack once and charts a hidden hearth. There is one attempt per bell stage, no damage for a wrong answer, and the full campaign is winnable without recognition. The haven can also be found by exploring.
 
-The map has a keeper zoom and a whole-chart view. Direction/distance road buttons and a landmark index support keyboard and mobile play. All terrain is bundled: no tile API, GPS permission, external map requests or API key is needed during play. See [the concept and implementation plan](docs/LOST_ATLAS.md) for research and future charts. The first chart is deliberately curated; this release does not support arbitrary worldwide locations.
+The map has a keeper zoom and a whole-chart view. Direction/distance road buttons and a landmark index support keyboard and mobile play. All terrain is bundled: no tile API, GPS permission, external map requests or API key is needed during play. See [the concept and implementation plan](docs/LOST_ATLAS.md) for research and future charts. The original chart is deliberately curated. The v0.4 regional generator described above adds other geographies.
 
 Geographic data: © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/). The downloadable [geographic database, source and provenance](public/atlas/NOTICE.md) are distributed separately from the original fiction and game code. The chart uses a historical snapshot, not current navigation data. Rebuild deterministically with `python3 scripts/build-atlas.py public/atlas/source.osm.gz`.
 

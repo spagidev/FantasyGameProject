@@ -131,4 +131,12 @@ The Arena of Echoes gives 18 coins once; the Porcelain Spring gives one flask on
 
 Players may submit one nonempty place name per bell count (0, 1, 2, 3) while in the map phase. Correct recognition, including supported alternative spelling, gives two attack once and reveals the hidden haven’s location. Wrong guesses change no stats; the next bell opens another attempt. Recognition does not collect the haven or move the player. It is optional; all three keepers have a tested complete path without it.
 
-The region, positions, site IDs, road IDs, collection IDs, attempt stages, strings and counters are bounded and validated when reading a journal. The entire format-2 journal remains under the existing 64 KB import limit. Map data is a checked-in OSM-derived historical chart; it is never downloaded from community tile services during play.
+The region, positions, site IDs, road IDs, collection IDs, attempt stages, strings and counters are bounded and validated when reading a journal. Original bundled-chart journals remain small; v0.4 permits journals up to 2 MB to include generated geography. Map data is a checked-in OSM-derived historical chart; it is never downloaded from community tile services during play.
+
+## Regional Atlas · v0.4
+
+An explicitly selected country/administrative region resolves to an OSM area. Cities/towns are queried by **area membership**, not merely by a rectangular bounding box. The seed chooses a candidate among the returned city nodes. At most two city extracts are attempted; rejected, ambiguous, unavailable or too-sparse maps leave the current save unchanged. Cancellation does not create an expedition. The original offline chart remains a separate explicit choice.
+
+A regional chart carries its matched area, immutable projected geography, connected 17-site / 24-road graph, terrain-based clues, city aliases and provenance with the run. All twelve existing encounters, side gifts, movement/ward rules and recognition bonuses are unchanged. Only the chosen city aliases are accepted for recognition. Country and region names are clues, not answers. Accents, case and punctuation are normalized; non-Latin names are supported.
+
+Generated geography is validated for finite coordinates, bounded geometry/string counts, distinct site anchors, valid road endpoints and graph connectivity. The journal cap is 2 MB. Save/reload/export uses the same geometry and never rerolls or fetches a different city. Combat transitions share immutable geography rather than cloning its geometry every turn.

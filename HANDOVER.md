@@ -1,56 +1,38 @@
-# Emberwake · The Lost Atlas checkpoint (v0.3.0)
+# Emberwake · Regional Atlas checkpoint (v0.4.0)
 
-## Current task and authorization
+## Latest user request
 
-The user requested research into OpenStreetMap and Mapy.com, a considered gameplay/implementation plan, and implementation of a real-world fantasy map with gradual discovery and useful geographic recognition. They asked for frequent GitHub checkpoints. This request authorized resuming development after the previous session's stop signal. The existing hosted game must remain owner-only. Do not publish cloud environment configuration.
+The user asked to name a country or administrative region before starting, with an unknown city inside it still requiring recognition. They prioritized **Slovakia and all eight kraje**, with eventual worldwide coverage. This continues the earlier authorization to implement, save GitHub checkpoints, and publish to the existing owner-only Site. Do not publish cloud environment configuration. No reliable quota telemetry is exposed; do not invent readings and obey any user stop signal.
 
-No reliable quota-reading tool is exposed. Do not invent quota percentages. The earlier standing safe-stop preferences remain: save above 90% five-hour or 97% weekly usage if reliable telemetry becomes available, and obey any new user stop signal immediately.
+## Implemented in v0.4
 
-## Implemented
-
-Read `docs/LOST_ATLAS.md` for the research, design and initial plan. v0.3 adds **The Lost Atlas**, selectable above the keeper choices before beginning. The original First Crossing stays available; old runs do not acquire map rules automatically.
-
-- The Saltbound Coast is a complete twelve-encounter campaign on a real, curated OSM region, with seventeen geographic sites and twenty-four connected roads. Three ordinary guardians free the well/kiln/lens; three bell guardians preserve the existing rewards, lessons and two endings.
-- Fantasy cartography renders the real coast, streets, groves and ruined building footprints with original fantasy landmark identities. Persistent soft fog follows visited locations and roads. Whole-chart/keeper zoom, north indicator, scale, direction/distance road buttons, and keyboard-accessible landmark index are included.
-- Movement is legal only between adjacent sites during the map phase. Later encounters are sealed and the next encounter must be physically reached. Movement/revisits never generate waylight income or repeat gifts. The existing engine handles actual encounters.
-- Optional arena coins, flask spring and hidden Rose Hearth are single-use. The haven gives up to 12 health and +1 attack. A full flask inventory leaves the spring available for later.
-- The field journal records geographic clues. One place-name attempt is allowed per bell stage; a wrong guess changes no stats. Correct recognition gives +2 attack once and charts the haven, without moving the player or collecting it. Recognition is optional.
-- Saves remain format 2; the optional version-1 `atlas` field is validated on load/import. Atlas position, discovered roads, gifts and guesses round-trip with the portable journal. All previous v1/v2 compatibility tests remain.
-- All map geometry is bundled. No live map/tile/geocoding requests, GPS permission, API key or gameplay backend is needed.
-
-## Geographic data and licensing
-
-The first chart's identity is a gameplay spoiler. Its provenance is intentionally available in source and licensing documentation: a historical June 2012 Monaco OSM extract mirrored by GraphHopper at commit `a1f15bac86c14457f31655c822e8ed4f018d2dc7`. No GraphHopper implementation was copied. Direct Overpass access was denied by the environment proxy, so a reproducible GitHub source was used.
-
-The OSM-derived database, original compressed source and ODbL notice are under `public/atlas/`. Attribution is always visible below the game chart. Reproduce with:
-
-```sh
-python3 scripts/build-atlas.py public/atlas/source.osm.gz
-```
-
-This standard-library-only compiler projects geometry, strips real runtime labels, retains OSM IDs, finds the largest walkable connected component, snaps authored sites to it, and builds shortest-path geographic connections with duplicate links removed. The downloadable database and `src/game/atlas-geography.json` use identical bytes; Vite caches geography in a separate chunk. Source filenames are for attribution, not a promise of up-to-date navigation data.
-
-## Repositories and hosting
-
-- GitHub development checkout: `/workspace/FantasyGameProject`, remote `https://github.com/spagidev/FantasyGameProject.git`. Checkpoints were pushed to branch `work`; the completed release is also fast-forwarded to `main` after validation.
-- Separate existing Sites checkout: `/workspace/sites/emberwake`. Preserve its `.openai/hosting.json` and source Git history when syncing game source. Do not create a new Site.
-- Site project: `appgprj_6af57de7182c8191b7dba67329607be0`.
-- URL: https://emberwake-last-light.fitpartridge2.chatgpt.site
-- Access was verified as `custom`, current user owner, sole allowed user, no groups or external visitors. Publish with the private operation and retain that audience.
-- Native Sites source credentials are short-lived. Keep tokens in session memory and send through hidden stdin only; never write credentials to a file, shell argument, Git config or output. The bundled workflow scripts were unavailable in this environment; ordinary authenticated Git and a deployment tar matching the pushed source were used.
+- Lost Atlas defaults to country/region setup with Slovakia filled in; all eight kraje are clickable and accept accented/unaccented aliases and ISO3166-2 codes. Original offline chart is an explicit alternative.
+- The private `/api/atlas` Worker resolves OSM administrative areas, requests city/town nodes **inside that area**, then uses the seed to select candidates. Generic local/English names and ISO codes use literal, escaped matching; unknown or ambiguous areas return errors. No out-of-area fallback.
+- A bounded city extract is compiled into real terrain and a connected 17-site / 24-road graph. Sparse/disconnected or unsupported complex coastlines are rejected. The service tries at most two city extracts per request.
+- The chosen region is public, the city hidden in normal UI until correctly guessed. Only city aliases qualify for recognition. Terrain-based clues replace the original coast-specific clues on generated charts.
+- Generated geometry and provenance travel in the format-2 save/journal; import cap is 2 MB. Old First Crossing and v0.3 Atlas saves are still accepted. No provider requests during exploration, combat or reload. Geography is immutable and shared during combat transitions.
+- Loading, cancellation, errors and source selection preserve the current save. Request abort/timeouts are handled. Mobile and keyboard setup are included.
+- Hosting now uses `dist/server/index.js`: a standalone Cloudflare Worker embeds and serves the same game assets and map API. **Omit `static`** in the existing Site manifest. `scripts/build-worker.mjs` verifies HTML, JavaScript and API routing after each production build.
+- Provider: public Overpass by default, configurable via production `OVERPASS_URL`. No public Nominatim, live tile service, map account/API key or GPS. Queries are user-triggered, serialized per isolate, identified, bounded and cached; in-memory cache is bounded and large extracts use the edge cache. This remains one private player; public scaling requires provisioned infrastructure.
 
 ## Validation and limits
 
-- 44 unit/engine/storage tests passed, including connectivity for every site, duplicate neighbour rejection, invalid moves, encounter locks, no repeat gifts/income, recognition, malformed Atlas saves and full campaigns for all three keepers without recognition.
-- All 13 existing browser checks passed, including complete campaigns, legacy journals, imports/exports, mobile combat and storage failures.
-- New Atlas browser checks cover a full Warden campaign, real-road movement, fog/reload persistence, no external map requests, recognition, gifts, keyboard roads, mobile width and WCAG A/AA checks. Both new checks passed after the final fixes; together with the 13 existing checks, all 15 browser cases passed.
-- Production TypeScript/Vite build passed. Browser snapshots are generated under ignored `test-results/`.
-- The Sites preview relay timed out. The project's existing automated Playwright browser suite was used for browser validation. Native deployment success is the evidence for publication; do not claim an authenticated production gameplay test unless one is actually performed.
-- This is one authored chart. It is not an arbitrary worldwide map importer or a full Heroes-style army/town simulation. Human playtesting is still needed for difficulty, enjoyment, fog radius and navigational clarity; automated winning paths do not establish those.
+53 unit/engine/service/storage tests passed, including all eight region aliases, area-membership queries, caching, source errors, generated topology, city-only recognition, journal round-trips and full campaigns. Browser cases cover all original campaigns plus regional setup, hidden city, reload/export, provider errors, cancellation and mobile accessibility; all 17 browser cases passed (14 unchanged cases plus the three affected cases rerun after fixes).
 
-## Next useful work
+The Sites preview relay still times out. Existing Playwright tests exercise the app; new service/UI integration tests use controlled OSM fixtures. The managed environment blocks live Overpass access, so live regional map generation is not established by these fixture tests. Production deployment success is verified separately. Do not claim every city worldwide works. Human Slovak playtesting is the next useful check.
 
-1. Human playtest the next-encounter bearing, map visibility, optional detours and recognition clues. Keep geography optional and avoid exposing the true place name in normal unrevealed UI.
-2. Add a second curated region with meaningful river crossings and more branching encounter choices, after testing the first chart.
-3. Separate geography-independent topology contracts from terrain pack loading if the number of maps grows. Global imports require reliable extraction, licensing/provenance, connectivity validation and campaign placement; see the plan.
-4. Preserve old journal formats and the original First Crossing. Do not add permanent stat grinding or runtime map-service dependencies casually.
+## Locations and publishing
+
+Development: `/workspace/FantasyGameProject`, GitHub `https://github.com/spagidev/FantasyGameProject.git`, branch `work`; checkpoint commits are pushed throughout, final validated release also fast-forwards `main`.
+
+Existing Sites checkout: `/workspace/sites/emberwake`; preserve its source history and `.openai/hosting.json`. Project ID: `appgprj_6af57de7182c8191b7dba67329607be0`. URL: https://emberwake-last-light.fitpartridge2.chatgpt.site
+
+Access was verified as custom, owner-only, sole allowed user, no groups/external viewers. Use the private save/deploy operation. Never recreate the Site or widen access to deploy it. Source credentials expire quickly: keep them in session memory, pass through hidden stdin only, never write tokens to files or command arguments. Bundled Sites workflow helpers are unavailable in this environment; ordinary authenticated Git and an archive of the matching Worker build are used. Source preparation and deployment metadata are recorded outside the source checkout in `/workspace/sites/emberwake-deployment.json`.
+
+## Files and next work
+
+- `docs/REGIONAL_ATLAS.md`: feature plan. `docs/LOST_ATLAS.md`: original OSM/Mapy research and fantasy exploration design.
+- `src/atlas/regions.ts`: aliases and boundary query. `worker/atlas-service.ts`: provider/cache and candidate selection. `src/atlas/compile.ts`, `coast.ts`: connected geometry compiler. `types.ts`: map import validation.
+- `src/game/atlas.ts`: geography-independent exploration with legacy bundled chart support. `src/components/AtlasSetup.tsx`: region choice. `Atlas.tsx`: fog/map and recognition.
+- `public/atlas/`: original pinned June 2012 Monaco OSM source, ODbL notice and database. Generated charts provide their own ODbL geographic data download and provenance. Do not expose true city names in normal unrevealed UI.
+- Next: real Slovak playtests across the eight kraje; improve water multipolygons/coast complexity, city selection distribution and region disambiguation; provision a map source before public/global scaling. Preserve both old journal formats and original campaign rules. Do not add permanent stat grinding or timers.

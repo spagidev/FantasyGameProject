@@ -32,10 +32,10 @@ export function regionQuery(input: string) {
   if (region) return { label: region.name, selector: `area["ISO3166-2"="${region.code}"]` };
   if (['slovakia', 'slovensko', 'slovakrepublic', 'sk'].includes(normalized))
     return { label: 'Slovakia', selector: 'area["ISO3166-1"="SK"]["admin_level"="2"]' };
-  // Literal tag equality: user input is never interpolated as an Overpass program or regex.
-  const quoted = JSON.stringify(name);
+  // Escape both regex metacharacters and QL string syntax before a case-insensitive name match.
+  const quoted = JSON.stringify('^' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$');
   return {
     label: name,
-    selector: `(${['name', 'name:en', 'official_name', 'ISO3166-2', 'ISO3166-1'].map((key) => `area["boundary"="administrative"]["admin_level"~"^[2-6]$"][${JSON.stringify(key)}=${quoted}];`).join('')})`,
+    selector: `(${['name', 'name:en', 'official_name', 'ISO3166-2', 'ISO3166-1'].map((key) => `area["boundary"="administrative"]["admin_level"~"^[2-6]$"][${JSON.stringify(key)}~${quoted},i];`).join('')})`,
   };
 }
