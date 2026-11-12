@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { createAtlasService } from '../../worker/atlas-service';
 import { streetFixture } from '../../tests/atlas-fixture';
 
@@ -9,6 +9,32 @@ const request = (region = 'Slovakia') =>
     headers: { 'Content-Type': 'application/json' },
   });
 describe('private geographic preparation service', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('continues to the provider when the platform denies access to its default cache', async () => {
+    vi.stubGlobal('caches', {
+      get default() {
+        throw new Error('This Worker is not permitted to access the default cache.');
+      },
+    });
+    const fetcher = vi.fn(async () => Response.json({ elements: [] }));
+    const response = await createAtlasService(fetcher)(request());
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect((await response.json()).error).toMatch(/No administrative area matched/);
+  });
+  it('ignores a failed cache read while retaining in-memory responses', async () => {
+    vi.stubGlobal('caches', {
+      default: {
+        match: async () => {
+          throw new Error('Cache access denied');
+        },
+      },
+    });
+    const fetcher = vi.fn(async () => Response.json({ elements: [] }));
+    const handler = createAtlasService(fetcher);
+    await handler(request());
+    await handler(request());
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
   it('selects cities by membership in the resolved administrative area, caches data, and returns a usable chart', async () => {
     const queries: string[] = [];
     const fake = vi.fn(async (_url: unknown, options?: RequestInit) => {

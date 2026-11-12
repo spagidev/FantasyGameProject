@@ -254,7 +254,7 @@ input::placeholder {
   font-size: 8px;
   letter-spacing: 4px;
   margin-top: 6px;
-  color: #596a54;
+  color: #44523e;
 }
 .brand-sigil {
   display: grid;
@@ -282,7 +282,7 @@ input::placeholder {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 5px;
-  color: #56664f;
+  color: #43523d;
   font-size: 13px;
   min-height: 45px;
 }
@@ -960,7 +960,7 @@ input::placeholder {
 }
 .atlas-source-picker {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 5px;
   margin: 17px 0;
   padding: 4px;
@@ -981,6 +981,38 @@ input::placeholder {
   border-color: #b1b99f;
   box-shadow: 0 1px 5px #243c2620;
   color: #253f2c;
+}
+.bundled-availability,
+.atlas-fallback-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px 14px;
+  border: 1px solid #a6b28b;
+  border-radius: 4px;
+  background: #e8ecd8;
+  color: #385032;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.bundled-availability {
+  margin: 12px 0;
+}
+.bundled-availability > svg,
+.atlas-fallback-notice > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.bundled-availability.unavailable {
+  background: #f1e6d2;
+  color: #624d2e;
+  border-color: #bfab85;
+}
+.atlas-fallback-notice {
+  margin: 0 0 20px;
+}
+.atlas-source-note {
+  color: #425937;
 }
 .atlas-setup label {
   display: block;

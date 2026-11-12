@@ -317,6 +317,12 @@ export function AtlasMap({
           <a href="/atlas/NOTICE.md" target="_blank" rel="noreferrer">
             ODbL · data & source
           </a>
+          {state.chart?.source.provider === 'OpenStreetMap / Geofabrik' && (
+            <span className="atlas-source-note">
+              {' '}
+              · Bundled roads · historical snapshot (2022 or earlier)
+            </span>
+          )}
           {state.chart && (
             <button
               className="atlas-data-download"
@@ -472,8 +478,10 @@ export function AtlasJournal({ run, dispatch }: { run: Run; dispatch: (a: Action
       <span className="eyebrow">A GEOGRAPHY OF MEMORY</span>
       <h3>The field journal</h3>
       <p>
-        Roads and shorelines survived. Their names did not. Explore, prepare, and ring the three
-        bells.
+        {a.chart
+          ? 'The roads survived. Their names did not.'
+          : 'Roads and shorelines survived. Their names did not.'}{' '}
+        Explore, prepare, and ring the three bells.
       </p>
       <div className="atlas-journal-stats">
         <span>

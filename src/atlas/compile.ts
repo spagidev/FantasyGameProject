@@ -44,8 +44,9 @@ export function compileChart(
   elements: OsmElement[],
   city: OsmElement,
   area: string,
-  areaId: number,
+  areaId: number | null,
   query: string,
+  provenance?: RegionalChart['source'],
 ): RegionalChart {
   if (!city.tags?.name || !Number.isFinite(city.lat) || !Number.isFinite(city.lon))
     throw new Error('The chosen city has no usable centre.');
@@ -296,7 +297,7 @@ export function compileChart(
     points,
     edges,
     clues,
-    source: {
+    source: provenance ?? {
       licence: 'ODbL-1.0',
       retrieved: new Date().toISOString(),
       provider: 'OpenStreetMap / Overpass',

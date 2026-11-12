@@ -30,7 +30,7 @@ export type Geography = {
 export type RegionalChart = Geography & {
   version: 1;
   area: string;
-  areaId: number;
+  areaId: number | null;
   cityId: number;
   city: string;
   aliases: string[];
@@ -41,7 +41,9 @@ export type RegionalChart = Geography & {
   source: {
     licence: 'ODbL-1.0';
     retrieved: string;
-    provider: 'OpenStreetMap / Overpass';
+    provider: 'OpenStreetMap / Overpass' | 'OpenStreetMap / Geofabrik';
+    snapshot?: string;
+    url?: string;
     query: string;
   };
 };
@@ -77,8 +79,9 @@ export function validRegionalChart(x: unknown): x is RegionalChart {
     !text(c.area) ||
     !text(c.city, 80) ||
     !text(c.title) ||
-    !Number.isSafeInteger(c.areaId) ||
-    c.areaId <= 0 ||
+    !(c.areaId === null
+      ? c.source?.provider === 'OpenStreetMap / Geofabrik'
+      : Number.isSafeInteger(c.areaId) && c.areaId > 0) ||
     !Number.isSafeInteger(c.cityId) ||
     c.cityId <= 0 ||
     !point(c.centre) ||
@@ -151,7 +154,9 @@ export function validRegionalChart(x: unknown): x is RegionalChart {
   return (
     !!c.source &&
     c.source.licence === 'ODbL-1.0' &&
-    c.source.provider === 'OpenStreetMap / Overpass' &&
+    ['OpenStreetMap / Overpass', 'OpenStreetMap / Geofabrik'].includes(c.source.provider) &&
+    (c.source.snapshot === undefined || text(c.source.snapshot, 150)) &&
+    (c.source.url === undefined || (text(c.source.url, 500) && /^https:\/\//.test(c.source.url))) &&
     text(c.source.retrieved, 40) &&
     text(c.source.query, 4000)
   );

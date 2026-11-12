@@ -28,20 +28,22 @@ export function createAtlasService(fetcher: typeof fetch = fetch) {
       .map((n) => n.toString(16).padStart(2, '0'))
       .join('');
     if (memory.has(key)) return memory.get(key)!;
-    const cache = (globalThis as unknown as { caches?: { default?: Cache } }).caches?.default;
     const cacheKey = new Request(`${origin}/__atlas-cache/${key}`);
-    // Some private Site Workers expose Cache API but do not grant default-cache access.
-    // Treat edge caching as an optimization so a denied cache read cannot block atlas lookup.
-    let cached: Response | undefined;
+    let cache: Cache | undefined;
+    // Private Site Workers may expose Cache API while denying access to its default cache.
+    // Reading, decoding and writing edge cache entries must all remain optional.
     try {
-      cached = await cache?.match(cacheKey);
+      cache = (globalThis as unknown as { caches?: { default?: Cache } }).caches?.default;
+      const cached = await cache?.match(cacheKey);
+      if (cached) {
+        const data = (await cached.json()) as OsmResponse;
+        if (Array.isArray(data.elements) && !data.remark) {
+          remember(key, data);
+          return data;
+        }
+      }
     } catch {
-      /* Continue through the bounded in-memory cache and the map provider. */
-    }
-    if (cached) {
-      const data = (await cached.json()) as OsmResponse;
-      remember(key, data);
-      return data;
+      cache = undefined;
     }
     const result = queue.then(async () => {
       if (signal.aborted) throw new Error('Map preparation was cancelled.');
@@ -63,10 +65,12 @@ export function createAtlasService(fetcher: typeof fetch = fetch) {
           body: new URLSearchParams({ data: query }),
           signal: controller.signal,
         });
-        if (!response.ok)
+        if (!response.ok) {
+          console.warn('atlas_provider_rejected', response.status, new URL(provider).hostname);
           throw new Error(
             'The map provider is busy or unavailable. Please wait a moment and try again.',
           );
+        }
         if (Number(response.headers.get('Content-Length') ?? 0) > 12 * 1024 * 1024)
           throw new Error('This map extract is too large. Choose a smaller region.');
         const reader = response.body!.getReader(),

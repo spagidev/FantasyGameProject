@@ -44,6 +44,12 @@ Browser tests use `/usr/bin/chromium` when present. On other machines, run `npx 
 
 In combat, use the action buttons or keys **1–4**. Your action resolves first, then poison, then the enemy's visible intention. **Guard lasts one enemy action. Flasks also end your turn.** Open “How to play” for the complete introduction.
 
+## Maps ready to play · v0.6
+
+**The Lost Atlas → Bundled maps** starts with no map-provider connection. Choose Slovakia or any of its eight kraje; 16 historical city road charts are included, two per kraj. A seed chooses the hidden city inside that area. Setup shows coverage counts without revealing the city. Live map remains available and falls back to this collection inside the same chosen area if the provider fails. Other countries need the live provider until their own collections are added.
+
+These are road snapshots published in 2022 or earlier, not current maps or complete terrain datasets. The complete chart stays in your autosave and exported journal. The game site still needs to load normally; no external map service is used for bundled play. See [collection design](docs/BUNDLED_ATLAS.md) and [geographic sources/downloads](public/atlas/NOTICE.md).
+
 ## The illuminated atlas · v0.5
 
 A complete interface redesign gives Emberwake the feel of an illustrated field atlas: forest-green ink, warm parchment, antique copper and generous serif typography. Original paintings depict the three realms, all three keepers and four adversary identities. Artwork and fonts are bundled locally.
@@ -54,7 +60,7 @@ All rules, map features, regional choices, keyboard controls and existing journa
 
 ## Choose your country or region · v0.4
 
-Select **The Lost Atlas → Country or region**, enter your area, then **Begin expedition**. Slovakia is the default. Expand the quick choices for **Bratislavský, Trnavský, Trenčiansky, Nitriansky, Žilinský, Banskobystrický, Prešovský or Košický kraj**; accented and unaccented Slovak names and ISO codes work. You can also enter another country's or administrative region's local/English name. Ambiguous areas require an ISO code; unsupported areas show an error instead of choosing somewhere else.
+Select **The Lost Atlas → Live map**, enter your area, then **Begin expedition**. Bundled maps are now the default for reliable Slovak play. Slovakia is the default. Expand the quick choices for **Bratislavský, Trnavský, Trenčiansky, Nitriansky, Žilinský, Banskobystrický, Prešovský or Košický kraj**; accented and unaccented Slovak names and ISO codes work. You can also enter another country's or administrative region's local/English name. Ambiguous areas require an ISO code; unsupported areas show an error instead of choosing somewhere else.
 
 The game resolves the real administrative boundary, selects a city/town **inside that area**, and builds an expedition over its connected OSM streets. Your region remains visible as a clue; the city stays hidden. Correctly guessing the **city**, including supported alternative names, earns the existing recognition bonus. Naming the country/region does not count.
 

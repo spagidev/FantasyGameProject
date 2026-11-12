@@ -1,4 +1,6 @@
-import { validRegionalChart, type RegionalChart } from './atlas/types';
+import type { RegionalChart } from './atlas/types';
+import { bundledCount, type AtlasSource } from './atlas/bundled';
+import { prepareChart } from './atlas/prepare';
 import { AtlasSetup, RegionalAtlasPreview } from './components/AtlasSetup';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -82,7 +84,9 @@ export default function App() {
     loaded.save.run?.atlas ? 'atlas' : 'classic',
   );
   const [atlasArea, setAtlasArea] = useState('Slovakia');
-  const [offlineAtlas, setOfflineAtlas] = useState(false);
+  const [atlasSource, setAtlasSource] = useState<AtlasSource>('bundled');
+  const [atlasNotice, setAtlasNotice] = useState('');
+  const offlineAtlas = atlasSource === 'original';
   const [atlasLoading, setAtlasLoading] = useState(false);
   const [atlasError, setAtlasError] = useState('');
   const atlasRequest = useRef<AbortController | null>(null);
@@ -170,21 +174,19 @@ export default function App() {
       setAtlasError('');
       const timeout = setTimeout(() => controller.abort(), 110000);
       try {
-        const response = await fetch('/api/atlas', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ region: atlasArea.trim(), seed: newSeed }),
-          signal: controller.signal,
-        });
-        const data = await response.json();
-        if (!response.ok || !validRegionalChart(data.chart))
-          throw new Error(
-            typeof data.error === 'string'
-              ? data.error
-              : 'The returned map could not be read. Please try again.',
-          );
+        const result = await prepareChart(
+          atlasArea.trim(),
+          newSeed,
+          atlasSource as 'bundled' | 'live',
+          controller.signal,
+        );
         if (atlasRequest.current !== controller || controller.signal.aborted) return;
-        selectedChart = data.chart;
+        selectedChart = result.chart;
+        setAtlasNotice(
+          result.fallback
+            ? `The live provider could not prepare a map. You’re playing a bundled chart inside ${atlasArea.trim()}.`
+            : '',
+        );
       } catch (error) {
         if (atlasRequest.current === controller)
           setAtlasError(
@@ -203,6 +205,7 @@ export default function App() {
         }
       }
     }
+    if (expedition !== 'atlas' || offlineAtlas) setAtlasNotice('');
     setSave((s) => ({
       ...s,
       run: newRun(keeper, newSeed, selectedChart),
@@ -405,6 +408,12 @@ export default function App() {
                 </span>
               </div>
             )}
+            {run && atlasNotice && (
+              <p className="atlas-fallback-notice" role="status">
+                <Icon name="info" size={17} />
+                {atlasNotice}
+              </p>
+            )}
             <div className={`game-layout ${run ? 'play-layout' : 'launch-layout'}`}>
               <div className="game-main" ref={boardRef}>
                 {run?.atlas && run.phase !== 'map' && (
@@ -501,9 +510,9 @@ export default function App() {
                           setAtlasArea(v);
                           setAtlasError('');
                         }}
-                        offline={offlineAtlas}
-                        onOffline={(v) => {
-                          setOfflineAtlas(v);
+                        source={atlasSource}
+                        onSource={(v) => {
+                          setAtlasSource(v);
                           setAtlasError('');
                         }}
                         loading={atlasLoading}
@@ -581,7 +590,10 @@ export default function App() {
                         onClick={start}
                         disabled={
                           atlasLoading ||
-                          (expedition === 'atlas' && !offlineAtlas && atlasArea.trim().length < 2)
+                          (expedition === 'atlas' &&
+                            !offlineAtlas &&
+                            (atlasArea.trim().length < 2 ||
+                              (atlasSource === 'bundled' && !bundledCount(atlasArea))))
                         }
                       >
                         {atlasLoading ? 'Preparing your atlas…' : 'Begin expedition'}

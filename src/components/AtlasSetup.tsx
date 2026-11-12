@@ -1,22 +1,25 @@
+import { bundledCount, type AtlasSource } from '../atlas/bundled';
 import { SLOVAK_REGIONS } from '../atlas/regions';
 import { Icon } from './Icon';
 export function AtlasSetup({
   area,
   onArea,
-  offline,
-  onOffline,
+  source,
+  onSource,
   loading,
   error,
   onCancel,
 }: {
   area: string;
   onArea: (v: string) => void;
-  offline: boolean;
-  onOffline: (v: boolean) => void;
+  source: AtlasSource;
+  onSource: (v: AtlasSource) => void;
   loading: boolean;
   error: string;
   onCancel: () => void;
 }) {
+  const offline = source === 'original';
+  const count = bundledCount(area);
   return (
     <section className="atlas-setup" aria-label="Choose atlas geography">
       <span className="eyebrow">WHERE SHOULD THE VEIL FALL?</span>
@@ -26,10 +29,21 @@ export function AtlasSetup({
         have to discover and name the city.
       </p>
       <div className="atlas-source-picker" role="group" aria-label="Atlas map source">
-        <button aria-pressed={!offline} disabled={loading} onClick={() => onOffline(false)}>
-          Country or region
+        <button
+          aria-pressed={source === 'bundled'}
+          disabled={loading}
+          onClick={() => onSource('bundled')}
+        >
+          Bundled maps
         </button>
-        <button aria-pressed={offline} disabled={loading} onClick={() => onOffline(true)}>
+        <button
+          aria-pressed={source === 'live'}
+          disabled={loading}
+          onClick={() => onSource('live')}
+        >
+          Live map
+        </button>
+        <button aria-pressed={offline} disabled={loading} onClick={() => onSource('original')}>
           Original offline chart
         </button>
       </div>
@@ -67,10 +81,18 @@ export function AtlasSetup({
               ))}
             </div>
           </details>
+          <p className={`bundled-availability ${!count ? 'unavailable' : ''}`} role="status">
+            <Icon name={count ? 'check' : 'info'} size={16} />
+            <span>
+              {count
+                ? `${count} bundled ${count === 1 ? 'chart' : 'charts'} in this area. ${source === 'live' ? 'Used automatically if the live provider fails.' : 'Ready to play without the map provider.'}`
+                : 'No bundled charts here yet. Choose Slovakia or a kraj, or use Live map.'}
+            </span>
+          </p>
           <small>
             Accents are optional for Slovak names. Elsewhere, use a full local or English
-            administrative name, or an ISO region code. Map preparation needs internet; exploration
-            then uses your saved chart.
+            administrative name, or an ISO region code. Live maps need the provider; bundled maps
+            ship with Emberwake. Both save the complete chart with your journey.
           </small>
         </>
       )}
@@ -80,7 +102,9 @@ export function AtlasSetup({
           <span>
             Charting an unknown city inside {area}…
             <small>
-              Finding the boundary, then tracing connected roads. This may take a minute.
+              {source === 'bundled'
+                ? 'Opening a chart from your collection.'
+                : 'Finding the boundary, then tracing connected roads. This may take a minute.'}
             </small>
           </span>
           <button className="text-button" onClick={onCancel}>
@@ -111,7 +135,8 @@ export function RegionalAtlasPreview({ area }: { area: string }) {
       </div>
       <p className="muted">
         The chart stays sealed until you begin. Follow the roads, uncover the land, and remember
-        which city lies beneath the fantasy.
+        which city lies beneath the fantasy.{' '}
+        {bundledCount(area) > 0 && `${bundledCount(area)} bundled charts are ready in this area.`}
       </p>
     </section>
   );

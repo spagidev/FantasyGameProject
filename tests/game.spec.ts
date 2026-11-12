@@ -427,6 +427,7 @@ test('a chosen Slovak kraj starts a hidden city, city-only recognition survives 
   });
   await page.goto('/');
   await page.getByRole('button', { name: /The Lost Atlas/ }).click();
+  await page.getByRole('button', { name: 'Live map', exact: true }).click();
   await expect(page.getByLabel('Country or region', { exact: true })).toHaveValue('Slovakia');
   await page.getByLabel('Country or region', { exact: true }).fill('Bratislavsky kraj');
   await expect(page.locator('main')).not.toContainText('Testovce');
@@ -460,11 +461,13 @@ test('regional setup lists all eight kraje, handles unavailable maps and permits
   );
   await page.goto('/');
   await page.getByRole('button', { name: /The Lost Atlas/ }).click();
+  await page.getByRole('button', { name: 'Live map', exact: true }).click();
   await page.getByText('Slovakia · choose one of the eight kraje', { exact: true }).click();
   const regionButtons = page.locator('.slovak-regions button');
   expect(await regionButtons.count()).toBe(9);
   await page.getByRole('button', { name: 'Košický kraj', exact: true }).click();
   await expect(page.getByLabel('Country or region', { exact: true })).toHaveValue('Košický kraj');
+  await page.getByLabel('Country or region', { exact: true }).fill('Austria');
   await page.getByRole('button', { name: /Begin expedition/ }).click();
   await expect(page.getByRole('alert')).toContainText('provider is busy');
   expect(
