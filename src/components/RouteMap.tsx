@@ -1,5 +1,5 @@
 import { CHAPTERS, NODE_LABELS, WAYLIGHTS } from '../game/data';
-import { nextNodes, nodeAt, waylightFor, type MapNode, type Run } from '../game/engine';
+import { layoutOf, nextNodes, nodeAt, waylightFor, type MapNode, type Run } from '../game/engine';
 import { Landscape } from './Art';
 import { Icon } from './Icon';
 
@@ -59,10 +59,10 @@ export function RouteMap({
         </svg>
         {[0, 1, 2, 3].flatMap((row) =>
           (row === 3 ? [1] : [0, 1, 2]).map((lane) => {
-            const node = nodeAt(seed, start + row, lane);
+            const node = nodeAt(seed, start + row, lane, run ? layoutOf(run) : 'seeded');
             const visited = run?.path.includes(node.id);
             const enabled = available.some((n) => n.id === node.id);
-            const site = (run?.ruleset ?? 2) === 2 ? waylightFor(node) : null;
+            const site = (run?.ruleset ?? 3) >= 2 ? waylightFor(node) : null;
             return (
               <div
                 className={`map-stop ${enabled ? 'available' : ''} ${visited ? 'visited' : ''} ${node.kind === 'boss' ? 'guardian-stop' : ''}`}
@@ -86,6 +86,7 @@ export function RouteMap({
                     : site
                       ? WAYLIGHTS[site].name
                       : NODE_LABELS[node.kind]}
+                  {node.foe && node.kind !== 'boss' && <small>{node.name}</small>}
                 </span>
               </div>
             );

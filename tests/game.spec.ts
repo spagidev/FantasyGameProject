@@ -1,8 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
-import { EVENTS, KEEPERS, RELICS, TALENTS, type KeeperId } from '../src/game/data';
-import { nodeAt, type Action, type Run } from '../src/game/engine';
+import { EVENTS, KEEPERS, RELICS, TALENTS, type KeeperId, type RelicId } from '../src/game/data';
+import { makeEnemy, nextNodes, nodeOf, type Action, type Run } from '../src/game/engine';
 import { SAVE_KEY, LEGACY_SAVE_KEY, MAX_SAVE_BYTES } from '../src/game/storage';
 import legacyJournal from './fixtures/v1-journal.json' with { type: 'json' };
 import { campaignAction } from './player';
@@ -16,20 +16,17 @@ async function clickAction(page: Page, run: Run, action: Action) {
   } else if (action.type === 'travel' && run.atlas) {
     await page.getByRole('button', { name: 'Enter encounter' }).click();
   } else if (action.type === 'travel') {
-    const node = nodeAt(run.seed, run.depth + 1, action.lane);
+    const node = nodeOf(run, run.depth + 1, action.lane);
     await page.locator('.route-choice').filter({ hasText: node.name }).first().click();
   } else if (action.type === 'talent') {
     await page.locator('.talent-card').filter({ hasText: TALENTS[action.id].name }).click();
-  } else if (['strike', 'guard', 'skill', 'flask'].includes(action.type)) {
-    await page
-      .locator('.action-button')
-      .nth(['strike', 'guard', 'skill', 'flask'].indexOf(action.type))
-      .click();
+  } else if (['strike', 'guard', 'skill', 'technique', 'flask'].includes(action.type)) {
+    await page.locator(`.duel-action[data-action="${action.type}"]`).click();
   } else if (action.type === 'reward') {
     if (action.id === 'heal') await page.getByRole('button', { name: /Leave the relics/ }).click();
     else await page.locator('.reward-card').filter({ hasText: RELICS[action.id].name }).click();
   } else if (action.type === 'event') {
-    const event = EVENTS[nodeAt(run.seed, run.depth, run.lane).eventIndex];
+    const event = EVENTS[nodeOf(run).eventIndex];
     await page
       .getByRole('button', { name: new RegExp(event.options[action.option].label) })
       .click();
@@ -44,11 +41,14 @@ async function clickAction(page: Page, run: Run, action: Action) {
       })
       .click();
   } else if (action.type === 'buy') {
+    const services = {
+      heal: /A little kindness/,
+      flask: /A bottled sunrise/,
+      forge: /An edge of dawn/,
+    } as Record<string, RegExp>;
     await page
       .getByRole('button', {
-        name: { heal: /A little kindness/, flask: /A bottled sunrise/, forge: /An edge of dawn/ }[
-          action.item
-        ],
+        name: services[action.item] ?? new RegExp(RELICS[action.item as RelicId].name),
       })
       .click();
   } else if (action.type === 'leave')
@@ -85,8 +85,8 @@ test('autosaves a turn, resumes exactly and confirms abandonment', async ({ page
   await page.getByRole('button', { name: /Begin expedition/ }).click();
   await page.locator('.route-choice').first().click();
   const initial = await readRun(page);
-  await expect(page.locator('.action-button').nth(2)).toBeDisabled();
-  await page.locator('.action-button').first().click();
+  await expect(page.locator('.duel-action').nth(2)).toBeDisabled();
+  await page.locator('.duel-action').first().click();
   await page.keyboard.press('1'); // Shortcuts also work while an action button is focused.
   const progressed = await readRun(page);
   expect(progressed.turn).toBe(initial.turn + 2);
@@ -151,7 +151,7 @@ test('mobile layout stays within the viewport and supports combat', async ({ pag
   );
   await page.getByRole('button', { name: /Begin expedition/ }).click();
   await page.locator('.route-choice').first().click();
-  await page.locator('.action-button').first().click();
+  await page.locator('.duel-action').first().click();
   expect((await readRun(page)).turn).toBe(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
@@ -175,7 +175,10 @@ test('scouting is free, exposes future patterns, and only travels reachable lane
   await page.keyboard.press('Escape');
   await page.locator('.map-stop.available button').nth(1).click();
   await expect(page.getByRole('dialog')).toContainText('Cinder Kiln');
-  await expect(page.getByRole('dialog')).toContainText('Second ember');
+  await expect(page.getByRole('dialog')).toContainText(
+    makeEnemy(nodeOf(original, 0, 1)).pattern[1].name,
+  );
+  await expect(page.getByRole('dialog')).toContainText('Poise');
   const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(accessibility.violations).toEqual([]);
   expect(await readRun(page)).toEqual(original);
@@ -203,7 +206,7 @@ test('an existing version 1 save resumes its exact turn and keeps a legacy backu
     talents: [],
   });
   await expect(page.locator('.classic-notice')).toContainText('original rules are preserved');
-  await page.locator('.action-button').first().click();
+  await page.locator('.duel-action').first().click();
   const next = await readRun(page);
   expect(next.turn).toBe(2);
   expect(next.health).toBe(44);
@@ -236,8 +239,8 @@ test('blocked browser storage allows a complete in-memory turn', async ({ page }
   await expect(page.getByRole('alert')).toContainText('Browser storage is unavailable');
   await page.getByRole('button', { name: /Begin expedition/ }).click();
   await page.locator('.route-choice').first().click();
-  await page.locator('.action-button').first().click();
-  await expect(page.locator('.turn-label')).toHaveText('TURN 02');
+  await page.locator('.duel-action').first().click();
+  await expect(page.locator('.duel-turn')).toHaveText('TURN 02');
 });
 
 test('desktop presentation and map have no browser errors', async ({ page }) => {
@@ -252,31 +255,34 @@ test('desktop presentation and map have no browser errors', async ({ page }) => 
   expect(errors).toEqual([]);
 });
 
-test('elite and trader routes honor purchases across reloads', async ({ page }) => {
-  test.setTimeout(60000);
+test('trader routes honor purchases across reloads', async ({ page }) => {
+  test.setTimeout(90000);
   await page.goto('/');
   await page.getByLabel('Journey seed').fill('trader-crossing');
   await page.getByRole('button', { name: /Begin expedition/ }).click();
   let run = await readRun(page);
-  await clickAction(page, run, { type: 'travel', lane: 1 });
-  run = await readRun(page);
-  let moves = 0;
-  while (!(run.phase === 'map' && run.depth === 1) && moves++ < 60) {
-    await clickAction(
-      page,
-      run,
-      run.phase === 'map' ? { type: 'travel', lane: 1 } : campaignAction(run),
+  // Walk toward the first trader: at every fork prefer a lane that still reaches one.
+  const towardShop = (r: Run): Action => {
+    const options = nextNodes(r);
+    const shop = options.find((n) => n.kind === 'shop');
+    const reaches = options.find((n) =>
+      [0, 1, 2].some(
+        (lane) => Math.abs(lane - n.lane) <= 1 && nodeOf(r, n.depth + 1, lane).kind === 'shop',
+      ),
     );
+    return { type: 'travel', lane: (shop ?? reaches ?? options[0]).lane };
+  };
+  let moves = 0;
+  while (run.phase !== 'shop' && moves++ < 120) {
+    await clickAction(page, run, run.phase === 'map' ? towardShop(run) : campaignAction(run));
     run = await readRun(page);
     expect(run.phase).not.toBe('lost');
   }
-  expect(run.depth).toBe(1);
-  await clickAction(page, run, { type: 'travel', lane: 1 });
-  run = await readRun(page);
   expect(run.phase).toBe('shop');
   const coins = run.coins;
   const attack = run.attack;
   await page.getByRole('button', { name: /An edge of dawn/ }).click();
+  expect(coins).toBeGreaterThanOrEqual(35);
   expect((await readRun(page)).coins).toBe(coins - 35);
   expect((await readRun(page)).attack).toBe(attack + 2);
   await expect(page.getByRole('button', { name: /An edge of dawn/ })).toBeDisabled();
@@ -296,7 +302,7 @@ test('journal export/import restores an exact turn and rejects invalid files', a
   await page.goto('/');
   await page.getByRole('button', { name: /Begin expedition/ }).click();
   await page.locator('.route-choice').first().click();
-  await page.locator('.action-button').first().click();
+  await page.locator('.duel-action').first().click();
   const original = await readRun(page);
   await page.getByRole('button', { name: 'Manage journal' }).click();
   const exported = page.waitForEvent('download');

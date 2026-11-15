@@ -15,6 +15,7 @@ import {
   type RelicId,
 } from './game/data';
 import {
+  attackOf,
   canBuy,
   canEvent,
   incomingDamage,
@@ -22,18 +23,16 @@ import {
   makeEnemy,
   newRun,
   nextNodes,
-  nodeAt,
+  nodeOf,
+  priceOf,
+  restAmount,
   transition,
-  guardAmount,
-  skillDamage,
-  strikeFocus,
-  strikeHealing,
-  poisonAmount,
   waylightFor,
   victoryCoins,
   type Action,
   type Run,
   type MapNode,
+  type ShopItem,
 } from './game/engine';
 import {
   advanceSave,
@@ -47,6 +46,7 @@ import { EnemyPortrait, KeeperPortrait, Landscape } from './components/Art';
 import { Icon, type IconName } from './components/Icon';
 import { Modal } from './components/Modal';
 import { RouteMap } from './components/RouteMap';
+import { Combat, combatKeys } from './components/Combat';
 import { Journal } from './components/Journal';
 import { Scout, TalentChoice, WaylightsPanel } from './components/Strategy';
 import { AtlasMap, AtlasJournal } from './components/Atlas';
@@ -133,7 +133,8 @@ export default function App() {
         modal ||
         scouted ||
         view !== 'journey' ||
-        run?.phase !== 'combat' ||
+        !run ||
+        run.phase !== 'combat' ||
         event.repeat ||
         event.ctrlKey ||
         event.metaKey ||
@@ -143,17 +144,15 @@ export default function App() {
             event.target.isContentEditable))
       )
         return;
-      const type = ({ '1': 'strike', '2': 'guard', '3': 'skill', '4': 'flask' } as const)[
-        event.key as '1'
-      ];
-      if (type) {
+      const type = combatKeys(run)[Number(event.key) - 1];
+      if (type && /^[1-5]$/.test(event.key)) {
         event.preventDefault();
         dispatch({ type });
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [run?.phase, modal, scouted, view, dispatch]);
+  }, [run?.phase, run?.ruleset, modal, scouted, view, dispatch]);
 
   function cancelAtlas() {
     atlasRequest.current?.abort();
@@ -212,6 +211,7 @@ export default function App() {
       profile: { ...s.profile, lastKeeper: keeper },
     }));
     setView('journey');
+    window.scrollTo({ top: 0, behavior: 'instant' });
   }
 
   return (
@@ -636,14 +636,14 @@ export default function App() {
                               <strong>{node.name}</strong>
                               <em>
                                 {['battle', 'boss', 'elite'].includes(node.kind)
-                                  ? `${makeEnemy(node, run.ruleset).maxHealth} health · ${victoryCoins(run, node)} coins + relic`
+                                  ? `${makeEnemy(node, run.ruleset, run.dusk).maxHealth} health · ${victoryCoins(run, node)} coins + relic`
                                   : node.kind === 'event'
                                     ? 'A story. A choice. A little consequence.'
                                     : node.kind === 'camp'
                                       ? 'Rest, refill a flask, or improve your blade.'
                                       : 'Trade coins for supplies and strength.'}
                               </em>
-                              {run.ruleset === 2 && waylightFor(node) && (
+                              {run.ruleset >= 2 && waylightFor(node) && (
                                 <span className="route-site-benefit">
                                   <Icon name="flame" size={11} />
                                   {WAYLIGHTS[waylightFor(node)!].name} ·{' '}
@@ -837,7 +837,7 @@ function KeeperPanel({ run }: { run: Run }) {
       </div>
       <div className="run-stats">
         <span>
-          <Icon name="sword" /> <b>{run.attack}</b>
+          <Icon name="sword" /> <b>{attackOf(run)}</b>
           <small>Attack</small>
         </span>
         <span>
@@ -867,7 +867,7 @@ function RelicInventory({ ids }: { ids: RelicId[] }) {
       <div className="section-label">
         <Icon name="gem" size={15} />
         <span>RELICS CARRIED</span>
-        <small>{ids.length} / 6</small>
+        <small>{ids.length}</small>
       </div>
       {ids.length ? (
         <div className="relic-list">
@@ -892,195 +892,9 @@ function RelicInventory({ ids }: { ids: RelicId[] }) {
   );
 }
 
-function Combat({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) {
-  const k = KEEPERS[run.keeper];
-  const e = run.enemy!;
-  const intent = intentFor(run)!;
-  const chapter = Math.floor(run.depth / 4);
-  const specialDamage = skillDamage(run);
-  return (
-    <section className="combat-board" aria-label="Turn-based combat">
-      <div className="arena">
-        <Landscape chapter={chapter} />
-        <div className="arena-shade" />
-        <div className="board-top">
-          <div>
-            <span className="eyebrow">
-              {NODE_LABELS[nodeAt(run.seed, run.depth, run.lane).kind].toUpperCase()}
-            </span>
-            <h2>{e.name}</h2>
-          </div>
-          <span className="turn-label">
-            TURN <b>{String(run.turn + 1).padStart(2, '0')}</b>
-          </span>
-        </div>
-        <div className="combat-figures">
-          <div className="hero-figure">
-            <KeeperPortrait keeper={run.keeper} />
-            <span>{k.name}</span>
-          </div>
-          <div className="versus">✧</div>
-          <div className="enemy-display">
-            <EnemyPortrait art={e.art} />
-            <div className="enemy-vitals">
-              <div>
-                <span>{e.name}</span>
-                <strong>
-                  {e.health} <small>/ {e.maxHealth}</small>
-                </strong>
-              </div>
-              <div
-                className="health-bar enemy-health"
-                role="meter"
-                aria-label="Enemy health"
-                aria-valuenow={e.health}
-                aria-valuemin={0}
-                aria-valuemax={e.maxHealth}
-              >
-                <i style={{ width: `${(e.health / e.maxHealth) * 100}%` }} />
-              </div>
-              <div className="enemy-statuses">
-                {e.guard > 0 && (
-                  <span>
-                    <Icon name="shield" size={12} /> {e.guard} guard
-                  </span>
-                )}
-                {e.poison > 0 && (
-                  <span className="poison">
-                    <Icon name="leaf" size={12} /> {e.poison} poison
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className={`intent-panel ${intent.damage > 10 ? 'danger-intent' : ''}`}>
-          <span className="intent-icon">
-            <Icon name={intent.damage ? 'sword' : intent.guard ? 'shield' : 'heart'} size={20} />
-          </span>
-          <div>
-            <span className="eyebrow">ENEMY INTENT</span>
-            <strong>{intent.name}</strong>
-          </div>
-          <p>
-            {intent.damage ? (
-              <>
-                <b>{incomingDamage(run)}</b> incoming{' '}
-                <small>
-                  ({intent.damage} raw − {run.armor} armor)
-                </small>
-              </>
-            ) : intent.guard ? (
-              <>
-                <b>+{intent.guard}</b> enemy guard
-              </>
-            ) : (
-              <>
-                <b>+{intent.heal}</b> enemy health
-              </>
-            )}
-            {intent.drain ? <small>Also drains {intent.drain} focus</small> : null}
-          </p>
-        </div>
-      </div>
-      <div className="combat-controls">
-        <div className="controls-heading">
-          <span>
-            YOUR MOVE <small>No rush. The dark can wait.</small>
-          </span>
-          <div className="focus-meter" aria-label={`Focus: ${run.focus} of 5`}>
-            <span>FOCUS</span>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <i key={i} className={i < run.focus ? 'filled' : ''} />
-            ))}
-            <b>{run.focus}/5</b>
-          </div>
-        </div>
-        <div className="action-grid">
-          <ActionButton
-            icon="sword"
-            title="Strike"
-            number="1"
-            detail={`Deal ${run.attack} damage`}
-            sub={`+${strikeFocus(run)} focus${strikeHealing(run) ? ` · heal ${strikeHealing(run)}` : ''}`}
-            onClick={() => dispatch({ type: 'strike' })}
-          />
-          <ActionButton
-            icon="shield"
-            title="Guard"
-            number="2"
-            detail={`Block ${guardAmount(run)} damage`}
-            sub={`+2 focus${run.relics.includes('briar') ? ' · deal 3 damage' : ''}`}
-            onClick={() => dispatch({ type: 'guard' })}
-          />
-          <ActionButton
-            icon={run.keeper === 'wayfarer' ? 'leaf' : 'sparkles'}
-            title={k.skill}
-            number="3"
-            detail={`Deal ${specialDamage}${run.keeper === 'seer' ? ' piercing' : ''} damage`}
-            sub={`${k.cost} focus${run.keeper === 'wayfarer' ? ` · +${poisonAmount(run)} poison` : run.keeper === 'warden' ? ' · +5 guard' : ' · bypass guard'}`}
-            disabled={run.focus < k.cost}
-            onClick={() => dispatch({ type: 'skill' })}
-            special
-          />
-          <ActionButton
-            icon="flask"
-            title="Drink flask"
-            number="4"
-            detail="Restore 16 health"
-            sub={`${run.flasks} remaining · ends turn`}
-            disabled={!run.flasks || run.health === run.maxHealth}
-            onClick={() => dispatch({ type: 'flask' })}
-          />
-        </div>
-        <p className="combat-footnote">
-          <Icon name="info" size={12} /> Every action ends your turn. Guard lasts one enemy action.
-          Poison bypasses guard.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function ActionButton({
-  icon,
-  title,
-  number,
-  detail,
-  sub,
-  disabled,
-  special,
-  onClick,
-}: {
-  icon: IconName;
-  title: string;
-  number: string;
-  detail: string;
-  sub: string;
-  disabled?: boolean;
-  special?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      className={`action-button ${special ? 'special-action' : ''}`}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <div>
-        <Icon name={icon} size={21} />
-        <kbd>{number}</kbd>
-      </div>
-      <strong>{title}</strong>
-      <span>{detail}</span>
-      <small>{sub}</small>
-    </button>
-  );
-}
-
 function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) {
   const boss = run.depth % 4 === 3;
-  const site = run.ruleset === 2 ? waylightFor(nodeAt(run.seed, run.depth, run.lane)) : null;
+  const site = run.ruleset >= 2 ? waylightFor(nodeOf(run)) : null;
   return (
     <section className="scene-board reward-board">
       <Landscape chapter={Math.floor(run.depth / 4)} />
@@ -1120,7 +934,9 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
               <span className="relic-large">
                 <Icon name={RELICS[id].icon as IconName} size={32} />
               </span>
-              <span className="eyebrow">RELIC</span>
+              <span className={`eyebrow rarity-${RELICS[id].rarity}`}>
+                {run.ruleset === 3 ? `${RELICS[id].rarity.toUpperCase()} RELIC` : 'RELIC'}
+              </span>
               <h3>{RELICS[id].name}</h3>
               <p>{RELICS[id].description}</p>
               <em>{RELICS[id].flavor}</em>
@@ -1145,7 +961,7 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
 }
 
 function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) {
-  const node = nodeAt(run.seed, run.depth, run.lane);
+  const node = nodeOf(run);
   const event = EVENTS[node.eventIndex];
   const shop = run.phase === 'shop';
   return (
@@ -1188,30 +1004,48 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
             ))
           ) : shop ? (
             <>
+              {(run.shop ?? []).map((id) => (
+                <button
+                  className={`story-option shop-relic rarity-${RELICS[id].rarity}`}
+                  key={id}
+                  disabled={!canBuy(run, id)}
+                  onClick={() => dispatch({ type: 'buy', item: id })}
+                >
+                  <Icon name={RELICS[id].icon as IconName} size={22} />
+                  <span>
+                    <strong>{RELICS[id].name}</strong>
+                    <small>
+                      {RELICS[id].rarity[0].toUpperCase() + RELICS[id].rarity.slice(1)} relic ·{' '}
+                      {RELICS[id].description}
+                    </small>
+                  </span>
+                  <span className="price">
+                    {priceOf(run, id)}
+                    <Icon name="coins" size={15} />
+                  </span>
+                </button>
+              ))}
               {(
                 [
                   {
                     item: 'flask',
                     title: 'A bottled sunrise',
-                    description: 'Gain 1 flask · restores 16 health in combat',
-                    price: 14,
+                    description: 'Gain 1 flask · restores health in combat',
                     icon: 'flask',
                   },
                   {
                     item: 'heal',
                     title: 'A little kindness',
                     description: 'Restore 20 health immediately',
-                    price: 18,
                     icon: 'heart',
                   },
                   {
                     item: 'forge',
                     title: 'An edge of dawn',
                     description: 'Permanently gain 2 attack',
-                    price: 35,
                     icon: 'sword',
                   },
-                ] as const
+                ] as { item: ShopItem; title: string; description: string; icon: IconName }[]
               ).map((o) => (
                 <button
                   className="story-option"
@@ -1233,7 +1067,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
                       <Icon name="check" />
                     ) : (
                       <>
-                        {o.price}
+                        {priceOf(run, o.item)}
                         <Icon name="coins" size={15} />
                       </>
                     )}
@@ -1252,7 +1086,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
                 <span>
                   <strong>Rest by the embers</strong>
                   <small>
-                    Restore 18 health · {run.health}/{run.maxHealth} now
+                    Restore {restAmount(run)} health · {run.health}/{run.maxHealth} now
                   </small>
                 </span>
                 <Icon name="arrow" size={17} />
@@ -1294,7 +1128,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
             </button>
             <p className="scene-hint">
               {shop
-                ? 'Each item can be bought once per visit.'
+                ? `You carry ${run.coins} coins. Each item can be bought once per visit.`
                 : 'Choose one comfort, then return to the road.'}
             </p>
           </>

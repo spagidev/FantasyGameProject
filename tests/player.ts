@@ -1,10 +1,10 @@
 import { atlasObjective, atlasGeography } from '../src/game/atlas';
-import { EVENTS, type EventOption, type RelicId } from '../src/game/data';
+import { EVENTS, RELICS, type EventOption, type RelicId } from '../src/game/data';
 import {
   canBuy,
   canEvent,
   nextNodes,
-  nodeAt,
+  nodeOf,
   transition,
   availableTalents,
   type Action,
@@ -19,11 +19,12 @@ export function bestCombatAction(run: Run): Action {
     { type: 'strike' },
     { type: 'guard' },
     { type: 'skill' },
+    { type: 'technique' },
     { type: 'flask' },
   ];
   let beam: Candidate[] = [{ run, first: actions[0], score: 0 }];
   let victory: Candidate | null = null;
-  for (let depth = 0; depth < 12; depth++) {
+  for (let depth = 0; depth < (run.ruleset === 3 ? 9 : 12); depth++) {
     const next: Candidate[] = [];
     const seen = new Set<string>();
     for (const c of beam)
@@ -36,6 +37,9 @@ export function bestCombatAction(run: Run): Action {
           r.focus * 1.1 -
           (r.enemy?.health ?? 0) * 0.75 -
           (r.enemy?.guard ?? 0) * 0.15 -
+          (r.frost ?? 0) * 1.5 -
+          (r.enemy?.fury ?? 0) * 2 +
+          (r.enemy?.stagger ? 3 : 0) -
           depth * 0.12;
         const candidate = { run: r, first: depth ? c.first : action, score };
         if (r.phase !== 'combat') {
@@ -48,7 +52,14 @@ export function bestCombatAction(run: Run): Action {
             r.enemy?.health,
             r.enemy?.guard,
             r.enemy?.poison,
-            r.turn % 3,
+            r.enemy?.step === undefined ? r.turn % 3 : r.enemy.step % r.enemy.pattern.length,
+            r.enemy?.poise,
+            r.enemy?.stagger,
+            r.enemy?.phase,
+            r.guard,
+            r.weak,
+            r.frost,
+            r.charge,
           ].join();
           if (!seen.has(key)) {
             seen.add(key);
@@ -88,14 +99,26 @@ export function campaignAction(r: Run): Action {
   }
   if (r.phase === 'reward') {
     const priority: RelicId[] = ['dawn', 'thread', 'hearthseed', 'mothglass', 'psalm', 'briar'];
+    if (r.ruleset === 3) {
+      if (r.health * 3 < r.maxHealth || !r.rewards.length) return { type: 'reward', id: 'heal' };
+      const rank = { rare: 2, uncommon: 1, common: 0 };
+      return {
+        type: 'reward',
+        id: [...r.rewards].sort((a, b) => rank[RELICS[b].rarity] - rank[RELICS[a].rarity])[0],
+      };
+    }
     return { type: 'reward', id: priority.find((id) => r.rewards.includes(id)) ?? 'heal' };
   }
   if (r.phase === 'event') {
-    const options = EVENTS[nodeAt(r.seed, r.depth, r.lane).eventIndex].options;
+    const options: EventOption[] = EVENTS[nodeOf(r).eventIndex].options;
     return {
       type: 'event',
       option: options.findIndex(
-        (o) => canEvent(r, o) && (((o as EventOption).health ?? 0) >= 0 || r.health > 20),
+        (o) =>
+          canEvent(r, o) &&
+          ((o.health ?? 0) >= 0 || r.health > 24) &&
+          ((o.flasks ?? 0) >= 0 || r.flasks > 2) &&
+          (o.maxHealth ?? 0) >= 0,
       ),
     };
   }
@@ -107,6 +130,17 @@ export function campaignAction(r: Run): Action {
         : r.flasks < 5
           ? { type: 'camp', choice: 'flask' }
           : { type: 'leave' };
+  if (r.phase === 'shop' && r.ruleset === 3) {
+    const relic = r.shop?.find((id) => canBuy(r, id));
+    if (relic && r.health * 2 > r.maxHealth) return { type: 'buy', item: relic };
+    return canBuy(r, 'heal') && r.health * 2 <= r.maxHealth
+      ? { type: 'buy', item: 'heal' }
+      : canBuy(r, 'forge')
+        ? { type: 'buy', item: 'forge' }
+        : canBuy(r, 'flask') && r.flasks < 3
+          ? { type: 'buy', item: 'flask' }
+          : { type: 'leave' };
+  }
   if (r.phase === 'shop')
     return canBuy(r, 'forge')
       ? { type: 'buy', item: 'forge' }

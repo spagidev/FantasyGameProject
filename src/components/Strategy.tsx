@@ -7,10 +7,13 @@ import {
   WAYLIGHTS,
   type WaylightId,
 } from '../game/data';
+import { describeTraits, FOES } from '../game/bestiary';
 import {
   availableTalents,
   makeEnemy,
   nextNodes,
+  priceOf,
+  restAmount,
   roadBenefits,
   victoryCoins,
   waylightFor,
@@ -19,7 +22,41 @@ import {
   type Run,
 } from '../game/engine';
 import { Landscape } from './Art';
+import { intentEffects } from './Combat';
 import { Icon, type IconName } from './Icon';
+import type { Intent } from '../game/data';
+
+function PatternList({ pattern, armor }: { pattern: Intent[]; armor: number | null }) {
+  return (
+    <ol className="scout-pattern">
+      {pattern.map((intent, i) => {
+        const hits = intent.hits ?? 1;
+        return (
+          <li key={`${intent.name}-${i}`}>
+            <span>{i + 1}</span>
+            <div>
+              <strong>{intent.name}</strong>
+              <p>
+                {[
+                  ...(intent.damage > 0
+                    ? [
+                        `${hits > 1 ? `${hits} hits of ${intent.damage}` : intent.damage} raw damage${
+                          armor !== null
+                            ? ` · ${Math.max(0, intent.damage - armor) * hits} after your armor`
+                            : ''
+                        }`,
+                      ]
+                    : []),
+                  ...intentEffects(intent),
+                ].join(' · ')}
+              </p>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 export function Scout({
   run,
@@ -31,8 +68,10 @@ export function Scout({
   onTravel: () => void;
 }) {
   const combat = ['battle', 'elite', 'boss'].includes(node.kind);
-  const enemy = combat ? makeEnemy(node, run?.ruleset ?? 2) : null;
-  const site = (run?.ruleset ?? 2) === 2 ? waylightFor(node) : null;
+  const enemy = combat ? makeEnemy(node, run?.ruleset ?? 3, run?.dusk ?? 0) : null;
+  const site = (run?.ruleset ?? 3) >= 2 ? waylightFor(node) : null;
+  const v3 = (run?.ruleset ?? 3) === 3;
+  const traits = describeTraits(enemy?.traits);
   const reachable = run && nextNodes(run).some((n) => n.id === node.id);
   return (
     <div className="scout-content">
@@ -66,25 +105,27 @@ export function Scout({
               coins + relic choice
             </span>
           </div>
+          {enemy.id && <p className="scout-blurb">{FOES[enemy.id].blurb}</p>}
+          {enemy.maxPoise !== undefined && (
+            <div className="scout-traits">
+              <span title="Hit damage wears poise down. At zero it is staggered.">
+                Poise {enemy.maxPoise}
+              </span>
+              {traits.map((t) => (
+                <span key={t.label} title={t.text}>
+                  {t.label} · {t.text}
+                </span>
+              ))}
+            </div>
+          )}
           <span className="eyebrow">THEIR PATTERN · REPEATS IN THIS ORDER</span>
-          <ol className="scout-pattern">
-            {enemy.pattern.map((intent, i) => (
-              <li key={intent.name}>
-                <span>{i + 1}</span>
-                <div>
-                  <strong>{intent.name}</strong>
-                  <p>
-                    {intent.damage > 0
-                      ? `${intent.damage} raw damage${run ? ` · ${Math.max(0, intent.damage - run.armor)} after your armor` : ''}`
-                      : intent.guard
-                        ? `Gain ${intent.guard} enemy guard`
-                        : `Restore ${intent.heal} enemy health`}
-                    {intent.drain ? ` · drain ${intent.drain} focus` : ''}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
+          <PatternList pattern={enemy.pattern} armor={run ? run.armor : null} />
+          {enemy.phase2 && (
+            <>
+              <span className="eyebrow">BELOW HALF HEALTH · {enemy.phase2.name.toUpperCase()}</span>
+              <PatternList pattern={enemy.phase2.pattern} armor={run ? run.armor : null} />
+            </>
+          )}
         </>
       )}
       {site && (
@@ -117,7 +158,7 @@ export function Scout({
           <p>A quiet place to prepare. Choose one comfort, then continue.</p>
           <div>
             <strong>Rest</strong>
-            <span>Restore 18 health</span>
+            <span>Restore {run ? restAmount(run) : 20} health</span>
           </div>
           <div>
             <strong>Refill</strong>
@@ -135,17 +176,27 @@ export function Scout({
             Each item is available once per visit. Buy any combination you can afford, then leave
             freely.
           </p>
+          {v3 && (
+            <div>
+              <strong>Three relics</strong>
+              <span>
+                {run
+                  ? `${priceOf(run, 'briar')}–${priceOf(run, 'chime')} coins, by rarity`
+                  : '40–75 coins, by rarity'}
+              </span>
+            </div>
+          )}
           <div>
             <strong>A flask</strong>
-            <span>14 coins</span>
+            <span>{run ? priceOf(run, 'flask') : 14} coins</span>
           </div>
           <div>
             <strong>Restore 20 health</strong>
-            <span>18 coins</span>
+            <span>{run ? priceOf(run, 'heal') : 18} coins</span>
           </div>
           <div>
             <strong>Gain 2 attack</strong>
-            <span>35 coins</span>
+            <span>{run ? priceOf(run, 'forge') : 35} coins</span>
           </div>
         </div>
       )}
