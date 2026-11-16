@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { newRun, transition, type Run } from '../src/game/engine';
+import { newRun, nextNodes, transition, type Run } from '../src/game/engine';
 import { advanceSave, emptySave, SAVE_KEY } from '../src/game/storage';
 import { campaignAction } from './player';
 
@@ -8,19 +8,19 @@ function scenes() {
   const found = new Map<string, Run>();
   let run = newRun('warden', 123),
     steps = 0;
-  while (!['won', 'lost'].includes(run.phase) && steps++ < 220) {
+  while (!['won', 'lost'].includes(run.phase) && steps++ < 600) {
     if (!found.has(run.phase)) found.set(run.phase, run);
-    if (run.phase === 'map' && run.depth === 1)
-      found.set('camp', transition(run, { type: 'travel', lane: run.lane === 2 ? 2 : 0 }));
-    run = transition(
-      run,
-      run.phase === 'map' && run.depth === 1 ? { type: 'travel', lane: 1 } : campaignAction(run),
-    );
+    // Routes are seeded: capture each kind of stop the first time one is within reach.
+    if (run.phase === 'map')
+      for (const node of nextNodes(run))
+        if (['camp', 'shop', 'event'].includes(node.kind) && !found.has(node.kind))
+          found.set(node.kind, transition(run, { type: 'travel', lane: node.lane }));
+    run = transition(run, campaignAction(run));
   }
   found.set(run.phase, run);
   let lost = transition(newRun('warden', 123), { type: 'travel', lane: 0 });
   lost = { ...lost, health: 1 };
-  lost = transition(lost, { type: 'strike' });
+  while (lost.phase === 'combat') lost = transition(lost, { type: 'strike' });
   found.set('lost', lost);
   return found;
 }

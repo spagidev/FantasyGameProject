@@ -1,4 +1,31 @@
-# Emberwake · Bundled Slovak maps checkpoint (v0.6.0)
+# Emberwake · The Long Night checkpoint (v0.7.0)
+
+## Latest user request
+
+“Produce a plan on how to make this game more logical, playable and addictive, then gradually implement it.” The plan and the measured diagnosis of v0.6 are in `docs/IMPROVEMENT_PLAN.md`; all four phases are implemented on branch `claude/game-improvement-plan-quwmax`.
+
+## Implemented in v0.7
+
+- **Ruleset 3** in `src/game/engine.ts` (`combat3`, `hit3`, `wear`, `drawRelics`, seeded `kindAt`/`foeAt`), content in `src/game/bestiary.ts` and `src/game/data.ts`. New runs default to it; `newRun(keeper, seed, atlas, { ruleset, dusk, pool, daily })`. Use `nodeOf(run)` for a run's own node; bare `nodeAt` defaults to the classic layout.
+- **Legacy preserved**: rulesets 1–2 run through `legacyCombat`/`legacyEnemy` unchanged; `engine.test.ts` and `strategy.test.ts` pin ruleset 2. Save format stays version 2; ruleset-3 runs carry extra validated fields. `profile.meta` (records) is sanitised, never a reason to reject a journal.
+- **Interface**: `src/components/Combat.tsx` (duel board, previews from `transition`, floaters, coaching), `Night.tsx` (Dusk picker, score card), `Chronicle.tsx` (codex tabs), `src/sound.ts` (switch in the footer), styles in `src/nightfall.css`. The old combat rules in `styles.css` are now unused.
+- **Balance**: scripted players over 60 seeds per keeper at Dusk 0 — strike-only 0%, simple heuristic (guard heavy blows, skill when affordable) 68/30/55% for Warden/Seer/Wayfarer, bounded search 100%. At Dusk 8 the search player wins 14 of 15 recorded runs. These are simulations, not human playtests.
+- `playwright.config.ts` also accepts the Chromium at `/opt/pw-browsers/chromium`.
+
+## Validation
+
+92 unit tests, 21 Chromium tests (full campaigns for three keepers and the Atlas, accessibility on every new screen, mobile), strict build, Worker packaging and the balance matrix pass.
+
+## Known limits
+
+- New enemies reuse four portraits with hue tints.
+- The Seer is the hardest keeper for a simple player (30%).
+- Atlas walking is still free; Atlas runs use fixed encounter kinds.
+- The Strike/skill labels show base damage; the result line under them is the exact figure.
+
+---
+
+# Earlier checkpoint · Bundled Slovak maps (v0.6.0)
 
 ## Latest user request
 

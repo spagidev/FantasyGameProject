@@ -1,8 +1,72 @@
-# Emberwake rules · Roads Rekindled (ruleset 2)
+# Emberwake rules
 
-This document is the contract for the pure state engine in `src/game/engine.ts`.
+This document is the contract for the pure state engine in `src/game/engine.ts`. New expeditions use **ruleset 3 · The Long Night**, described first. Journals from earlier versions keep ruleset 1 or 2 for the rest of their expedition; those rules follow unchanged below.
 
-New expeditions use ruleset 2. Imported or resumed version 1 expeditions keep the classic ruleset for their entire run. Base actions, chapter structure, relics, bosses, and prices are shared; the new waylights, lessons, and lane patterns below apply only to ruleset 2.
+## Ruleset 3 · The Long Night
+
+### Expedition
+
+Twelve crossings in three realms. In each realm: a waylight guardian (three lanes, three different enemies), two crossings arranged by the seed, then the bell guardian. The second crossing is always one story, one elite and one ordinary battle in a seeded order; the third always contains a sanctuary and a trader plus either a story or an elite, so every route can reach a sanctuary or a trader before the guardian. Lane movement is unchanged: all lanes at the start of a realm, otherwise the same or a neighbouring lane. A story scene never repeats within one expedition. Lost Atlas charts keep their fixed encounter kinds and use the same combat, relics and scenes.
+
+Keepers start as before (Warden 48/7/2, Seer 36/6/0, Wayfarer 40/6/1 health/attack/armor), with 35 coins and two flasks. The Seer starts every battle with 1 extra focus.
+
+### A turn
+
+1. **Your action.** Strike, Guard, keeper skill, keeper technique or flask. An unavailable action changes nothing.
+2. Weakness counts down by one (not after a flask, which removes it).
+3. **Poison** deals its stacks to the enemy, ignoring guard, then fades by 1.
+4. **Frost** costs you its stacks, ignoring guard and armor, then melts by 1.
+5. **The enemy acts**, unless it is staggered and this is the action it loses. Each hit deals `max(0, damage + fury − armor)`; multi-hit attacks apply armor to every hit; your guard absorbs the total. Then its other effects apply: guard, healing, fury, focus drain, weakness, frost.
+6. Regrowth heals the enemy. A guardian at or below half health changes to its second pattern, starting from its first intention; the action you were shown always resolves first.
+7. Unused guard is discarded (the Oathkeeper’s Buckle keeps up to 6).
+
+The interface shows the current and the following intention. The line under each action is produced by running the engine on that action, so it cannot disagree with the result.
+
+### Poise, stagger and perfect guards
+
+Every enemy has poise. Each of your hits reduces it by the damage of that hit before enemy guard is subtracted (Shield bash ×2, Bell Clapper ×1.5). At zero the enemy is **staggered**: it loses its next action — the intention is skipped, not delayed — and takes ×1.5 hit damage (×2 with the Executioner’s Chime) until it next acts. Poise then refills at 130% of its previous maximum, rounded up, and cannot be worn while the enemy is staggered.
+
+A **perfect guard** is an attack whose whole damage was absorbed by your guard. It wears poise by the amount blocked. If that breaks poise, the enemy loses its following action and stays exposed until the action after that.
+
+### Actions
+
+| Action                      | Effect                                                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Strike                      | Deal attack; +1 focus. Wayfarer heals 2. Costs thorns health against thorned enemies (never the last point). |
+| Guard                       | Gain `9 + armor` guard (Seer +4); +2 focus.                                                                  |
+| Flask                       | Restore 16; remove frost and weakness. Refused at full health with neither.                                  |
+| Warden · Sundering blow (3) | `2 × attack + 3` damage; +5 guard.                                                                           |
+| Warden · Shield bash (2)    | Damage equal to her Guard value; double poise damage. Not a Strike.                                          |
+| Seer · Starfire (3)         | `2 × attack + 7`, ignoring guard and plating.                                                                |
+| Seer · Foresee (2)          | Guard equal to the incoming damage. Refused when nothing is incoming.                                        |
+| Wayfarer · Nightbloom (2)   | `attack + 2` damage; +5 poison.                                                                              |
+| Wayfarer · Quicken (2)      | The enemy takes twice its poison stacks at once; stacks remain. Refused without poison.                      |
+
+Weakened hits deal 75%, rounded down; stagger multiplies next, rounded down; plating then subtracts (minimum 1).
+
+### Enemies
+
+The bestiary in `src/game/bestiary.ts` is the single source of every enemy’s health, poise, pattern, traits and second phase; scouting and the codex read the same data. Traits: **thorns N**, **regrowth N**, **plated N**. Intentions may carry `hits`, `guard`, `heal`, `drain`, `fury` (added permanently to every later hit), `weak` and `frost`.
+
+### Relics, lessons, traders, scenes
+
+After a victory choose one of three relics or recover 12 health. Offers are drawn without repetition from the relics this expedition can find and the keeper does not carry, weighted by rarity: battles 60/33/7 (common/uncommon/rare), elites 12/50/38, guardians 0/45/55, traders 40/40/20, scene gifts 45/40/15. The draw uses integer arithmetic on the seed only. Relic effects are exactly their descriptions in `RELICS`.
+
+After the first and second bell choose one of three lessons (each keeper has four; the seed hides one for the first choice). Traders stock three relics (40 / 55 / 75 coins by rarity) besides a flask (14), 20 health (18) and +2 attack (35); each once per visit. Sanctuaries offer rest (20 health), a flask, or +2 attack for 30 coins. Scenes have two or three options with every cost and reward stated; an option is refused if it cannot be paid in coins, flasks, health (at least 1 must remain) or maximum health.
+
+### Dusk
+
+A chosen level 0–8 applies all rules up to that level: (1) enemies +10% health; (2) elites and guardians hit 2 harder; (3) one starting flask; (4) poise +25%; (5) every enemy hits 1 harder; (6) rest restores 6 less; (7) trader prices +20%; (8) enemies a further +15% health and guardians begin with 2 fury. Completing an expedition at a keeper’s deepest open level opens the next.
+
+### Records
+
+`src/game/meta.ts`. Score = 10 per crossing + 150 per bell + 40 per elite + 5 per stagger + 3 per perfect guard + 100 for naming an Atlas city + (on completion) 300 and 2 per remaining health, all multiplied by `1 + 0.2 × dusk`. Deeds are judged on every saved step; twelve of them add one relic each to the pool of future expeditions. Records never change a keeper’s starting statistics. Unreadable records in a journal are dropped without rejecting the journal.
+
+---
+
+# Rulesets 1 and 2 (earlier journals)
+
+Before v0.7, new expeditions used ruleset 2. Imported or resumed version 1 expeditions keep the classic ruleset for their entire run. Base actions, chapter structure, relics, bosses, and prices are shared; the new waylights, lessons, and lane patterns below apply only to ruleset 2.
 
 ## Expedition
 

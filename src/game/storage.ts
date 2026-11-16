@@ -1,17 +1,27 @@
 import { validAtlas } from './atlas';
-import { KEEPERS, LORE, RELICS, TALENTS, WAYLIGHTS, type KeeperId } from './data';
-import type { Run } from './engine';
+import { FOES } from './bestiary';
+import { KEEPERS, LORE, NEW_TALENTS, RELICS, TALENTS, WAYLIGHTS, type KeeperId } from './data';
+import { DUSK_MAX, nodeOf, type Run } from './engine';
+import { advanceMeta, emptyMeta, sanitizeMeta, type Meta } from './meta';
 
 export const SAVE_KEY = 'emberwake.save.v2';
 export const LEGACY_SAVE_KEY = 'emberwake.save.v1';
 export const MAX_SAVE_BYTES = 2 * 1024 * 1024;
-export type Profile = { runs: number; wins: number; lore: string[]; lastKeeper: KeeperId };
+export type Profile = {
+  runs: number;
+  wins: number;
+  lore: string[];
+  lastKeeper: KeeperId;
+  /** Records, deeds and unlocks. Journals written before v0.7 do not carry it. */
+  meta?: Meta;
+};
+export const metaOf = (profile: Profile): Meta => profile.meta ?? emptyMeta();
 export type Save = { version: 2; run: Run | null; profile: Profile };
 export function emptySave(): Save {
   return {
     version: 2,
     run: null,
-    profile: { runs: 0, wins: 0, lore: ['beginning'], lastKeeper: 'warden' },
+    profile: { runs: 0, wins: 0, lore: ['beginning'], lastKeeper: 'warden', meta: emptyMeta() },
   };
 }
 
@@ -28,7 +38,7 @@ export function validRun(x: unknown): x is Run {
   if (
     !record(x) ||
     x.version !== 2 ||
-    (x.ruleset !== 1 && x.ruleset !== 2) ||
+    (x.ruleset !== 1 && x.ruleset !== 2 && x.ruleset !== 3) ||
     typeof x.keeper !== 'string' ||
     !Object.hasOwn(KEEPERS, x.keeper)
   )
@@ -66,9 +76,12 @@ export function validRun(x: unknown): x is Run {
     !integer(x.bells, 0, 3)
   )
     return false;
+  const v3 = x.ruleset === 3;
+  const relicIds = (v: unknown, max: number): v is string[] =>
+    strings(v, max) && v.every((id) => Object.hasOwn(RELICS, id)) && new Set(v).size === v.length;
   for (const key of ['relics', 'rewards']) {
     if (
-      !strings(x[key], 6) ||
+      !strings(x[key], v3 ? Object.keys(RELICS).length : 6) ||
       !x[key].every((id) => Object.hasOwn(RELICS, id)) ||
       new Set(x[key]).size !== x[key].length
     )
@@ -80,14 +93,40 @@ export function validRun(x: unknown): x is Run {
     !strings(x.talents, 2) ||
     new Set(x.talents).size !== x.talents.length ||
     !x.talents.every(
-      (id) => Object.hasOwn(TALENTS, id) && TALENTS[id as keyof typeof TALENTS].keeper === x.keeper,
+      (id) =>
+        Object.hasOwn(TALENTS, id) &&
+        TALENTS[id as keyof typeof TALENTS].keeper === x.keeper &&
+        (v3 || !(NEW_TALENTS as string[]).includes(id)),
     )
   )
     return false;
+  if (v3) {
+    const s = x.stats;
+    if (
+      !integer(x.dusk, 0, DUSK_MAX) ||
+      !relicIds(x.pool, Object.keys(RELICS).length) ||
+      !relicIds(x.shop, 3) ||
+      !integer(x.weak, 0, 99) ||
+      !integer(x.frost, 0, 999) ||
+      typeof x.charge !== 'boolean' ||
+      !integer(x.strikes, 0) ||
+      !strings(x.spent, 4) ||
+      !x.spent.every((id) => id === 'cinder') ||
+      !strings(x.slain, 12) ||
+      !x.slain.every((id) => Object.hasOwn(FOES, id)) ||
+      !record(s) ||
+      !['turns', 'staggers', 'parries', 'taken', 'elites', 'flasks', 'bestHit'].every((k) =>
+        integer(s[k], 0, 1000000),
+      ) ||
+      (x.daily !== undefined &&
+        (typeof x.daily !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(x.daily)))
+    )
+      return false;
+  }
   if (
     x.atlas !== undefined &&
     (!validAtlas(x.atlas) ||
-      x.ruleset !== 2 ||
+      x.ruleset === 1 ||
       x.atlas.attempts.some((g) => g.bell > (x.bells as number)))
   )
     return false;
@@ -101,8 +140,10 @@ export function validRun(x: unknown): x is Run {
     !strings(x.path, 12) ||
     x.path.length !== x.depth + 1 ||
     !knownLore(x.lore) ||
-    !strings(x.purchased, 3) ||
-    !x.purchased.every((p) => ['flask', 'heal', 'forge'].includes(p))
+    !strings(x.purchased, v3 ? 6 : 3) ||
+    !x.purchased.every(
+      (p) => ['flask', 'heal', 'forge'].includes(p) || (v3 && Object.hasOwn(RELICS, p)),
+    )
   )
     return false;
   if (x.ending !== null && x.ending !== 'dawn' && x.ending !== 'hearth') return false;
@@ -122,20 +163,47 @@ export function validRun(x: unknown): x is Run {
       !integer(e.poison, 0, 10000)
     )
       return false;
-    if (
-      !Array.isArray(e.pattern) ||
-      e.pattern.length < 1 ||
-      e.pattern.length > 10 ||
-      !e.pattern.every(
+    const validPattern = (pattern: unknown[]) =>
+      pattern.length >= 1 &&
+      pattern.length <= 10 &&
+      pattern.every(
         (i) =>
           record(i) &&
           typeof i.name === 'string' &&
           i.name.length <= 100 &&
           integer(i.damage, 0, 1000) &&
-          ['guard', 'heal', 'drain'].every((k) => i[k] === undefined || integer(i[k], 0, 1000)),
+          ['guard', 'heal', 'drain', 'hits', 'fury', 'weak', 'frost'].every(
+            (k) => i[k] === undefined || integer(i[k], 0, 1000),
+          ),
+      );
+    if (!Array.isArray(e.pattern) || !validPattern(e.pattern)) return false;
+    if (v3) {
+      const t = e.traits;
+      const p2 = e.phase2;
+      if (
+        typeof e.id !== 'string' ||
+        !Object.hasOwn(FOES, e.id) ||
+        !integer(e.tint, 0, 360) ||
+        !integer(e.step, 0) ||
+        !integer(e.maxPoise, 1, 100000) ||
+        !integer(e.poise, 0, e.maxPoise) ||
+        !integer(e.stagger, 0, 2) ||
+        !integer(e.fury, 0, 1000) ||
+        (e.phase !== 1 && e.phase !== 2) ||
+        (t !== undefined &&
+          (!record(t) ||
+            !Object.entries(t).every(
+              ([k, v]) => ['thorns', 'regen', 'plated'].includes(k) && integer(v, 1, 100),
+            ))) ||
+        (p2 !== undefined &&
+          (!record(p2) ||
+            typeof p2.name !== 'string' ||
+            p2.name.length > 100 ||
+            !Array.isArray(p2.pattern) ||
+            !validPattern(p2.pattern)))
       )
-    )
-      return false;
+        return false;
+    }
   }
   if (x.phase === 'combat' && (!record(x.enemy) || x.enemy.health === 0 || x.health === 0))
     return false;
@@ -145,8 +213,14 @@ export function validRun(x: unknown): x is Run {
   if ((x.phase === 'won' || x.phase === 'ending') && (x.depth !== 11 || x.bells !== 3))
     return false;
   if (x.phase === 'won' && x.ending === null) return false;
-  if (x.phase === 'event' && x.depth % 4 !== 1) return false;
-  if (['camp', 'shop'].includes(String(x.phase)) && x.depth % 4 !== 2) return false;
+  if (v3) {
+    const kind = x.depth >= 0 ? nodeOf(x as unknown as Run).kind : null;
+    if (['event', 'camp', 'shop'].includes(String(x.phase)) && kind !== x.phase) return false;
+    if (x.phase === 'combat' && !['battle', 'elite', 'boss'].includes(String(kind))) return false;
+  } else {
+    if (x.phase === 'event' && x.depth % 4 !== 1) return false;
+    if (['camp', 'shop'].includes(String(x.phase)) && x.depth % 4 !== 2) return false;
+  }
   return true;
 }
 
@@ -183,7 +257,7 @@ export function decodeSave(raw: string): Save | null {
       !Object.hasOwn(KEEPERS, p.lastKeeper)
     )
       return null;
-    return x as Save;
+    return { ...x, profile: { ...p, meta: sanitizeMeta(p.meta) } } as Save;
   } catch {
     return null;
   }
@@ -192,14 +266,19 @@ export function decodeSave(raw: string): Save | null {
 export function advanceSave(save: Save, run: Run): Save {
   const terminal = run.phase === 'won' || run.phase === 'lost';
   const alreadyTerminal = save.run?.phase === 'won' || save.run?.phase === 'lost';
+  const finished = terminal && !alreadyTerminal;
+  const lore = [...new Set([...save.profile.lore, ...run.lore])];
+  // Only the same expedition's previous step counts as "before".
+  const before = save.run && save.run.seed === run.seed ? save.run : null;
   return {
     version: 2,
     run,
     profile: {
-      runs: save.profile.runs + (terminal && !alreadyTerminal ? 1 : 0),
-      wins: save.profile.wins + (run.phase === 'won' && !alreadyTerminal ? 1 : 0),
+      runs: save.profile.runs + (finished ? 1 : 0),
+      wins: save.profile.wins + (finished && run.phase === 'won' ? 1 : 0),
       lastKeeper: run.keeper,
-      lore: [...new Set([...save.profile.lore, ...run.lore])],
+      lore,
+      meta: advanceMeta(metaOf(save.profile), run, lore, before, finished),
     },
   };
 }

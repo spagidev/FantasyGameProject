@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { TALENTS, type KeeperId, type TalentId } from './data';
+import { NEW_TALENTS, TALENTS, type KeeperId, type TalentId } from './data';
 import {
   availableTalents,
   guardAmount,
   makeEnemy,
-  newRun,
+  newRun as makeRun,
   nodeAt,
   poisonAmount,
   roadBenefits,
@@ -17,6 +17,9 @@ import {
 } from './engine';
 import { advanceSave, decodeSave, emptySave, validRun } from './storage';
 import { campaignAction } from '../../tests/player';
+
+// These suites pin the first two rulesets. Ruleset 3 is covered in nightfall.test.ts.
+const newRun = (keeper: KeeperId, seed: number) => makeRun(keeper, seed, false, { ruleset: 2 });
 
 function winFirst(lane: number) {
   let run = transition(newRun('warden', 123), { type: 'travel', lane });
@@ -126,7 +129,9 @@ describe('remembered lessons', () => {
     const won = transition(fight, { type: 'strike' });
     expect(won.health).toBe(24);
     expect(won.coins).toBe(35 + 18 + 6);
-    expect(Object.keys(TALENTS)).toHaveLength(9);
+    expect(Object.keys(TALENTS).filter((id) => !NEW_TALENTS.includes(id as TalentId))).toHaveLength(
+      9,
+    );
   });
   it('roundtrips an unchosen lesson without paying for it twice', () => {
     const run = atFirstLesson('seer');

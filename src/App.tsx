@@ -15,6 +15,7 @@ import {
   type RelicId,
 } from './game/data';
 import {
+  attackOf,
   canBuy,
   canEvent,
   incomingDamage,
@@ -22,31 +23,35 @@ import {
   makeEnemy,
   newRun,
   nextNodes,
-  nodeAt,
+  nodeOf,
+  priceOf,
+  restAmount,
   transition,
-  guardAmount,
-  skillDamage,
-  strikeFocus,
-  strikeHealing,
-  poisonAmount,
   waylightFor,
   victoryCoins,
   type Action,
   type Run,
   type MapNode,
+  type ShopItem,
 } from './game/engine';
 import {
   advanceSave,
   decodeSave,
   emptySave,
+  metaOf,
   SAVE_KEY,
   LEGACY_SAVE_KEY,
   type Save,
 } from './game/storage';
+import { DEEDS, dailyRoad, duskUnlocked, unlockedRelics, type Meta } from './game/meta';
+import { Chronicle } from './components/Chronicle';
+import { DuskPicker, ScoreCard } from './components/Night';
 import { EnemyPortrait, KeeperPortrait, Landscape } from './components/Art';
 import { Icon, type IconName } from './components/Icon';
 import { Modal } from './components/Modal';
 import { RouteMap } from './components/RouteMap';
+import { Combat, combatKeys } from './components/Combat';
+import { play, setSound } from './sound';
 import { Journal } from './components/Journal';
 import { Scout, TalentChoice, WaylightsPanel } from './components/Strategy';
 import { AtlasMap, AtlasJournal } from './components/Atlas';
@@ -96,6 +101,16 @@ export default function App() {
   const [scouted, setScouted] = useState<MapNode | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const run = save.run;
+  const meta = metaOf(save.profile);
+  const [dusk, setDusk] = useState(0);
+  const night = Math.min(dusk, duskUnlocked(meta, keeper));
+  // Deeds completed since this page opened, for the toast and the ending screen.
+  const knownDeeds = useRef(meta.deeds);
+  const [earned, setEarned] = useState<string[]>([]);
+  const [toast, setToast] = useState<string[]>([]);
+  const bestBefore = useRef(run ? (meta.best[run.keeper] ?? 0) : 0);
+  if (run && !terminal(run)) bestBefore.current = meta.best[run.keeper] ?? 0;
+  const today = dailyRoad(new Date());
   const chapter = run
     ? Math.floor(Math.min(11, run.phase === 'map' ? run.depth + 1 : run.depth) / 4)
     : 0;
@@ -122,6 +137,25 @@ export default function App() {
   }, [save]);
 
   useEffect(() => {
+    const fresh = meta.deeds.filter((id) => !knownDeeds.current.includes(id));
+    knownDeeds.current = meta.deeds;
+    if (!fresh.length) return;
+    setEarned((e) => [...e, ...fresh]);
+    setToast(fresh);
+    play('deed');
+    const timer = setTimeout(() => setToast([]), 6500);
+    return () => clearTimeout(timer);
+  }, [meta.deeds]);
+
+  useEffect(() => setSound(meta.sound), [meta.sound]);
+  const bells = run?.bells ?? 0;
+  const rung = useRef(bells);
+  useEffect(() => {
+    if (bells > rung.current) play('bell');
+    rung.current = bells;
+  }, [bells]);
+
+  useEffect(() => {
     if (run && view === 'journey' && window.matchMedia('(max-width: 740px)').matches) {
       boardRef.current?.parentElement?.scrollIntoView({ behavior: 'instant', block: 'start' });
     }
@@ -133,7 +167,8 @@ export default function App() {
         modal ||
         scouted ||
         view !== 'journey' ||
-        run?.phase !== 'combat' ||
+        !run ||
+        run.phase !== 'combat' ||
         event.repeat ||
         event.ctrlKey ||
         event.metaKey ||
@@ -143,17 +178,15 @@ export default function App() {
             event.target.isContentEditable))
       )
         return;
-      const type = ({ '1': 'strike', '2': 'guard', '3': 'skill', '4': 'flask' } as const)[
-        event.key as '1'
-      ];
-      if (type) {
+      const type = combatKeys(run)[Number(event.key) - 1];
+      if (type && /^[1-5]$/.test(event.key)) {
         event.preventDefault();
         dispatch({ type });
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [run?.phase, modal, scouted, view, dispatch]);
+  }, [run?.phase, run?.ruleset, modal, scouted, view, dispatch]);
 
   function cancelAtlas() {
     atlasRequest.current?.abort();
@@ -161,13 +194,20 @@ export default function App() {
     setAtlasLoading(false);
   }
   useEffect(() => () => atlasRequest.current?.abort(), []);
-  async function start() {
+  async function start(
+    options: { daily?: boolean; keeper?: KeeperId; dusk?: number; classic?: boolean } = {},
+  ) {
     if (atlasRequest.current) return;
-    const newSeed = seed.trim()
-      ? seedFrom(seed.trim())
-      : crypto.getRandomValues(new Uint32Array(1))[0];
-    let selectedChart: boolean | RegionalChart = expedition === 'atlas';
-    if (expedition === 'atlas' && !offlineAtlas) {
+    const who = options.daily ? today.keeper : (options.keeper ?? keeper);
+    const mode = options.daily || options.classic ? 'classic' : expedition;
+    const level = options.daily ? 0 : Math.min(options.dusk ?? night, duskUnlocked(meta, who));
+    const newSeed = options.daily
+      ? today.seed
+      : seed.trim() && !options.keeper
+        ? seedFrom(seed.trim())
+        : crypto.getRandomValues(new Uint32Array(1))[0];
+    let selectedChart: boolean | RegionalChart = mode === 'atlas';
+    if (mode === 'atlas' && !offlineAtlas) {
       const controller = new AbortController();
       atlasRequest.current = controller;
       setAtlasLoading(true);
@@ -205,13 +245,20 @@ export default function App() {
         }
       }
     }
-    if (expedition !== 'atlas' || offlineAtlas) setAtlasNotice('');
+    if (mode !== 'atlas' || offlineAtlas) setAtlasNotice('');
+    setEarned([]);
+    setKeeper(who);
     setSave((s) => ({
       ...s,
-      run: newRun(keeper, newSeed, selectedChart),
-      profile: { ...s.profile, lastKeeper: keeper },
+      run: newRun(who, newSeed, selectedChart, {
+        dusk: level,
+        pool: unlockedRelics(metaOf(s.profile)),
+        ...(options.daily ? { daily: today.id } : {}),
+      }),
+      profile: { ...s.profile, lastKeeper: who },
     }));
     setView('journey');
+    window.scrollTo({ top: 0, behavior: 'instant' });
   }
 
   return (
@@ -290,6 +337,7 @@ export default function App() {
             lore={save.profile.lore}
             runs={save.profile.runs}
             wins={save.profile.wins}
+            meta={meta}
             onBack={() => setView('journey')}
           />
         ) : (
@@ -361,7 +409,11 @@ export default function App() {
                     ? 'THE LOST ATLAS'
                     : run?.ruleset === 1
                       ? 'THE FIRST CROSSING'
-                      : 'ROADS REKINDLED'}
+                      : run?.ruleset === 2
+                        ? 'ROADS REKINDLED'
+                        : run?.daily
+                          ? `TODAY’S ROAD · ${run.daily}`
+                          : `THE LONG NIGHT${run ? ` · DUSK ${run.dusk ?? 0}` : ''}`}
                 </span>
                 <div className="meta-items">
                   <span>
@@ -431,7 +483,11 @@ export default function App() {
                     <RouteMap run={run} onInspect={setScouted} />
                   )
                 ) : run.phase === 'combat' ? (
-                  <Combat run={run} dispatch={dispatch} />
+                  <Combat
+                    run={run}
+                    dispatch={dispatch}
+                    coach={save.profile.wins === 0 && run.depth < 4}
+                  />
                 ) : run.phase === 'reward' ? (
                   <Rewards run={run} dispatch={dispatch} />
                 ) : run.phase === 'talent' ? (
@@ -442,9 +498,27 @@ export default function App() {
                   <Ending
                     run={run}
                     dispatch={dispatch}
+                    meta={meta}
+                    earned={earned}
+                    previousBest={bestBefore.current}
+                    onAgain={
+                      run.ruleset === 3 && !run.atlas && !run.daily
+                        ? () =>
+                            void start({
+                              keeper: run.keeper,
+                              classic: true,
+                              dusk:
+                                run.phase === 'won'
+                                  ? Math.min(duskUnlocked(meta, run.keeper), (run.dusk ?? 0) + 1)
+                                  : (run.dusk ?? 0),
+                            })
+                        : undefined
+                    }
                     onRestart={() => {
                       setKeeper(run.keeper);
+                      setDusk(duskUnlocked(meta, run.keeper));
                       setSave((s) => ({ ...s, run: null }));
+                      window.scrollTo({ top: 0, behavior: 'instant' });
                     }}
                   />
                 )}
@@ -573,6 +647,13 @@ export default function App() {
                       </div>
                       <span className="keeper-style">{KEEPERS[keeper].style}</span>
                     </div>
+                    <DuskPicker
+                      meta={meta}
+                      keeper={keeper}
+                      dusk={night}
+                      onDusk={setDusk}
+                      disabled={atlasLoading}
+                    />
                     <div className="start-section">
                       <label className="seed-label" htmlFor="journey-seed">
                         Journey seed <span>optional · the same word, the same road</span>
@@ -587,7 +668,7 @@ export default function App() {
                       />
                       <button
                         className="primary-button"
-                        onClick={start}
+                        onClick={() => void start()}
                         disabled={
                           atlasLoading ||
                           (expedition === 'atlas' &&
@@ -602,6 +683,23 @@ export default function App() {
                       <span className="start-note">
                         <Icon name="check" size={13} /> Your progress is saved after every move.
                       </span>
+                      <button
+                        className="daily-button"
+                        disabled={atlasLoading}
+                        onClick={() => void start({ daily: true })}
+                      >
+                        <Icon name="sun" size={16} />
+                        <span>
+                          Today’s road · {today.id}
+                          <small>
+                            The same seeded crossing for everyone today, as{' '}
+                            {KEEPERS[today.keeper].name}.{' '}
+                            {meta.daily[today.id]
+                              ? `Your best: ${meta.daily[today.id].toLocaleString('en')}.`
+                              : 'Not yet walked.'}
+                          </small>
+                        </span>
+                      </button>
                     </div>
                     <div className="lore-note">
                       <Icon name="book" size={18} />
@@ -636,14 +734,14 @@ export default function App() {
                               <strong>{node.name}</strong>
                               <em>
                                 {['battle', 'boss', 'elite'].includes(node.kind)
-                                  ? `${makeEnemy(node, run.ruleset).maxHealth} health · ${victoryCoins(run, node)} coins + relic`
+                                  ? `${makeEnemy(node, run.ruleset, run.dusk).maxHealth} health · ${victoryCoins(run, node)} coins + relic`
                                   : node.kind === 'event'
                                     ? 'A story. A choice. A little consequence.'
                                     : node.kind === 'camp'
                                       ? 'Rest, refill a flask, or improve your blade.'
                                       : 'Trade coins for supplies and strength.'}
                               </em>
-                              {run.ruleset === 2 && waylightFor(node) && (
+                              {run.ruleset >= 2 && waylightFor(node) && (
                                 <span className="route-site-benefit">
                                   <Icon name="flame" size={11} />
                                   {WAYLIGHTS[waylightFor(node)!].name} ·{' '}
@@ -729,10 +827,38 @@ export default function App() {
           {saved ? 'Saved on this device' : 'Playing in this tab'} · Journal{' '}
           <Icon name="book" size={12} />
         </button>
+        <button
+          className="sound-toggle"
+          aria-label={meta.sound ? 'Turn sound off' : 'Turn sound on'}
+          aria-pressed={meta.sound}
+          onClick={() => {
+            setSound(!meta.sound);
+            setSave((s) => ({
+              ...s,
+              profile: { ...s.profile, meta: { ...metaOf(s.profile), sound: !meta.sound } },
+            }));
+          }}
+        >
+          <Icon name="bell" size={17} />
+          <span>{meta.sound ? 'Sound on' : 'Sound off'}</span>
+        </button>
         <button onClick={() => setModal('help')}>
           Keep a little light with you <Icon name="external" size={12} />
         </button>
       </footer>
+      {toast.length > 0 && (
+        <div className="deed-toast" role="status">
+          {DEEDS.filter((d) => toast.includes(d.id)).map((d) => (
+            <p key={d.id}>
+              <Icon name="sparkles" size={16} />
+              <span>
+                <b>Deed · {d.name}</b>
+                {d.unlocks ? `Future roads can now offer the ${RELICS[d.unlocks].name}.` : d.text}
+              </span>
+            </p>
+          ))}
+        </div>
+      )}
       <div className="sr-only" role="status" aria-live="polite">
         {run
           ? `${run.phase === 'combat' ? `Turn ${run.turn + 1}. Health ${run.health}. ${intentFor(run)?.name}: ${intentFor(run)?.damage} raw damage.` : run.phase === 'map' ? 'Choose your next path.' : run.phase === 'reward' ? 'Victory. Choose your reward.' : run.phase === 'lost' ? 'Your expedition has ended.' : run.phase === 'won' ? 'Your expedition is complete.' : run.phase}`
@@ -837,7 +963,7 @@ function KeeperPanel({ run }: { run: Run }) {
       </div>
       <div className="run-stats">
         <span>
-          <Icon name="sword" /> <b>{run.attack}</b>
+          <Icon name="sword" /> <b>{attackOf(run)}</b>
           <small>Attack</small>
         </span>
         <span>
@@ -867,7 +993,7 @@ function RelicInventory({ ids }: { ids: RelicId[] }) {
       <div className="section-label">
         <Icon name="gem" size={15} />
         <span>RELICS CARRIED</span>
-        <small>{ids.length} / 6</small>
+        <small>{ids.length}</small>
       </div>
       {ids.length ? (
         <div className="relic-list">
@@ -892,195 +1018,9 @@ function RelicInventory({ ids }: { ids: RelicId[] }) {
   );
 }
 
-function Combat({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) {
-  const k = KEEPERS[run.keeper];
-  const e = run.enemy!;
-  const intent = intentFor(run)!;
-  const chapter = Math.floor(run.depth / 4);
-  const specialDamage = skillDamage(run);
-  return (
-    <section className="combat-board" aria-label="Turn-based combat">
-      <div className="arena">
-        <Landscape chapter={chapter} />
-        <div className="arena-shade" />
-        <div className="board-top">
-          <div>
-            <span className="eyebrow">
-              {NODE_LABELS[nodeAt(run.seed, run.depth, run.lane).kind].toUpperCase()}
-            </span>
-            <h2>{e.name}</h2>
-          </div>
-          <span className="turn-label">
-            TURN <b>{String(run.turn + 1).padStart(2, '0')}</b>
-          </span>
-        </div>
-        <div className="combat-figures">
-          <div className="hero-figure">
-            <KeeperPortrait keeper={run.keeper} />
-            <span>{k.name}</span>
-          </div>
-          <div className="versus">✧</div>
-          <div className="enemy-display">
-            <EnemyPortrait art={e.art} />
-            <div className="enemy-vitals">
-              <div>
-                <span>{e.name}</span>
-                <strong>
-                  {e.health} <small>/ {e.maxHealth}</small>
-                </strong>
-              </div>
-              <div
-                className="health-bar enemy-health"
-                role="meter"
-                aria-label="Enemy health"
-                aria-valuenow={e.health}
-                aria-valuemin={0}
-                aria-valuemax={e.maxHealth}
-              >
-                <i style={{ width: `${(e.health / e.maxHealth) * 100}%` }} />
-              </div>
-              <div className="enemy-statuses">
-                {e.guard > 0 && (
-                  <span>
-                    <Icon name="shield" size={12} /> {e.guard} guard
-                  </span>
-                )}
-                {e.poison > 0 && (
-                  <span className="poison">
-                    <Icon name="leaf" size={12} /> {e.poison} poison
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className={`intent-panel ${intent.damage > 10 ? 'danger-intent' : ''}`}>
-          <span className="intent-icon">
-            <Icon name={intent.damage ? 'sword' : intent.guard ? 'shield' : 'heart'} size={20} />
-          </span>
-          <div>
-            <span className="eyebrow">ENEMY INTENT</span>
-            <strong>{intent.name}</strong>
-          </div>
-          <p>
-            {intent.damage ? (
-              <>
-                <b>{incomingDamage(run)}</b> incoming{' '}
-                <small>
-                  ({intent.damage} raw − {run.armor} armor)
-                </small>
-              </>
-            ) : intent.guard ? (
-              <>
-                <b>+{intent.guard}</b> enemy guard
-              </>
-            ) : (
-              <>
-                <b>+{intent.heal}</b> enemy health
-              </>
-            )}
-            {intent.drain ? <small>Also drains {intent.drain} focus</small> : null}
-          </p>
-        </div>
-      </div>
-      <div className="combat-controls">
-        <div className="controls-heading">
-          <span>
-            YOUR MOVE <small>No rush. The dark can wait.</small>
-          </span>
-          <div className="focus-meter" aria-label={`Focus: ${run.focus} of 5`}>
-            <span>FOCUS</span>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <i key={i} className={i < run.focus ? 'filled' : ''} />
-            ))}
-            <b>{run.focus}/5</b>
-          </div>
-        </div>
-        <div className="action-grid">
-          <ActionButton
-            icon="sword"
-            title="Strike"
-            number="1"
-            detail={`Deal ${run.attack} damage`}
-            sub={`+${strikeFocus(run)} focus${strikeHealing(run) ? ` · heal ${strikeHealing(run)}` : ''}`}
-            onClick={() => dispatch({ type: 'strike' })}
-          />
-          <ActionButton
-            icon="shield"
-            title="Guard"
-            number="2"
-            detail={`Block ${guardAmount(run)} damage`}
-            sub={`+2 focus${run.relics.includes('briar') ? ' · deal 3 damage' : ''}`}
-            onClick={() => dispatch({ type: 'guard' })}
-          />
-          <ActionButton
-            icon={run.keeper === 'wayfarer' ? 'leaf' : 'sparkles'}
-            title={k.skill}
-            number="3"
-            detail={`Deal ${specialDamage}${run.keeper === 'seer' ? ' piercing' : ''} damage`}
-            sub={`${k.cost} focus${run.keeper === 'wayfarer' ? ` · +${poisonAmount(run)} poison` : run.keeper === 'warden' ? ' · +5 guard' : ' · bypass guard'}`}
-            disabled={run.focus < k.cost}
-            onClick={() => dispatch({ type: 'skill' })}
-            special
-          />
-          <ActionButton
-            icon="flask"
-            title="Drink flask"
-            number="4"
-            detail="Restore 16 health"
-            sub={`${run.flasks} remaining · ends turn`}
-            disabled={!run.flasks || run.health === run.maxHealth}
-            onClick={() => dispatch({ type: 'flask' })}
-          />
-        </div>
-        <p className="combat-footnote">
-          <Icon name="info" size={12} /> Every action ends your turn. Guard lasts one enemy action.
-          Poison bypasses guard.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function ActionButton({
-  icon,
-  title,
-  number,
-  detail,
-  sub,
-  disabled,
-  special,
-  onClick,
-}: {
-  icon: IconName;
-  title: string;
-  number: string;
-  detail: string;
-  sub: string;
-  disabled?: boolean;
-  special?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      className={`action-button ${special ? 'special-action' : ''}`}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <div>
-        <Icon name={icon} size={21} />
-        <kbd>{number}</kbd>
-      </div>
-      <strong>{title}</strong>
-      <span>{detail}</span>
-      <small>{sub}</small>
-    </button>
-  );
-}
-
 function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) {
   const boss = run.depth % 4 === 3;
-  const site = run.ruleset === 2 ? waylightFor(nodeAt(run.seed, run.depth, run.lane)) : null;
+  const site = run.ruleset >= 2 ? waylightFor(nodeOf(run)) : null;
   return (
     <section className="scene-board reward-board">
       <Landscape chapter={Math.floor(run.depth / 4)} />
@@ -1120,7 +1060,9 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
               <span className="relic-large">
                 <Icon name={RELICS[id].icon as IconName} size={32} />
               </span>
-              <span className="eyebrow">RELIC</span>
+              <span className={`eyebrow rarity-${RELICS[id].rarity}`}>
+                {run.ruleset === 3 ? `${RELICS[id].rarity.toUpperCase()} RELIC` : 'RELIC'}
+              </span>
               <h3>{RELICS[id].name}</h3>
               <p>{RELICS[id].description}</p>
               <em>{RELICS[id].flavor}</em>
@@ -1145,7 +1087,7 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
 }
 
 function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) {
-  const node = nodeAt(run.seed, run.depth, run.lane);
+  const node = nodeOf(run);
   const event = EVENTS[node.eventIndex];
   const shop = run.phase === 'shop';
   return (
@@ -1188,30 +1130,48 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
             ))
           ) : shop ? (
             <>
+              {(run.shop ?? []).map((id) => (
+                <button
+                  className={`story-option shop-relic rarity-${RELICS[id].rarity}`}
+                  key={id}
+                  disabled={!canBuy(run, id)}
+                  onClick={() => dispatch({ type: 'buy', item: id })}
+                >
+                  <Icon name={RELICS[id].icon as IconName} size={22} />
+                  <span>
+                    <strong>{RELICS[id].name}</strong>
+                    <small>
+                      {RELICS[id].rarity[0].toUpperCase() + RELICS[id].rarity.slice(1)} relic ·{' '}
+                      {RELICS[id].description}
+                    </small>
+                  </span>
+                  <span className="price">
+                    {priceOf(run, id)}
+                    <Icon name="coins" size={15} />
+                  </span>
+                </button>
+              ))}
               {(
                 [
                   {
                     item: 'flask',
                     title: 'A bottled sunrise',
-                    description: 'Gain 1 flask · restores 16 health in combat',
-                    price: 14,
+                    description: 'Gain 1 flask · restores health in combat',
                     icon: 'flask',
                   },
                   {
                     item: 'heal',
                     title: 'A little kindness',
                     description: 'Restore 20 health immediately',
-                    price: 18,
                     icon: 'heart',
                   },
                   {
                     item: 'forge',
                     title: 'An edge of dawn',
                     description: 'Permanently gain 2 attack',
-                    price: 35,
                     icon: 'sword',
                   },
-                ] as const
+                ] as { item: ShopItem; title: string; description: string; icon: IconName }[]
               ).map((o) => (
                 <button
                   className="story-option"
@@ -1233,7 +1193,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
                       <Icon name="check" />
                     ) : (
                       <>
-                        {o.price}
+                        {priceOf(run, o.item)}
                         <Icon name="coins" size={15} />
                       </>
                     )}
@@ -1252,7 +1212,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
                 <span>
                   <strong>Rest by the embers</strong>
                   <small>
-                    Restore 18 health · {run.health}/{run.maxHealth} now
+                    Restore {restAmount(run)} health · {run.health}/{run.maxHealth} now
                   </small>
                 </span>
                 <Icon name="arrow" size={17} />
@@ -1294,7 +1254,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
             </button>
             <p className="scene-hint">
               {shop
-                ? 'Each item can be bought once per visit.'
+                ? `You carry ${run.coins} coins. Each item can be bought once per visit.`
                 : 'Choose one comfort, then return to the road.'}
             </p>
           </>
@@ -1307,10 +1267,18 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
 function Ending({
   run,
   dispatch,
+  meta,
+  earned,
+  previousBest,
+  onAgain,
   onRestart,
 }: {
   run: Run;
   dispatch: (a: Action) => void;
+  meta: Meta;
+  earned: string[];
+  previousBest: number;
+  onAgain?: () => void;
   onRestart: () => void;
 }) {
   const lost = run.phase === 'lost';
@@ -1388,9 +1356,24 @@ function Ending({
                 <span>Roads crossed</span>
               </div>
             </div>
-            <button className="primary-button" onClick={onRestart}>
-              <Icon name="reset" size={17} /> Walk another road
-            </button>
+            <ScoreCard run={run} meta={meta} earned={earned} previousBest={previousBest} />
+            <div className="ending-actions">
+              {onAgain && (
+                <button className="primary-button" onClick={onAgain}>
+                  <Icon name="flame" size={17} />
+                  {lost
+                    ? `Try again as ${KEEPERS[run.keeper].name}`
+                    : `Walk again as ${KEEPERS[run.keeper].name}`}
+                </button>
+              )}
+              <button
+                className={onAgain ? 'secondary-button' : 'primary-button'}
+                onClick={onRestart}
+              >
+                <Icon name="reset" size={17} />{' '}
+                {onAgain ? 'Choose another road' : 'Walk another road'}
+              </button>
+            </div>
             <p className="scene-hint">
               Your memories remain in the chronicle. Each keeper starts equal.
             </p>
@@ -1401,93 +1384,22 @@ function Ending({
   );
 }
 
-function Chronicle({
-  lore,
-  runs,
-  wins,
-  onBack,
-}: {
-  lore: string[];
-  runs: number;
-  wins: number;
-  onBack: () => void;
-}) {
-  return (
-    <section className="chronicle">
-      <div className="chronicle-header">
-        <span className="eyebrow">THE THINGS THE FIRE COULD NOT TAKE</span>
-        <h1>
-          The keeper’s <em>chronicle.</em>
-        </h1>
-        <p>A world is not gone while someone remembers its stories.</p>
-        <div className="chronicle-counts">
-          <span>
-            <b>{lore.length}</b> / {LORE.length} memories
-          </span>
-          <span>
-            <b>{runs}</b> expeditions ended
-          </span>
-          <span>
-            <b>{wins}</b> crossings completed
-          </span>
-        </div>
-      </div>
-      <div className="lore-grid">
-        {LORE.map((entry, i) => {
-          const unlocked = lore.includes(entry.id);
-          return (
-            <article className={`lore-card ${unlocked ? 'unlocked' : 'locked'}`} key={entry.id}>
-              <span className="lore-number">0{i + 1}</span>
-              <Icon name={unlocked ? 'book' : 'eye'} size={24} />
-              <span className="eyebrow">
-                {unlocked ? 'A MEMORY RETURNED' : 'WAITING IN THE DARK'}
-              </span>
-              <h2>{unlocked ? entry.title : 'An unwritten page'}</h2>
-              <p>
-                {unlocked
-                  ? entry.text
-                  : 'Walk a little farther. Speak to a stranger. Some stories can only be found on the road.'}
-              </p>
-            </article>
-          );
-        })}
-      </div>
-      <button className="secondary-button" onClick={onBack}>
-        <Icon name="compass" size={17} /> Return to the expedition
-      </button>
-    </section>
-  );
-}
-
 function Help() {
   return (
     <div className="help-content">
       <p>
         You carry the last ember through three realms. Awaken their bells, discover why the sun went
-        dark, and choose how the story ends.
+        dark, and choose how the story ends. Nothing is rolled in secret: every number you see is
+        the number that happens.
       </p>
-      <div className="help-step">
-        <span>✦</span>
-        <div>
-          <h3>The Lost Atlas</h3>
-          <p>
-            Choose The Lost Atlas before beginning to explore a fantasy world drawn over real
-            OpenStreetMap terrain. Walk connected roads to uncover the veil. Reach the next
-            encounter, scout it, then enter. Resolve twelve encounters and awaken three bells. Side
-            paths hide supplies; each gift can be gathered once. If you recognize the real place,
-            name it in the field journal for +2 attack and a hidden hearth’s location. One guess per
-            bell stage; recognition is optional. Your atlas saves with your journal.
-          </p>
-        </div>
-      </div>
       <div className="help-step">
         <span>01</span>
         <div>
           <h3>Read the road</h3>
           <p>
-            Scout any map node for free before choosing a glowing route. Encounters give coins and
-            relics. Story choices change your strength or supplies. Sanctuaries offer one comfort;
-            traders sell each item once.
+            Every realm is four crossings: a waylight guardian, two crossings arranged by your seed,
+            then the bell guardian. Scout any node for free to see exactly what waits there. Before
+            each guardian at least one sanctuary and one trader are within reach.
           </p>
         </div>
       </div>
@@ -1496,8 +1408,10 @@ function Help() {
         <div>
           <h3>Read your enemy</h3>
           <p>
-            Their next move is always visible. You act first. Every action, including drinking a
-            flask, ends your turn. Armor reduces damage before your temporary guard absorbs it.
+            You always act first, and the enemy’s next two intentions are shown. Under every action
+            is its exact result this turn: damage dealt, damage taken, and whether it breaks poise
+            or lands a perfect guard. Armor reduces every hit; multi-hit attacks lose armor from
+            each hit.
           </p>
         </div>
       </div>
@@ -1522,11 +1436,11 @@ function Help() {
         </span>
         <span>
           <Icon name="sparkles" />
-          <b>Keeper skill</b>
+          <b>Skill · Technique</b>
           <small>
-            Spend focus for your
+            Spend focus on your
             <br />
-            unique ability.
+            keeper’s two abilities.
           </small>
         </span>
         <span>
@@ -1535,55 +1449,86 @@ function Help() {
           <small>
             Restore 16 health.
             <br />
-            Still ends your turn.
+            Lifts frost and weakness.
           </small>
         </span>
       </div>
-      <p className="help-tip">
-        <Icon name="info" /> Guard lasts one enemy action. Enemy guard lasts until broken. Poison
-        ticks after your action, bypasses guard, then loses one stack. Focus starts at 2 before
-        waylight and lesson bonuses, and caps at 5.
-      </p>
       <div className="help-step">
         <span>03</span>
         <div>
-          <h3>Know your keeper</h3>
+          <h3>Break their poise</h3>
           <p>
-            <b>Warden:</b> spend 3 focus for 2× attack + 3 damage and 5 guard.
-            <br />
-            <b>Seer:</b> Guard blocks 4 extra; spend 3 focus for 2× attack + 7 piercing damage.
-            <br />
-            <b>Wayfarer:</b> Strike heals 2; spend 2 focus for attack + 2 damage and 5 poison.
+            Every hit wears down the enemy’s <b>poise</b>. At zero it is <b>staggered</b>: it loses
+            its next action, and your hits deal +50% until it acts again. Then it recovers, a little
+            steadier than before. Time the break so it cancels the heavy blow, not a harmless turn.
+          </p>
+          <p>
+            A <b>perfect guard</b> — absorbing an entire attack — turns the damage you blocked into
+            poise damage. Guarding the big hit is also how you set up the break.
           </p>
         </div>
       </div>
+      <p className="help-tip">
+        <Icon name="info" /> <b>Poison</b> deals its stacks after your action, ignores guard, then
+        fades by 1. <b>Fury</b> is added to every hit an enemy lands. <b>Frost</b> costs you its
+        stacks each enemy turn, then melts by 1. <b>Weakened</b> hits deal 25% less. <b>Thorns</b>{' '}
+        cost you health when you Strike; <b>plated</b> enemies shrug off small hits; <b>regrowth</b>{' '}
+        heals them every turn. Guardians change their pattern below half health.
+      </p>
       <div className="help-step">
         <span>04</span>
         <div>
-          <h3>Carry what matters</h3>
+          <h3>Know your keeper</h3>
           <p>
-            After each victory, take a unique relic or recover 12 health. Relics last this
-            expedition. Memories last beyond it. There are no permanent stat bonuses, timers, or
-            purchases.
+            <b>Warden:</b> Sundering blow (3 focus) hits for 2× attack + 3 and guards 5. Shield bash
+            (2) hits for her Guard value and wears poise twice as fast.
+            <br />
+            <b>Seer:</b> starts with 1 extra focus and guards 4 more. Starfire (3) pierces guard and
+            plating. Foresee (2) guards exactly the incoming blow: always perfect.
+            <br />
+            <b>Wayfarer:</b> Strike heals 2. Nightbloom (2) adds 5 poison. Quicken (2) makes the
+            poison bite twice at once without fading.
           </p>
         </div>
       </div>
       <div className="help-step">
         <span>05</span>
         <div>
-          <h3>Leave a little light behind</h3>
+          <h3>Build something</h3>
           <p>
-            At the start of each realm, choose which waylight to free: a Dawnwell heals 2 on future
-            crossings, a Cinder Kiln earns 4 coins per crossing, and a Moth Observatory adds 1
-            starting focus. They stack for this run and never generate rewards while you are away.
-            After the first two bells, remember one keeper lesson to specialize your build.
+            After each victory take one of three relics, or recover 12 health. Elites and guardians
+            offer rarer ones; traders sell three more. Free a waylight at the start of each realm
+            for health, coins or focus on every later crossing, and learn one keeper lesson after
+            each of the first two bells.
+          </p>
+        </div>
+      </div>
+      <div className="help-step">
+        <span>06</span>
+        <div>
+          <h3>Come back to a harder night</h3>
+          <p>
+            Completing a road opens the next <b>Dusk</b> level for that keeper: listed hardships, a
+            higher score. <b>Deeds</b> add new relics to the ones future roads can offer. Nothing
+            ever raises a keeper’s starting strength; there are no timers and nothing to buy.
+          </p>
+        </div>
+      </div>
+      <div className="help-step">
+        <span>✦</span>
+        <div>
+          <h3>The Lost Atlas</h3>
+          <p>
+            A second kind of expedition, drawn over real OpenStreetMap roads. Walk the roads to lift
+            the veil, reach each encounter and enter it. Side paths hide supplies. If you recognize
+            the real city, name it in the field journal for +2 attack. One guess per bell.
           </p>
         </div>
       </div>
       <div className="help-footer">
         <Icon name="check" size={16} /> Autosaved on this device after every move.
         <br />
-        Keyboard: 1 Strike · 2 Guard · 3 Skill · 4 Flask · Esc closes dialogs.
+        Keyboard: 1 Strike · 2 Guard · 3 Skill · 4 Technique · 5 Flask · Esc closes dialogs.
       </div>
     </div>
   );

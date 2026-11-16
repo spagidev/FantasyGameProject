@@ -42,7 +42,22 @@ Browser tests use `/usr/bin/chromium` when present. On other machines, run `npx 
 - **Portable journals:** export or restore a validated save file to carry the expedition between browsers. Open “Journal” in the header or footer; files stay on your device.
 - Responsive layouts, keyboard controls, reduced-motion support, native accessible dialogs, and locally bundled fonts, original painted landscapes and character portraits.
 
-In combat, use the action buttons or keys **1–4**. Your action resolves first, then poison, then the enemy's visible intention. **Guard lasts one enemy action. Flasks also end your turn.** Open “How to play” for the complete introduction.
+The list above describes the first two rulesets. In combat your action resolves first, then poison, then the enemy's visible intention. **Guard lasts one enemy action. Flasks also end your turn.** Open “How to play” for the complete introduction.
+
+## The Long Night · v0.7
+
+New expeditions use a third ruleset built so that every turn asks a question and every run is different. Earlier journals continue under their own rules.
+
+- **Poise and stagger.** Every enemy has a poise bar. Hits wear it down; break it and the enemy loses the action it had announced and takes +50% damage until it acts again. A **perfect guard** — absorbing a whole attack — wears poise by the damage blocked.
+- **Five actions.** Each keeper gains a second technique: Shield bash, Foresee, Quicken.
+- **Exact previews.** Under every action is what it will do this turn, computed by the engine itself. The next two enemy intentions are always shown.
+- **A bestiary of 21** with their own patterns and traits (thorns, plating, regrowth, fury, frost, weakness, multi-hit); guardians change pattern at half health.
+- **28 relics in three rarities**, three offered after each victory and three more at every trader.
+- **Seeded routes and twelve story scenes**: the middle of every realm is arranged by the seed.
+- **Reasons to return:** a transparent score, eight **Dusk** levels unlocked one win at a time, 22 **deeds** (twelve add a relic to future roads), a codex of relics, enemies and past roads, and an optional date-seeded **today’s road**. Nothing raises a keeper’s starting strength.
+- One-screen combat on laptops and phones, hit feedback, first-fight guidance, and opt-in synthesized sound (off by default).
+
+Keyboard in combat: **1** Strike · **2** Guard · **3** Skill · **4** Technique · **5** Flask. See [the plan and diagnosis](docs/IMPROVEMENT_PLAN.md), [the rules](docs/RULES.md) and [the balance matrix](docs/BALANCE_REPORT.json).
 
 ## Maps ready to play · v0.6
 

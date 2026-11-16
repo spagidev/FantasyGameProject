@@ -14,6 +14,12 @@ Implemented a complete second expedition over a curated real OSM region: fantasy
 
 The next Atlas work should follow human playtesting: tune how much terrain each road reveals, whether the next-encounter bearing is clear, and whether the optional paths feel rewarding. Then author a second region with different geography (river crossings rather than a coast), and add geographically meaningful route alternatives. Arbitrary worldwide imports need a separate robust ingestion/connectivity pipeline before they can be offered.
 
+## Milestone 4 · The Long Night
+
+Implemented from `docs/IMPROVEMENT_PLAN.md`: ruleset 3 (poise, perfect guards, techniques, a 21-entry bestiary, 28 relics, seeded routes, twelve scenes), a rebuilt combat board with engine-computed previews, score, Dusk levels, deeds, codex, today’s road, opt-in sound and first-fight guidance. Rulesets 1–2 are preserved.
+
+Next for this line: human playtests of Dusk 0 difficulty per keeper; portraits for the new enemies (they currently share four tinted paintings); a movement cost or risk on Atlas roads so detours are a decision; more elites per realm.
+
 ## Next useful improvements
 
 1. **Playtest the decisions.** Gather human feedback on combat clarity, difficulty, and route incentives. Use the recorded seed/keeper/route matrix as a baseline before adjusting stats; automated search currently wins all 90 samples. The bounded test player proves legal winning paths; it is not evidence of novice difficulty or overall balance.

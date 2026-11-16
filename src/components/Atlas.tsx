@@ -11,7 +11,7 @@ import {
   newAtlas,
   type Point,
 } from '../game/atlas';
-import { nodeAt, type Action, type Run, type MapNode } from '../game/engine';
+import { nodeOf, type Action, type Run, type MapNode } from '../game/engine';
 import { Icon } from './Icon';
 
 const line = (points: Point[]) => points.map((p) => p.join(',')).join(' ');
@@ -384,7 +384,7 @@ export function AtlasMap({
               {site.depth !== undefined && onInspect && (
                 <button
                   className="text-button"
-                  onClick={() => onInspect(nodeAt(run.seed, site.depth!, site.lane!))}
+                  onClick={() => onInspect(nodeOf(run, site.depth!, site.lane!))}
                 >
                   Scout encounter
                 </button>

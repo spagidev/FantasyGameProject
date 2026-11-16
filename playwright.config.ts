@@ -1,6 +1,9 @@
 import { defineConfig } from '@playwright/test';
 import { existsSync } from 'node:fs';
 
+// Prefer a system Chromium when one is installed (managed environments); CI installs its own.
+const localChromium = ['/usr/bin/chromium', '/opt/pw-browsers/chromium'].find(existsSync);
+
 export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
@@ -8,8 +11,8 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:4173',
     headless: true,
     launchOptions:
-      !process.env.CI && existsSync('/usr/bin/chromium')
-        ? { executablePath: '/usr/bin/chromium', args: ['--no-sandbox'] }
+      !process.env.CI && localChromium
+        ? { executablePath: localChromium, args: ['--no-sandbox'] }
         : {},
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',

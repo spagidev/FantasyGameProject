@@ -5,7 +5,7 @@ import {
   canBuy,
   canEvent,
   intentFor,
-  newRun,
+  newRun as makeRun,
   nextNodes,
   nodeAt,
   transition,
@@ -13,6 +13,9 @@ import {
   type Run,
 } from './engine';
 import { advanceSave, decodeSave, emptySave, MAX_SAVE_BYTES, validRun } from './storage';
+
+// These suites pin the first two rulesets. Ruleset 3 is covered in nightfall.test.ts.
+const newRun = (keeper: KeeperId, seed: number) => makeRun(keeper, seed, false, { ruleset: 2 });
 
 function battle(keeper: KeeperId = 'warden') {
   return transition(newRun(keeper, 123), { type: 'travel', lane: 0 });
