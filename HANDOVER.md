@@ -6,7 +6,7 @@ Plan: `docs/ROUND2_PLAN.md`. Inspiration only from Heroes III (days, movement, t
 
 - `src/game/atlas.ts`: `day`/`oil`/`range`/`finds` on `AtlasState` (absent on older charts), `dayRange`, `atlasFinds`, `atlasRoute`, actions `atlas-walk` and `atlas-camp`. `makeEnemy(node, ruleset, dusk, nights)`; `nightsOf(run)`.
 - `src/components/Atlas.tsx`: day and oil meter, planner, blazes, finds, pictogram pins. `Chronicle.tsx`: Atlas passport tab (`meta.cities`).
-- `src/artwork.ts` globs `src/art/{foes,relics,sites,scenes}/*.webp`; components `EnemyPortrait`, `RelicIcon`, `SiteIcon`, `SceneArt` fall back when a file is absent. **No illustrations are committed yet**: `docs/ART_BRIEF.md` is the complete brief for an image-producing agent. After they land, check the combat board, reward cards, route map and scene screens at desktop and phone width, and extend `scripts/build-worker.mjs` checks if desired.
+- `src/artwork.ts` globs `src/art/{foes,relics,sites,scenes}/*.webp`; components `EnemyPortrait`, `RelicIcon`, `SiteIcon`, `SceneArt` fall back when a file is absent. All 81 illustrations from `docs/ART_BRIEF.md` were delivered (PR #3, 1.1 MB, provenance in `src/art/NOTICE.md`) and checked in every screen at desktop and phone width.
 - Combat: chips are buttons that explain themselves; `effectiveHit` feeds action titles; victory beat on the reward screen.
 - Validation: 96 unit tests and 22 Chromium tests pass; strict build and Worker packaging pass. Direct Atlas runs take 4–6 days on the charts sampled.
 
