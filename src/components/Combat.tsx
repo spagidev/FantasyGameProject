@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { describeTraits } from '../game/bestiary';
 import { KEEPERS, type Intent } from '../game/data';
 import { VOICES } from '../game/lore';
+import { TERRAIN } from '../game/terrain';
 import { omenOf, OMENS } from '../game/omens';
 import {
   realmOf,
@@ -131,6 +132,7 @@ export function Combat({
   const strike = strikeDamage(run);
   const blocked = techniqueBlocked(run);
   const traits = describeTraits(e.traits);
+  const ground = run.side ? undefined : nodeOf(run).terrain;
 
   // Floating feedback: compare this state with the one before it.
   const previous = useRef(run);
@@ -398,6 +400,11 @@ export function Combat({
                     {t.label}
                   </Chip>
                 ))}
+                {ground && (
+                  <Chip tone="trait" text={TERRAIN[ground].rule} explain={setExplain}>
+                    {TERRAIN[ground].name}
+                  </Chip>
+                )}
               </div>
             </div>
             {floats('enemy')}

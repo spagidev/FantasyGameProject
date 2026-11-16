@@ -1,8 +1,11 @@
 import type { RegionalChart } from '../atlas/types';
 import {
   applyAtlasAction,
+  ATLAS_SITES,
+  atlasGeography,
   atlasSite,
   darkNights,
+  siteAt,
   encounterState,
   freeOrder,
   grantGift,
@@ -16,6 +19,7 @@ import {
 } from './atlas';
 import { BOSSES, ELITES, FOES, ORDINARY, type Foe, type Traits } from './bestiary';
 import { VOICES } from './lore';
+import { chartTerrain, type TerrainId } from './terrain';
 import { omenOf } from './omens';
 import {
   CHAPTERS,
@@ -77,6 +81,8 @@ export type MapNode = {
   eventIndex: number;
   /** Ruleset 3: the bestiary entry fought here. */
   foe?: string;
+  /** v0.13 charts: the ground around the encounter's site, read from the real streets. */
+  terrain?: TerrainId;
 };
 export type RunStats = {
   turns: number;
@@ -333,8 +339,17 @@ export function nodeAt(
   return { id: `${depth}-${lane}`, depth, lane, kind, name, eventIndex };
 }
 /** The node at a position of this expedition's own route; defaults to where the keeper stands. */
-export const nodeOf = (r: Run, depth = r.depth, lane = r.lane): MapNode =>
-  nodeAt(r.seed, depth, lane, layoutOf(r));
+export function nodeOf(r: Run, depth = r.depth, lane = r.lane): MapNode {
+  const node = nodeAt(r.seed, depth, lane, layoutOf(r));
+  const a = r.atlas;
+  if (!a?.ground || depth < 0) return node;
+  const site = siteAt(depth, lane, a);
+  const encounters = ATLAS_SITES.filter((s) => s.depth !== undefined).map((s) => s.id);
+  const terrain = site
+    ? chartTerrain(atlasGeography(a), encounters, a.chart?.metresPerPixel ?? 3.52)[site.id]
+    : null;
+  return terrain ? { ...node, terrain } : node;
+}
 
 /**
  * The guardian of a trove, as a scoutable node. It is drawn from the roster of the realm the
@@ -453,7 +468,14 @@ export function makeEnemy(node: MapNode, ruleset: Ruleset = 3, dusk = 0, nights 
     foe.health *
       (1 + (dusk >= 1 ? 0.1 : 0) + (dusk >= 8 ? 0.15 : 0) + Math.min(0.3, nights * 0.02)),
   );
-  const poise = Math.round(foe.poise * (dusk >= 4 ? 1.25 : 1));
+  const poise = Math.round(
+    foe.poise * (dusk >= 4 ? 1.25 : 1) * (node.terrain === 'hills' ? 0.8 : 1),
+  );
+  // Narrow streets: no room for a flurry.
+  const fit = (p: Intent[]) =>
+    node.terrain === 'streets'
+      ? p.map((i) => ((i.hits ?? 1) > 1 ? { ...i, hits: i.hits! - 1 } : i))
+      : p;
   return {
     id: foe.id,
     name: foe.name,
@@ -463,7 +485,7 @@ export function makeEnemy(node: MapNode, ruleset: Ruleset = 3, dusk = 0, nights 
     maxHealth: health,
     guard: 0,
     poison: 0,
-    pattern: grow(foe.pattern),
+    pattern: fit(grow(foe.pattern)),
     step: 0,
     poise,
     maxPoise: poise,
@@ -562,7 +584,8 @@ export function victoryCoins(r: Run, node = nodeOf(r)) {
   return (
     (node.kind === 'boss' ? 45 : node.kind === 'elite' ? 32 : 18) +
     (r.talents.includes('trail') ? 6 : 0) +
-    (r.relics.includes('ferrycoin') ? 8 : 0)
+    (r.relics.includes('ferrycoin') ? 8 : 0) +
+    (node.terrain === 'cross' ? 8 : 0)
   );
 }
 
@@ -1094,7 +1117,7 @@ export function transition(run: Run, action: Action): Run {
       clearBattle(r);
       omenFrost(r);
       if (r.relics.includes('wellrope')) r.guard = 6;
-      r.focus = startingFocus(r);
+      r.focus = Math.min(5, startingFocus(r) + (node.terrain === 'open' ? 1 : 0));
       r.phase = 'combat';
       r.log = [
         (v3 && node.foe && VOICES[node.foe]?.arrive) ||

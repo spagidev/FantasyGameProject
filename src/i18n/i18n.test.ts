@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { en } from './en';
 import { sk } from './sk';
 import { plural } from './plural';
+import { TIPS } from '../game/tips';
 import { emptyMeta, sanitizeMeta } from '../game/meta';
 
 type Tree = { [key: string]: unknown };
@@ -63,6 +64,13 @@ describe('interface dictionaries', () => {
     expect(sk.atlas.roadCount(2)).toBe('2 cesty');
     expect(sk.atlas.roadCount(5)).toBe('5 ciest');
     expect(en.atlas.roadCount(1)).toBe('1 road');
+  });
+});
+
+describe('the keeper’s guide', () => {
+  it('has English text equal to TIPS and a Slovak note for every id', () => {
+    expect(en.tips).toEqual(TIPS);
+    expect(Object.keys(sk.tips).sort()).toEqual(Object.keys(TIPS).sort());
   });
 });
 

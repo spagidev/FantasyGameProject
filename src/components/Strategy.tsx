@@ -1,5 +1,6 @@
 import { CHAPTERS, EVENTS, KEEPERS, TALENTS, WAYLIGHTS, type WaylightId } from '../game/data';
 import { describeTraits, FOES } from '../game/bestiary';
+import { TERRAIN } from '../game/terrain';
 import { encounterState, siteAt } from '../game/atlas';
 import {
   realmOf,
@@ -115,6 +116,11 @@ export function Scout({
                   {t.label} · {t.text}
                 </span>
               ))}
+              {node.terrain && (
+                <span title={TERRAIN[node.terrain].flavor}>
+                  {TERRAIN[node.terrain].name} · {TERRAIN[node.terrain].rule}
+                </span>
+              )}
             </div>
           )}
           <span className="eyebrow">{s.patternEyebrow}</span>

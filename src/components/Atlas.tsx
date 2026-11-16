@@ -36,6 +36,7 @@ import {
 import { SITE_ART, WORK_ART } from '../artwork';
 import { omenOf, OMENS } from '../game/omens';
 import { Modal } from './Modal';
+import { TERRAIN } from '../game/terrain';
 import { SceneArt } from './Art';
 import { provinceOfKraj } from '../atlas/provinces';
 import { Icon, type IconName } from './Icon';
@@ -897,6 +898,12 @@ export function AtlasMap({
               </span>
               <h3>{site.name}</h3>
               <p>{site.subtitle}</p>
+              {run && site.depth !== undefined && nodeOf(run, site.depth, site.lane!).terrain && (
+                <p className="atlas-ground">
+                  <b>{TERRAIN[nodeOf(run, site.depth, site.lane!).terrain!].name}.</b>{' '}
+                  {TERRAIN[nodeOf(run, site.depth, site.lane!).terrain!].rule}
+                </p>
+              )}
             </div>
             <div className="atlas-location-actions">
               {route && (

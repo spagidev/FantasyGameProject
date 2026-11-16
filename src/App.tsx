@@ -8,6 +8,7 @@ import {
   CHAPTERS,
   EVENTS,
   KEEPERS,
+  startingStats,
   LORE,
   RELICS,
   RELIC_SETS,
@@ -62,6 +63,8 @@ import { Journal } from './components/Journal';
 import { Scout, TalentChoice, WaylightsPanel } from './components/Strategy';
 import { AtlasMap, AtlasJournal } from './components/Atlas';
 import { OfflineBadge } from './components/OfflineBadge';
+import { GuideNote } from './components/GuideNote';
+import { tipFor } from './game/tips';
 import { DICTS, LanguageProvider, useT, type Lang } from './i18n';
 
 type Warning = '' | 'unreadable' | 'unavailable' | 'full';
@@ -159,7 +162,13 @@ export default function App() {
   const boardRef = useRef<HTMLDivElement>(null);
   const run = save.run;
   const meta = metaOf(save.profile);
+  const setMeta = (change: (m: Meta) => Meta) =>
+    setSave((s) => ({
+      ...s,
+      profile: { ...s.profile, meta: change(metaOf(s.profile)) },
+    }));
   const lang: Lang = meta.lang ?? 'en';
+  const tip = tipFor(save.run, meta);
   const t = DICTS[lang];
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -564,6 +573,16 @@ export default function App() {
               )}
               <div className={`game-layout ${run ? 'play-layout' : 'launch-layout'}`}>
                 <div className="game-main" ref={boardRef}>
+                  {tip && view === 'journey' && (
+                    <GuideNote
+                      key={tip}
+                      id={tip}
+                      onGotIt={() =>
+                        setMeta((m) => ({ ...m, tips: [...new Set([...(m.tips ?? []), tip])] }))
+                      }
+                      onHide={() => setMeta((m) => ({ ...m, tipsOff: true }))}
+                    />
+                  )}
                   {run?.atlas && run.phase !== 'map' && (
                     <details className="atlas-fold">
                       <summary>{t.app.atlasFold}</summary>
@@ -740,15 +759,15 @@ export default function App() {
                         <div className="keeper-base-stats">
                           <span>
                             <Icon name="heart" size={14} />
-                            {t.app.healthN(KEEPERS[keeper].health)}
+                            {t.app.healthN(startingStats(keeper).health)}
                           </span>
                           <span>
                             <Icon name="sword" size={14} />
-                            {t.app.attackN(KEEPERS[keeper].attack)}
+                            {t.app.attackN(startingStats(keeper).attack)}
                           </span>
                           <span>
                             <Icon name="shield" size={14} />
-                            {t.app.armorN(KEEPERS[keeper].armor)}
+                            {t.app.armorN(startingStats(keeper).armor)}
                           </span>
                         </div>
                         <span className="keeper-style">{KEEPERS[keeper].style}</span>
@@ -1010,7 +1029,10 @@ export default function App() {
 
         {modal === 'help' && (
           <Modal title={t.app.helpTitle} onClose={() => setModal(null)}>
-            <Help />
+            <Help
+              guideOn={!meta.tipsOff}
+              onGuide={() => setMeta((m) => ({ ...m, tipsOff: !m.tipsOff }))}
+            />
           </Modal>
         )}
         {scouted && (
@@ -1600,7 +1622,8 @@ function Ending({
   );
 }
 
-function Help() {
+function Help({ guideOn, onGuide }: { guideOn: boolean; onGuide: () => void }) {
+  const t = useT();
   return (
     <div className="help-content">
       <p>
@@ -1748,6 +1771,12 @@ function Help() {
             name it in the field journal for +2 attack. One guess per bell.
           </p>
         </div>
+      </div>
+      <div className="help-guide-toggle">
+        <button className="secondary-button" aria-pressed={guideOn} onClick={onGuide}>
+          {t.guide.toggle}: {guideOn ? t.guide.on : t.guide.off}
+        </button>
+        <small>{t.guide.toggleNote}</small>
       </div>
       <div className="help-footer">
         <Icon name="check" size={16} /> Autosaved on this device after every move.

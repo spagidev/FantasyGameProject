@@ -223,6 +223,8 @@ export type AtlasState = {
    * three are done. Charts begun earlier keep the strict order.
    */
   done?: string[];
+  /** The ground of each encounter shapes its fight (v0.13). Absent on older charts. */
+  ground?: true;
 };
 /**
  * The hearth-wagon: the keeper's camp is a small town that travels with her. Each evening
@@ -307,7 +309,7 @@ export function newAtlas(chart?: RegionalChart, travel = true): AtlasState {
   };
   if (!travel) return state;
   const range = dayRange(state);
-  return { ...state, day: 1, oil: range, range, finds: [], works: [], done: [] };
+  return { ...state, day: 1, oil: range, range, finds: [], works: [], done: [], ground: true };
 }
 
 /** Shortest road distances from one site to every other, over the whole chart. */
@@ -677,6 +679,7 @@ export function validAtlas(x: unknown): x is AtlasState {
         a.finds.length <= 5 &&
         new Set(a.finds).size === a.finds.length &&
         a.finds.every((n) => Number.isInteger(n) && n >= 0 && n < atlasGeography(a).edges.length) &&
+        (a.ground === undefined || a.ground === true) &&
         (a.done === undefined ||
           (Array.isArray(a.done) &&
             a.done.length <= 12 &&

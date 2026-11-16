@@ -1476,3 +1476,14 @@
   text-decoration: underline;
   text-underline-offset: 4px;
 }
+
+/* v0.13 · the ground of an encounter. */
+.atlas-ground {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #47583f;
+}
+.atlas-ground b {
+  color: #5c4a26;
+}
