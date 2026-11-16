@@ -17,8 +17,19 @@ export function bundledCount(area: string) {
     return 0;
   }
 }
-export async function bundledChart(area: string, seed: number): Promise<RegionalChart> {
-  const choices = bundledChoices(area);
+/**
+ * Chooses a chart inside the area by seed. `rekindled` lists bundled chart ids the player has
+ * already completed: while any other chart remains in the area, those are passed over, so a
+ * campaign through a province reaches both of its cities instead of repeating one.
+ */
+export async function bundledChart(
+  area: string,
+  seed: number,
+  rekindled: string[] = [],
+): Promise<RegionalChart> {
+  const all = bundledChoices(area);
+  const fresh = all.filter((entry) => !rekindled.includes(entry.id));
+  const choices = fresh.length ? fresh : all;
   if (!choices.length)
     throw new Error(
       'No bundled charts cover this area yet. Choose Slovakia or one of its eight kraje, or try Live map.',

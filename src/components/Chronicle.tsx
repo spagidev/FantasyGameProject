@@ -4,6 +4,8 @@ import { CHAPTERS, KEEPERS, LORE, RELICS, type KeeperId, type RelicId } from '..
 import { DEEDS, KNOWN_CHARTS, duskUnlocked, unlockedRelics, type Meta } from '../game/meta';
 import { EnemyPortrait, RelicIcon } from './Art';
 import { intentEffects } from './Combat';
+import { campaignProgress, type ProvinceCode } from '../atlas/provinces';
+import { CampaignMap } from './CampaignMap';
 import { Icon } from './Icon';
 
 type Tab = 'memories' | 'deeds' | 'relics' | 'bestiary' | 'atlas' | 'records';
@@ -22,6 +24,7 @@ export function Chronicle({
   onBack: () => void;
 }) {
   const [tab, setTab] = useState<Tab>('memories');
+  const [province, setProvince] = useState<ProvinceCode | null>(null);
   const pool = unlockedRelics(meta);
   const relicIds = Object.keys(RELICS) as RelicId[];
   const foes = Object.keys(FOES);
@@ -189,6 +192,24 @@ export function Chronicle({
               Every chart is a real place. Walk it for a stamp, finish its expedition, and name the
               city beneath the veil to write its true name here.
             </p>
+            <CampaignMap cities={meta.cities} selected={province} onSelect={setProvince} />
+            <h2 className="campaign-heading">Legends of the provinces</h2>
+            <div className="codex-grid campaign-legends">
+              {campaignProgress(meta.cities).map((p) => (
+                <article
+                  key={p.province.code}
+                  className={`codex-card ${p.recovered ? 'is-done' : 'is-open'}`}
+                >
+                  <span className="eyebrow">{p.province.kraj.toUpperCase()}</span>
+                  <h2>{p.province.name}</h2>
+                  <small>
+                    {p.completed}/{p.total} rekindled · {p.walked} walked · {p.named} named
+                  </small>
+                  <p>{p.recovered ? p.province.legend : p.province.rumor}</p>
+                </article>
+              ))}
+            </div>
+            <h2 className="campaign-heading">Passport</h2>
             <div className="codex-grid">
               {Object.entries(meta.cities).map(([key, city]) => (
                 <article

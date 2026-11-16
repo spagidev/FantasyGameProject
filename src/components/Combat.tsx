@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { describeTraits } from '../game/bestiary';
 import { KEEPERS, NODE_LABELS, type Intent } from '../game/data';
+import { VOICES } from '../game/lore';
 import {
   effectiveHit,
   flaskHealing,
@@ -393,6 +394,11 @@ export function Combat({
             {floats('enemy')}
           </div>
         </div>
+        {v3 && e.id && VOICES[e.id] && (run.turn === 0 || (e.phase === 2 && e.step === 0)) && (
+          <p className="duel-voice">
+            {e.phase === 2 ? (VOICES[e.id].turn ?? VOICES[e.id].arrive) : VOICES[e.id].arrive}
+          </p>
+        )}
         {explain && (
           <p className="duel-explain" role="status">
             <Icon name="info" size={13} /> {explain}

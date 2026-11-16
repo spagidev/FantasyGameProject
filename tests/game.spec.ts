@@ -14,6 +14,7 @@ async function readRun(page: Page): Promise<Run> {
 async function clickAction(page: Page, run: Run, action: Action) {
   if (action.type === 'atlas-camp') {
     await page.locator('[data-action="camp"]').click();
+    await page.locator(`[data-work="${action.work ?? 'rest'}"]`).click();
   } else if (action.type === 'atlas-move') {
     await page.locator(`[data-destination="${action.to}"]`).click();
   } else if (action.type === 'travel' && run.atlas) {
@@ -430,6 +431,7 @@ test('the Atlas is a day’s walk: lamp oil, camp, a route planner and a passpor
   await expect(page.locator('[data-action="walk-route"]')).toBeDisabled();
   // Camp: a new day, full oil, and now one button walks the planned route.
   await page.locator('[data-action="camp"]').click();
+  await page.locator('[data-work="rest"]').click();
   run = await readRun(page);
   expect(run.atlas).toMatchObject({ day: 2, oil: run.atlas!.range });
   await expect(page.locator('.atlas-day')).toContainText('Day 2');
@@ -438,6 +440,7 @@ test('the Atlas is a day’s walk: lamp oil, camp, a route planner and a passpor
   await page.locator('[data-action="walk-route"]').click();
   expect((await readRun(page)).atlas!.position).toBe('origin');
   await page.locator('[data-action="camp"]').click();
+  await page.locator('[data-work="rest"]').click();
   // A tapped status chip explains itself in words.
   await page.locator('[data-destination="watch"]').click();
   await page.getByRole('button', { name: 'Enter encounter' }).click();

@@ -2,6 +2,7 @@ import type { RegionalChart } from '../atlas/types';
 import {
   applyAtlasAction,
   atlasSite,
+  darkNights,
   travels,
   newAtlas,
   cloneAtlasRun,
@@ -9,6 +10,7 @@ import {
   type AtlasState,
 } from './atlas';
 import { BOSSES, ELITES, FOES, ORDINARY, type Foe, type Traits } from './bestiary';
+import { VOICES } from './lore';
 import {
   CHAPTERS,
   EVENTS,
@@ -393,8 +395,8 @@ function legacyEnemy(node: MapNode, ruleset: 1 | 2): Enemy {
   };
 }
 
-/** Nights spent on an Atlas chart: each adds 2% health to enemies not yet fought, up to 30%. */
-export const nightsOf = (r: Pick<Run, 'atlas'>) => (travels(r.atlas) ? r.atlas.day - 1 : 0);
+/** Nights that count on an Atlas chart (halved by the ward-lantern): each adds 2% health to enemies not yet fought, up to 30%. */
+export const nightsOf = (r: Pick<Run, 'atlas'>) => darkNights(r.atlas);
 export function makeEnemy(node: MapNode, ruleset: Ruleset = 3, dusk = 0, nights = 0): Enemy {
   if (ruleset < 3 || !node.foe) return legacyEnemy(node, ruleset === 1 ? 1 : 2);
   const foe = FOES[node.foe];
@@ -689,6 +691,8 @@ function victory(r: Run) {
   if (kind === 'boss') {
     r.bells += 1;
     r.lore.push(`bell-${r.bells}`);
+    // Each keeper writes their own page after a bell.
+    if (r.ruleset === 3) r.lore.push(`${r.keeper}-bell-${r.bells}`);
   }
   if (r.ruleset === 3) {
     if (r.enemy?.id) r.slain!.push(r.enemy.id);
@@ -953,6 +957,7 @@ function combat3(
     e.pattern = e.phase2.pattern;
     e.step = 0;
     note(r, `${e.phase2.name}. ${e.name} changes its pattern.`);
+    if (e.id && VOICES[e.id]?.turn) note(r, VOICES[e.id].turn!);
   }
   r.guard = r.relics.includes('buckle') ? Math.min(6, r.guard) : 0;
   r.turn += 1;
@@ -989,7 +994,10 @@ export function transition(run: Run, action: Action): Run {
       clearBattle(r);
       r.focus = startingFocus(r);
       r.phase = 'combat';
-      r.log = [`${node.name} stands between you and the next bell.`];
+      r.log = [
+        (v3 && node.foe && VOICES[node.foe]?.arrive) ||
+          `${node.name} stands between you and the next bell.`,
+      ];
       if (v3 && r.relics.includes('hourglass')) {
         r.enemy.stagger = 2;
         note(r, 'The Glass Hourglass turns. Your enemy begins staggered.');
@@ -1107,6 +1115,7 @@ export function transition(run: Run, action: Action): Run {
   ) {
     r.ending = action.choice;
     r.lore.push(action.choice);
+    if (v3) r.lore.push(`${r.keeper}-${action.choice}`);
     r.phase = 'won';
     return r;
   }

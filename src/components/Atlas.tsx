@@ -13,11 +13,19 @@ import {
   bearing,
   charted,
   newAtlas,
+  WORKS,
+  REST_HEALING,
+  worksOf,
+  workBlocked,
+  type WorkId,
   type Point,
 } from '../game/atlas';
 import { nodeOf, waylightFor, type Action, type Run, type MapNode } from '../game/engine';
-import { SITE_ART } from '../artwork';
-import { Icon } from './Icon';
+import { SITE_ART, WORK_ART } from '../artwork';
+import { Modal } from './Modal';
+import { SceneArt } from './Art';
+import { provinceOfKraj } from '../atlas/provinces';
+import { Icon, type IconName } from './Icon';
 
 /** Distances the way a hiking map prints them. */
 export const metres = (m: number) =>
@@ -46,6 +54,142 @@ const glyph = (id: string) =>
                 ? '♧'
                 : '⌂';
 
+function WorkIcon({ id, size }: { id: WorkId; size: number }) {
+  const art = WORK_ART[id];
+  if (art) return <img src={art} alt="" width={size} height={size} />;
+  const icon: Record<WorkId, IconName> = {
+    stove: 'flame',
+    still: 'flask',
+    wheel: 'sword',
+    rack: 'compass',
+    strongbox: 'coins',
+    ward: 'shield',
+  };
+  return <Icon name={icon[id]} size={size} />;
+}
+
+function WagonSummary({ run }: { run: Run }) {
+  const built = worksOf(run.atlas);
+  return (
+    <div className="wagon-summary" role="group" aria-label="Hearth-wagon works">
+      <strong>The hearth-wagon</strong>
+      {built.length ? (
+        <ul>
+          {built.map((id) => (
+            <li key={id} title={WORKS[id].effect}>
+              <WorkIcon id={id} size={14} />
+              {WORKS[id].name}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <span>Nothing built yet — make camp to build</span>
+      )}
+    </div>
+  );
+}
+
+/** What the next dawn brings if the keeper makes this choice tonight. */
+function dawnPreview(run: Run, work: WorkId | null) {
+  const a = run.atlas!;
+  const works = work ? [...worksOf(a), work] : worksOf(a);
+  const count = (id: string) => run.waylights.filter((w) => w === id).length;
+  const health = count('well') * 2 + (works.includes('stove') ? 4 : 0);
+  const coins = count('kiln') * 4 + (works.includes('strongbox') ? 6 : 0);
+  const flask = works.includes('still') && run.flasks < 2;
+  const parts = ['full lamp oil'];
+  if (coins) parts.push(`+${coins} coins`);
+  if (health) parts.push(`+${health} health`);
+  if (flask) parts.push('+1 flask');
+  return { day: a.day! + 1, parts, ward: works.includes('ward') };
+}
+
+function EveningDialog({
+  run,
+  onClose,
+  onChoose,
+}: {
+  run: Run;
+  onClose: () => void;
+  onChoose: (work: WorkId | null) => void;
+}) {
+  const [hover, setHover] = useState<WorkId | null>(null);
+  const preview = dawnPreview(run, hover);
+  const hint = (work: WorkId | null) => ({
+    onMouseEnter: () => setHover(work),
+    onFocus: () => setHover(work),
+  });
+  return (
+    <Modal title="Evening at the wagon" onClose={onClose}>
+      <div className="wagon-dialog">
+        <SceneArt id="wagon" />
+        <p>
+          Each evening the keeper may build one work onto the hearth-wagon or rest by its fire,
+          never both.
+        </p>
+        <div className="wagon-options">
+          <button
+            className="wagon-option"
+            data-work="rest"
+            onClick={() => onChoose(null)}
+            {...hint(null)}
+          >
+            <Icon name="heart" size={22} />
+            <span className="wagon-copy">
+              <strong>Rest by the fire</strong>
+              <span>
+                Restore {REST_HEALING} health ({run.health}/{run.maxHealth} now)
+              </span>
+            </span>
+          </button>
+          {(Object.keys(WORKS) as WorkId[]).map((id) => {
+            const work = WORKS[id];
+            const blocked = workBlocked(run, id);
+            return (
+              <button
+                key={id}
+                className={`wagon-option ${blocked === 'Already built' ? 'is-built' : ''}`}
+                data-work={id}
+                disabled={!!blocked}
+                onClick={() => onChoose(id)}
+                {...hint(id)}
+              >
+                <WorkIcon id={id} size={22} />
+                <span className="wagon-copy">
+                  <strong>{work.name}</strong>
+                  <span>{work.effect}</span>
+                  <em>{work.flavor}</em>
+                </span>
+                <span className="wagon-cost">
+                  {blocked === 'Already built' ? (
+                    <>
+                      <Icon name="check" size={14} /> Built
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="coins" size={14} /> {work.cost}
+                      {blocked === 'Not enough coins' && <small>Not enough coins</small>}
+                    </>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="wagon-dawn" aria-live="polite">
+          <b>
+            Day {preview.day} dawns: {preview.parts.join(' · ')}
+          </b>
+          <span>
+            The dark gathers: enemies ahead gain 2% health{' '}
+            {preview.ward ? 'every second night' : 'each night'}
+          </span>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function AtlasMap({
   run,
   dispatch,
@@ -61,6 +205,7 @@ export function AtlasMap({
   const current = atlasSite(state.position, state);
   const [selected, setSelected] = useState(state.position);
   const [zoom, setZoom] = useState(true);
+  const [evening, setEvening] = useState(false);
   const uid = useId().replace(/:/g, '');
   useEffect(() => setSelected(state.position), [state.position]);
   const site = atlasSite(selected, state);
@@ -75,6 +220,7 @@ export function AtlasMap({
   const canCollect =
     ['cache', 'haven', 'spring'].includes(current.kind) && !state.collected.includes(current.id);
   const days = travels(state);
+  const province = state.chart ? provinceOfKraj(state.chart.area) : undefined;
   const route = movable && selected !== state.position ? atlasRoute(state, selected) : null;
   const reach = days ? state.oil! : Infinity;
   // How much of the planned route today's oil covers.
@@ -106,7 +252,11 @@ export function AtlasMap({
           <h2>
             {state.recognized
               ? `${state.chart?.city ?? 'Monaco'}, beneath the veil`
-              : (state.chart?.title ?? 'The Saltbound Coast')}
+              : state.chart
+                ? province
+                  ? `A veiled city of ${province.name}`
+                  : state.chart.title
+                : 'The Saltbound Coast'}
           </h2>
           {state.chart && <span className="atlas-area-hint">Hidden city · {state.chart.area}</span>}
           <p>
@@ -154,12 +304,23 @@ export function AtlasMap({
             className="secondary-button"
             data-action="camp"
             disabled={!movable}
-            onClick={() => dispatch?.({ type: 'atlas-camp' })}
+            onClick={() => setEvening(true)}
             title="Start a new day with full oil. Waylights pay at dawn; the dark gathers a little."
           >
             Make camp
           </button>
         </div>
+      )}
+      {days && run && <WagonSummary run={run} />}
+      {evening && run && dispatch && (
+        <EveningDialog
+          run={run}
+          onClose={() => setEvening(false)}
+          onChoose={(work) => {
+            setEvening(false);
+            dispatch(work ? { type: 'atlas-camp', work } : { type: 'atlas-camp' });
+          }}
+        />
       )}
       <div className={`atlas-canvas ${zoom ? 'atlas-zoomed' : ''}`}>
         <svg

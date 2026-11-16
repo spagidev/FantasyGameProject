@@ -1,3 +1,4 @@
+import { EPILOGUES, KEEPER_PAGES } from './lore';
 export type KeeperId = 'warden' | 'seer' | 'wayfarer';
 export type RelicId =
   | 'briar'
@@ -905,6 +906,8 @@ export const LORE = [
     title: 'One good thing',
     text: 'The last smith of Veyr made the lock on the sun’s second heart. She has spent nine hundred winters wishing she had made it a little worse.',
   },
+  ...KEEPER_PAGES,
+  ...EPILOGUES,
 ] as const;
 
 export const NODE_LABELS: Record<NodeKind, string> = {

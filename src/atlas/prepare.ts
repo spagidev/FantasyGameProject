@@ -6,9 +6,11 @@ export async function prepareChart(
   source: 'bundled' | 'live',
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
+  rekindled: string[] = [],
 ) {
   if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
-  if (source === 'bundled') return { chart: await bundledChart(area, seed), fallback: false };
+  if (source === 'bundled')
+    return { chart: await bundledChart(area, seed, rekindled), fallback: false };
   try {
     const response = await fetcher('/api/atlas', {
       method: 'POST',
@@ -27,7 +29,8 @@ export async function prepareChart(
   } catch (error) {
     // A cancelled request must never start another expedition or change its region.
     if (signal.aborted) throw error;
-    if (bundledCount(area)) return { chart: await bundledChart(area, seed), fallback: true };
+    if (bundledCount(area))
+      return { chart: await bundledChart(area, seed, rekindled), fallback: true };
     const message = error instanceof Error ? error.message : 'The live map could not be prepared.';
     throw new Error(
       `${message} No bundled charts cover this area yet. Bundled maps are available for Slovakia and all eight kraje.`,

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   ATLAS_SITES,
+  REST_HEALING,
+  WORKS,
+  workBlocked,
   atlasFinds,
   atlasNeighbours,
   atlasObjective,
@@ -9,7 +12,7 @@ import {
   charted,
   dayRange,
 } from './atlas';
-import { makeEnemy, nodeOf } from './engine';
+import { makeEnemy, nightsOf, nodeOf } from './engine';
 import { scoreOf } from './meta';
 import { newRun, transition, type Run } from './engine';
 import { advanceSave, decodeSave, emptySave, validRun } from './storage';
@@ -136,7 +139,7 @@ describe('Lost Atlas expedition', () => {
     const lit: Run = { ...dry, waylights: ['well', 'kiln', 'kiln'], health: 10 };
     const dawn = transition(lit, { type: 'atlas-camp' });
     expect(dawn.atlas).toMatchObject({ day: 2, oil: a.range });
-    expect(dawn.health).toBe(12);
+    expect(dawn.health).toBe(10 + 8 + 2); // a night's rest, then the Dawnwell
     expect(dawn.coins).toBe(lit.coins + 8);
     expect(validRun(dawn)).toBe(true);
     // Waylights pay at dawn on a chart, not again when an encounter is entered.
@@ -150,6 +153,52 @@ describe('Lost Atlas expedition', () => {
     expect(transition(old, { type: 'atlas-camp' })).toBe(old);
     expect(validRun({ ...dawn, atlas: { ...dawn.atlas!, oil: -1 } })).toBe(false);
     expect(validRun({ ...dawn, atlas: { ...dawn.atlas!, finds: [999] } })).toBe(false);
+  });
+  it('each evening builds one wagon work or rests; works pay at dawn and never twice', () => {
+    const base: Run = { ...newRun('warden', 123, true), coins: 200, health: 20, flasks: 0 };
+    expect(base.atlas!.works).toEqual([]);
+    expect(Object.keys(WORKS)).toHaveLength(6);
+    // Resting heals; building does not.
+    expect(transition(base, { type: 'atlas-camp' }).health).toBe(20 + REST_HEALING);
+    const stove = transition(base, { type: 'atlas-camp', work: 'stove' });
+    expect(stove).toMatchObject({ coins: 180, health: 24 });
+    expect(stove.atlas).toMatchObject({ day: 2, works: ['stove'] });
+    expect(workBlocked(stove, 'stove')).toBe('Already built');
+    expect(transition(stove, { type: 'atlas-camp', work: 'stove' })).toBe(stove);
+    expect(workBlocked({ ...base, coins: 19 }, 'stove')).toBe('Not enough coins');
+    const poor = { ...base, coins: 19 };
+    expect(transition(poor, { type: 'atlas-camp', work: 'stove' })).toBe(poor);
+    // Each work does exactly what it says.
+    const wheel = transition(base, { type: 'atlas-camp', work: 'wheel' });
+    expect(wheel.attack).toBe(base.attack + 2);
+    const rack = transition(base, { type: 'atlas-camp', work: 'rack' });
+    expect(rack.atlas!.range).toBe(Math.round((base.atlas!.range! * 1.25) / 100) * 100);
+    expect(rack.atlas!.oil).toBe(rack.atlas!.range);
+    const box = transition(transition(base, { type: 'atlas-camp', work: 'strongbox' }), {
+      type: 'atlas-camp',
+    });
+    expect(box.coins).toBe(200 - 30 + 6 + 6);
+    let still = transition(base, { type: 'atlas-camp', work: 'still' });
+    expect(still.flasks).toBe(1);
+    still = transition(transition(still, { type: 'atlas-camp' }), { type: 'atlas-camp' });
+    expect(still.flasks).toBe(2); // the still stops at two
+    // The ward-lantern halves the nights that toughen enemies.
+    let ward = transition(base, { type: 'atlas-camp', work: 'ward' });
+    for (let i = 0; i < 4; i++) ward = transition(ward, { type: 'atlas-camp' });
+    expect(ward.atlas!.day).toBe(6);
+    expect(nightsOf(ward)).toBe(3);
+    expect(nightsOf({ ...ward, atlas: { ...ward.atlas!, works: [] } })).toBe(5);
+    expect(validRun(ward)).toBe(true);
+    expect(decodeSave(JSON.stringify(advanceSave(emptySave(), ward)))?.run).toEqual(ward);
+    expect(validRun({ ...ward, atlas: { ...ward.atlas!, works: ['palace'] as never } })).toBe(
+      false,
+    );
+    // Charts saved by v0.8 have no works list and still load and camp.
+    const v08 = { ...base, atlas: { ...base.atlas!, works: undefined } };
+    expect(validRun(JSON.parse(JSON.stringify(v08)))).toBe(true);
+    expect(transition(v08, { type: 'atlas-camp', work: 'stove' }).atlas!.works).toEqual(['stove']);
+    const fighting: Run = { ...base, phase: 'combat' };
+    expect(transition(fighting, { type: 'atlas-camp', work: 'stove' })).toBe(fighting);
   });
   it('wayside finds lie on five different roads and are gathered once by walking them', () => {
     const base = newRun('warden', 123, true);

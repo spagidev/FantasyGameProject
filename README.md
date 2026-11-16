@@ -44,6 +44,13 @@ Browser tests use `/usr/bin/chromium` when present. On other machines, run `npx 
 
 The list above describes the first two rulesets. In combat your action resolves first, then poison, then the enemy's visible intention. **Guard lasts one enemy action. Flasks also end your turn.** Open “How to play” for the complete introduction.
 
+## The Hearth-wagon and the Provinces · v0.9
+
+- **A camp that is a town.** On the Lost Atlas your camp is a hearth-wagon. Each evening build one of six works onto it (a stove, a dew-still, a whetwheel, a lamp-rack, a toll-box, a ward-lantern) or rest by its fire — never both. Works pay at dawn; nights still cost.
+- **A map of the realm.** Choose where the veil falls on a real map of Slovakia, drawn as eight provinces of Veyr that mirror the eight kraje. A province campaign reaches both of its hidden cities; rekindle both to recover the province's legend.
+- **Voices.** Guardians and elites speak. Each keeper writes their own page after every bell and lives their own epilogue under each ending: fifteen new chronicle pages, and three tellings of one story.
+- [The backlog](docs/BACKLOG.md) lists what comes next, sized for different agents. [Art brief 2](docs/ART_BRIEF_2.md) asks for the wagon works, province crests and four paintings.
+
 ## The Living Map · v0.8
 
 The Lost Atlas becomes an adventure map with a clock, and the map becomes a tool.

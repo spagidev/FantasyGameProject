@@ -1,6 +1,7 @@
 import type { RegionalChart } from './atlas/types';
 import { bundledCount, type AtlasSource } from './atlas/bundled';
 import { prepareChart } from './atlas/prepare';
+import { campaignMap } from './atlas/provinces';
 import { AtlasSetup, RegionalAtlasPreview } from './components/AtlasSetup';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -52,6 +53,7 @@ import { Modal } from './components/Modal';
 import { RouteMap } from './components/RouteMap';
 import { Combat, combatKeys } from './components/Combat';
 import { play, setSound } from './sound';
+import { VOICES, pageFor } from './game/lore';
 import { Journal } from './components/Journal';
 import { Scout, TalentChoice, WaylightsPanel } from './components/Strategy';
 import { AtlasMap, AtlasJournal } from './components/Atlas';
@@ -219,6 +221,9 @@ export default function App() {
           newSeed,
           atlasSource as 'bundled' | 'live',
           controller.signal,
+          fetch,
+          // Charts already rekindled are passed over while another remains in the area.
+          campaignMap.cities.filter((c) => meta.cities[c.key]?.completed).map((c) => c.id),
         );
         if (atlasRequest.current !== controller || controller.signal.aborted) return;
         selectedChart = result.chart;
@@ -579,6 +584,7 @@ export default function App() {
                     </div>
                     {expedition === 'atlas' && (
                       <AtlasSetup
+                        meta={meta}
                         area={atlasArea}
                         onArea={(v) => {
                           setAtlasArea(v);
@@ -1038,11 +1044,21 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
           {boss ? 'A BELL REMEMBERS ITS SONG' : 'THE DARK YIELDS A LITTLE'}
         </span>
         <h2>{boss ? 'A memory awakens.' : 'Something worth carrying.'}</h2>
+        {boss && run.enemy?.id && VOICES[run.enemy.id]?.fall && (
+          <p className="voice-fall">{VOICES[run.enemy.id].fall}</p>
+        )}
         <p className="scene-lead">
           {boss
             ? CHAPTERS[Math.floor(run.depth / 4)].memory
             : 'Among the ashes, a small thing catches the light.\nChoose one gift for the road ahead.'}
         </p>
+        {boss && pageFor(`${run.keeper}-bell-${run.bells}`) && run.ruleset === 3 && (
+          <blockquote className="keeper-page">
+            <SceneArt id={`journal-${run.keeper}`} />
+            <p>{pageFor(`${run.keeper}-bell-${run.bells}`)!.text}</p>
+            <cite>— {KEEPERS[run.keeper].name}’s journal · a new page in your chronicle</cite>
+          </blockquote>
+        )}
         <div className="reward-coins">
           <Icon name="coins" size={16} /> +{victoryCoins(run)} coins collected
           {run.relics.includes('thread') && <span> · +5 health</span>}
@@ -1329,6 +1345,11 @@ function Ending({
               ? '“Eira,” the king whispers. The heart of the sun opens in his hands. You could wake it, if the world will share its burden. Or you could carry him home, and teach Cinderfall another way to keep warm.'
               : LORE.find((l) => l.id === run.ending)?.text}
         </p>
+        {run.phase === 'won' && run.ruleset === 3 && pageFor(`${run.keeper}-${run.ending}`) && (
+          <blockquote className="keeper-page">
+            <p>{pageFor(`${run.keeper}-${run.ending}`)!.text}</p>
+          </blockquote>
+        )}
         {choosing ? (
           <div className="encounter-options">
             <button
@@ -1534,11 +1555,15 @@ function Help() {
           <h3>The Lost Atlas</h3>
           <p>
             A second kind of expedition, drawn over real OpenStreetMap roads. Each day your lamp oil
-            carries you a fixed distance; make camp for a new day. Waylights pay at dawn, and every
-            night the enemies ahead grow a little tougher. Select a landmark to plan a route: the
-            map shows its distance and walking time, and one button walks it. Small finds lie on
-            some roads. If you recognize the real city, name it in the field journal for +2 attack.
-            One guess per bell.
+            carries you a fixed distance; then you make camp. Your camp is a hearth-wagon, a small
+            town that travels with you: each evening either build one work onto it (a stove, a
+            still, a toll-box…) or rest by its fire for 8 health — never both. Works and waylights
+            pay at dawn, and every night the enemies ahead grow a little tougher. Choose a province
+            on the map of the realm to decide where the veil falls; rekindle both of its hidden
+            cities to recover its legend. Select a landmark to plan a route: the map shows its
+            distance and walking time, and one button walks it. Small finds lie on some roads. If
+            you recognize the real city, name it in the field journal for +2 attack. One guess per
+            bell.
           </p>
         </div>
       </div>
