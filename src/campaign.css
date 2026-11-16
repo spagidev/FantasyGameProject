@@ -1,0 +1,157 @@
+/* The campaign map of the provinces (v0.9). */
+.campaign-map {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+}
+.campaign-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: #efe7d2;
+  border: 1px solid var(--copper, #85623c);
+  border-radius: 10px;
+}
+.campaign-province {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.campaign-map.has-selection .campaign-province:not(.is-selected) {
+  opacity: 0.55;
+}
+.campaign-outline {
+  stroke: #234634;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.campaign-selected-edge {
+  stroke: #16362f;
+  stroke-width: 5;
+  stroke-linejoin: round;
+}
+.campaign-label {
+  font-family: var(--serif, Georgia, serif);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  fill: #1b2a22;
+  paint-order: stroke;
+  stroke: rgba(245, 240, 229, 0.55);
+  stroke-width: 3px;
+}
+.campaign-marker {
+  stroke: #5a3f1f;
+  stroke-width: 2;
+}
+.campaign-marker.is-open {
+  fill: #f5f0e5;
+}
+.campaign-marker.is-walked {
+  fill: #85623c;
+}
+.campaign-marker.is-done {
+  fill: #d7b77f;
+  stroke: #16362f;
+}
+.campaign-star {
+  fill: #d7b77f;
+  stroke: #16362f;
+  stroke-width: 1.5;
+}
+.campaign-city {
+  font-family: var(--serif, Georgia, serif);
+  font-weight: 700;
+  fill: #16362f;
+  paint-order: stroke;
+  stroke: #f5f0e5;
+  stroke-width: 3px;
+}
+.campaign-buttons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (min-width: 800px) {
+  .campaign-buttons {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.campaign-buttons button {
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  color: #1b2a22;
+  background: var(--tint, #f5f0e5);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+}
+.campaign-buttons button b {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 1.05rem;
+}
+.campaign-buttons button span {
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+.campaign-buttons button[aria-pressed='true'] {
+  border-color: #16362f;
+  box-shadow: 0 0 0 2px #d7b77f;
+}
+.campaign-buttons button:focus-visible {
+  outline: 3px solid #16362f;
+  outline-offset: 2px;
+}
+.campaign-detail {
+  padding: 12px 14px;
+  background: #f5f0e5;
+  color: #1b2a22;
+  border: 1px solid #c9cabb;
+  border-left: 4px solid #85623c;
+  border-radius: 8px;
+}
+.campaign-detail h3 {
+  margin: 0;
+  font-family: var(--serif, Georgia, serif);
+  color: #16362f;
+}
+.campaign-detail .eyebrow {
+  color: #6b4d29;
+}
+.campaign-detail p {
+  margin: 6px 0 0;
+  color: #1b2a22;
+}
+.campaign-detail .muted {
+  color: #4a5648;
+}
+.campaign-counts {
+  font-size: 0.9rem;
+}
+.campaign-note {
+  font-size: 0.9rem;
+}
+.campaign-heading {
+  font-family: var(--serif, Georgia, serif);
+  margin: 18px 0 8px;
+}
+.campaign-legends {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+}
+@media (prefers-reduced-motion: reduce) {
+  .campaign-province {
+    transition: none;
+  }
+}
+
+.province-crest {
+  float: right;
+  margin: 0 0 6px 12px;
+}

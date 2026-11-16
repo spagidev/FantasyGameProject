@@ -214,11 +214,73 @@ export type AtlasState = {
   range?: number;
   /** Road indices whose wayside find has been gathered. */
   finds?: number[];
+  /** Works built onto the hearth-wagon (v0.9). Absent means none. */
+  works?: WorkId[];
 };
+/**
+ * The hearth-wagon: the keeper's camp is a small town that travels with her. Each evening
+ * she may build one work onto it or rest by its fire — never both.
+ */
+export type WorkId = 'stove' | 'still' | 'wheel' | 'rack' | 'strongbox' | 'ward';
+export const WORKS: Record<WorkId, { name: string; cost: number; effect: string; flavor: string }> =
+  {
+    stove: {
+      name: 'The iron stove',
+      cost: 20,
+      effect: 'Every dawn restores 4 health.',
+      flavor: 'It was a bell once. It prefers this.',
+    },
+    still: {
+      name: 'The dew-still',
+      cost: 25,
+      effect: 'Every dawn fills one flask, if you carry fewer than two.',
+      flavor: 'Moths drink from it first. That is how you know it is ready.',
+    },
+    wheel: {
+      name: 'The whetwheel',
+      cost: 35,
+      effect: 'Gain 2 attack at once.',
+      flavor: 'It sings a little as it turns: one note, the right one.',
+    },
+    rack: {
+      name: 'The lamp-rack',
+      cost: 20,
+      effect: 'A day’s lamp oil carries you a quarter farther.',
+      flavor: 'Six lamps where there was one. The road looks shorter already.',
+    },
+    strongbox: {
+      name: 'The toll-box',
+      cost: 30,
+      effect: 'Every dawn collects 6 coins.',
+      flavor: 'People leave what they can, for the light going by.',
+    },
+    ward: {
+      name: 'The ward-lantern',
+      cost: 40,
+      effect: 'The dark gathers half as fast: only every second night toughens your enemies.',
+      flavor: 'It does not push the night back. It asks it, politely, to wait.',
+    },
+  };
+export const REST_HEALING = 8;
+export const worksOf = (a?: AtlasState): WorkId[] => a?.works ?? [];
+/** Nights that count toward the gathering dark. */
+export const darkNights = (a?: AtlasState) => {
+  if (a?.day === undefined) return 0;
+  const nights = a.day - 1;
+  return worksOf(a).includes('ward') ? Math.ceil(nights / 2) : nights;
+};
+/** Whether a work can be built this evening, and why not. */
+export function workBlocked(run: Run, id: WorkId): string | null {
+  const a = run.atlas;
+  if (!a || a.day === undefined || run.phase !== 'map') return 'Not now';
+  if (worksOf(a).includes(id)) return 'Already built';
+  if (run.coins < WORKS[id].cost) return 'Not enough coins';
+  return null;
+}
 export type AtlasAction =
   | { type: 'atlas-move'; to: string }
   | { type: 'atlas-walk'; to: string }
-  | { type: 'atlas-camp' }
+  | { type: 'atlas-camp'; work?: WorkId }
   | { type: 'atlas-collect' }
   | { type: 'atlas-name'; name: string };
 export function newAtlas(chart?: RegionalChart, travel = true): AtlasState {
@@ -236,7 +298,7 @@ export function newAtlas(chart?: RegionalChart, travel = true): AtlasState {
   };
   if (!travel) return state;
   const range = dayRange(state);
-  return { ...state, day: 1, oil: range, range, finds: [] };
+  return { ...state, day: 1, oil: range, range, finds: [], works: [] };
 }
 
 /** Shortest road distances from one site to every other, over the whole chart. */
@@ -403,17 +465,40 @@ export function applyAtlasAction(run: Run, action: AtlasAction): Run {
     if (!walked) return run;
   } else if (action.type === 'atlas-camp') {
     if (!travels(a)) return run;
+    // The evening: build one work onto the wagon, or rest by its fire.
+    let evening: string;
+    if (action.work) {
+      if (!Object.hasOwn(WORKS, action.work) || workBlocked(r, action.work)) return run;
+      const work = WORKS[action.work];
+      r.coins -= work.cost;
+      a.works = [...worksOf(a), action.work];
+      if (action.work === 'wheel') r.attack += 2;
+      if (action.work === 'rack') a.range = Math.round((a.range * 1.25) / 100) * 100;
+      evening = `You build ${work.name.toLowerCase()} onto the wagon.`;
+    } else {
+      r.health = Math.min(r.maxHealth, r.health + REST_HEALING);
+      evening = 'You rest by the wagon’s fire.';
+    }
+    // Dawn.
     a.day++;
     a.oil = a.range;
-    const wells = r.waylights.filter((id) => id === 'well').length * 2;
-    const kilns = r.waylights.filter((id) => id === 'kiln').length * 4;
-    r.health = Math.min(r.maxHealth, r.health + wells);
-    r.coins += kilns;
-    message = `Day ${a.day}. You make camp and trim the lamp.${
-      wells || kilns
-        ? ` Your waylights send${kilns ? ` ${kilns} coins` : ''}${kilns && wells ? ' and' : ''}${wells ? ` ${wells} health` : ''} at dawn.`
-        : ''
-    } The dark has gathered a little.`;
+    const works = worksOf(a);
+    const health =
+      r.waylights.filter((id) => id === 'well').length * 2 + (works.includes('stove') ? 4 : 0);
+    const coins =
+      r.waylights.filter((id) => id === 'kiln').length * 4 + (works.includes('strongbox') ? 6 : 0);
+    const flask = works.includes('still') && r.flasks < 2;
+    r.health = Math.min(r.maxHealth, r.health + health);
+    r.coins += coins;
+    if (flask) r.flasks++;
+    const gifts = [
+      ...(coins ? [`${coins} coins`] : []),
+      ...(health ? [`${health} health`] : []),
+      ...(flask ? ['a full flask'] : []),
+    ];
+    message = `${evening} Day ${a.day} dawns${
+      gifts.length ? ` with ${gifts.join(', ')}` : ''
+    }. The dark has gathered a little.`;
   } else if (action.type === 'atlas-collect') {
     const site = atlasSite(a.position, a);
     if (a.collected.includes(site.id)) return run;
@@ -484,7 +569,10 @@ export function validAtlas(x: unknown): x is AtlasState {
     a.steps >= 0 &&
     a.steps <= 100000 &&
     (a.day === undefined
-      ? a.oil === undefined && a.range === undefined && a.finds === undefined
+      ? a.oil === undefined &&
+        a.range === undefined &&
+        a.finds === undefined &&
+        a.works === undefined
       : Number.isInteger(a.day) &&
         a.day >= 1 &&
         a.day <= 10000 &&
@@ -497,9 +585,12 @@ export function validAtlas(x: unknown): x is AtlasState {
         Array.isArray(a.finds) &&
         a.finds.length <= 5 &&
         new Set(a.finds).size === a.finds.length &&
-        a.finds.every(
-          (n) => Number.isInteger(n) && n >= 0 && n < atlasGeography(a).edges.length,
-        )) &&
+        a.finds.every((n) => Number.isInteger(n) && n >= 0 && n < atlasGeography(a).edges.length) &&
+        (a.works === undefined ||
+          (Array.isArray(a.works) &&
+            a.works.length <= Object.keys(WORKS).length &&
+            new Set(a.works).size === a.works.length &&
+            a.works.every((id) => typeof id === 'string' && Object.hasOwn(WORKS, id))))) &&
     typeof a.recognized === 'boolean' &&
     Array.isArray(a.attempts) &&
     a.attempts.length <= 4 &&

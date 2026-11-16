@@ -22,3 +22,7 @@ The game includes **16 historical city road charts, two in each Slovak kraj**, d
 - Source repositories retrieved **12 November 2026**. These are historical snapshots, not current maps. Coverage and source dates are deliberately visible in the game.
 
 Rebuild the shipped charts deterministically with `node scripts/build-bundled-atlas.mjs`. To re-extract the cropped source, check out the two pinned repository revisions above, install Python `fiona` and `pyproj`, and run `python3 scripts/extract-slovakia.py /path/to/transport-repository /path/to/places-repository`. Normal game builds use the checked-in charts and require no provider access or GIS tooling.
+
+## Campaign map of the provinces (v0.9)
+
+The national outline in `src/atlas/slovakia-map.json` is Natural Earth 1:10m Admin 0 (public domain), extracted via the `world-atlas` package into `scripts/slovakia-outline.geo.json`. City positions are the centres of the bundled OpenStreetMap-derived charts. The eight provinces drawn in the game are Voronoi cells of those centres grouped by kraj: an illustrative division, not administrative boundaries. Rebuild with `node scripts/build-campaign-map.mjs`.

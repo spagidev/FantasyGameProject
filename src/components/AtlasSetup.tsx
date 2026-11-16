@@ -1,5 +1,8 @@
 import { bundledCount, type AtlasSource } from '../atlas/bundled';
 import { SLOVAK_REGIONS } from '../atlas/regions';
+import type { Meta } from '../game/meta';
+import { provinceOfKraj, PROVINCES } from '../atlas/provinces';
+import { CampaignMap } from './CampaignMap';
 import { Icon } from './Icon';
 export function AtlasSetup({
   area,
@@ -9,7 +12,10 @@ export function AtlasSetup({
   loading,
   error,
   onCancel,
+  meta,
 }: {
+  /** Records, for the campaign map: which charts are walked, rekindled and named. */
+  meta?: Meta;
   area: string;
   onArea: (v: string) => void;
   source: AtlasSource;
@@ -20,6 +26,7 @@ export function AtlasSetup({
 }) {
   const offline = source === 'original';
   const count = bundledCount(area);
+  const bundled = source === 'bundled';
   return (
     <section className="atlas-setup" aria-label="Choose atlas geography">
       <span className="eyebrow">WHERE SHOULD THE VEIL FALL?</span>
@@ -47,6 +54,23 @@ export function AtlasSetup({
           Original offline chart
         </button>
       </div>
+      {bundled && (
+        <>
+          <CampaignMap
+            cities={meta?.cities ?? {}}
+            selected={provinceOfKraj(area)?.code ?? null}
+            onSelect={(code) =>
+              onArea(
+                code ? (PROVINCES.find((p) => p.code === code)?.kraj ?? 'Slovakia') : 'Slovakia',
+              )
+            }
+          />
+          <p className="campaign-note">
+            Choosing a province hides one of its two cities. Cities you have already rekindled are
+            passed over while another remains.
+          </p>
+        </>
+      )}
       {!offline && (
         <>
           <label htmlFor="atlas-region">Country or region</label>
@@ -68,19 +92,21 @@ export function AtlasSetup({
             <option value="Austria" />
             <option value="Germany" />
           </datalist>
-          <details className="slovak-regions">
-            <summary>Slovakia · choose one of the eight kraje</summary>
-            <div>
-              <button disabled={loading} onClick={() => onArea('Slovakia')}>
-                All of Slovakia
-              </button>
-              {SLOVAK_REGIONS.map((r) => (
-                <button key={r.code} disabled={loading} onClick={() => onArea(r.name)}>
-                  {r.name}
+          {!bundled && (
+            <details className="slovak-regions">
+              <summary>Slovakia · choose one of the eight kraje</summary>
+              <div>
+                <button disabled={loading} onClick={() => onArea('Slovakia')}>
+                  All of Slovakia
                 </button>
-              ))}
-            </div>
-          </details>
+                {SLOVAK_REGIONS.map((r) => (
+                  <button key={r.code} disabled={loading} onClick={() => onArea(r.name)}>
+                    {r.name}
+                  </button>
+                ))}
+              </div>
+            </details>
+          )}
           <p className={`bundled-availability ${!count ? 'unavailable' : ''}`} role="status">
             <Icon name={count ? 'check' : 'info'} size={16} />
             <span>

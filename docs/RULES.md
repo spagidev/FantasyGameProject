@@ -68,6 +68,21 @@ Five **wayside finds** lie on five different roads chosen by the seed: two purse
 
 The **route planner** (`atlasRoute`) returns the shortest route over roads the keeper knows — roads already walked and roads whose both ends are charted. `atlas-walk` follows it one road at a time and stops where the oil runs out. Atlas journals begun before v0.8 have no day counter and keep free walking.
 
+#### The hearth-wagon (v0.9)
+
+Each evening, **Make camp** opens one choice, never both: build one of six works onto the wagon, or rest by its fire for 8 health. A work is built once, paid for in coins, and stays for the expedition. The next day then dawns.
+
+| Work             | Cost | Effect                                                   |
+| ---------------- | ---- | -------------------------------------------------------- |
+| The iron stove   | 20   | Every dawn restores 4 health.                            |
+| The dew-still    | 25   | Every dawn fills one flask, if you carry fewer than two. |
+| The whetwheel    | 35   | Gain 2 attack at once.                                   |
+| The lamp-rack    | 20   | A day’s lamp oil carries you a quarter farther.          |
+| The toll-box     | 30   | Every dawn collects 6 coins.                             |
+| The ward-lantern | 40   | Only every second night toughens your enemies.           |
+
+At dawn the lamp oil is refilled (to the rack's longer day, if built), then waylights and works pay: each Dawnwell restores 2 health, the stove 4, each Cinder Kiln pays 4 coins, the toll-box 6, and the dew-still fills a flask if fewer than two are carried. A work built tonight pays at the very next dawn. With the ward-lantern only every second night (rounded up) counts toward the 2% health gained by enemies not yet fought.
+
 ### Records
 
 `src/game/meta.ts`. Score = 10 per crossing + 150 per bell + 40 per elite + 5 per stagger + 3 per perfect guard + 100 for naming an Atlas city + (on completion) 300 and 2 per remaining health, all multiplied by `1 + 0.2 × dusk`. Deeds are judged on every saved step; twelve of them add one relic each to the pool of future expeditions. Records never change a keeper’s starting statistics. Unreadable records in a journal are dropped without rejecting the journal.

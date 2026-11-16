@@ -1371,3 +1371,65 @@
 .codex-card > .relic-art {
   align-self: flex-start;
 }
+
+/* v0.9 · voices and keeper pages. */
+.duel-voice {
+  margin: 0;
+  padding: 2px 4px 0;
+  font-family: var(--serif);
+  font-size: 17px;
+  font-style: italic;
+  line-height: 1.4;
+  color: #f1e3bf;
+  text-shadow: 0 1px 6px #06161699;
+  animation: voice-in 0.9s ease-out;
+}
+.voice-fall {
+  max-width: 560px;
+  margin: 0 auto 14px;
+  font-family: var(--serif);
+  font-size: 19px;
+  font-style: italic;
+  line-height: 1.45;
+  color: #f1e3bf;
+}
+.keeper-page {
+  max-width: 560px;
+  margin: 18px auto 6px;
+  padding: 16px 20px 14px;
+  border: 1px solid #c7b27366;
+  border-left: 3px solid #d7b77f;
+  border-radius: 4px;
+  background: #0f2a2599;
+  text-align: left;
+}
+.keeper-page p {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 18px;
+  line-height: 1.5;
+  color: #efe6cb;
+}
+.keeper-page cite {
+  display: block;
+  margin-top: 9px;
+  font-size: 10.5px;
+  font-style: normal;
+  letter-spacing: 0.4px;
+  color: #d9c391;
+}
+@keyframes voice-in {
+  from {
+    opacity: 0;
+  }
+}
+@container (max-width: 700px) {
+  .duel-voice {
+    font-size: 15px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .duel-voice {
+    animation: none;
+  }
+}

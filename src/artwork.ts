@@ -24,3 +24,9 @@ export const SITE_ART = table(
 export const SCENE_ART = table(
   import.meta.glob('./art/scenes/*.webp', { eager: true, query: '?url', import: 'default' }),
 );
+export const WORK_ART = table(
+  import.meta.glob('./art/works/*.webp', { eager: true, query: '?url', import: 'default' }),
+);
+export const PROVINCE_ART = table(
+  import.meta.glob('./art/provinces/*.webp', { eager: true, query: '?url', import: 'default' }),
+);
