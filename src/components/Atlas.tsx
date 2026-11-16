@@ -77,7 +77,7 @@ function WagonSummary({ run }: { run: Run }) {
         <ul>
           {built.map((id) => (
             <li key={id} title={WORKS[id].effect}>
-              <WorkIcon id={id} size={14} />
+              <WorkIcon id={id} size={WORK_ART[id] ? 24 : 14} />
               {WORKS[id].name}
             </li>
           ))}
@@ -154,7 +154,7 @@ function EveningDialog({
                 onClick={() => onChoose(id)}
                 {...hint(id)}
               >
-                <WorkIcon id={id} size={22} />
+                <WorkIcon id={id} size={WORK_ART[id] ? 52 : 22} />
                 <span className="wagon-copy">
                   <strong>{work.name}</strong>
                   <span>{work.effect}</span>

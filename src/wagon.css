@@ -167,3 +167,8 @@
     align-items: center;
   }
 }
+
+.wagon-option > img {
+  margin-top: 0;
+  filter: drop-shadow(0 1px 2px #3a2a1233);
+}

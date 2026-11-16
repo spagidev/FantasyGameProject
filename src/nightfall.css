@@ -1433,3 +1433,11 @@
     animation: none;
   }
 }
+
+/* v0.9 · a journal painting inside a keeper's page. */
+.keeper-page .scene-art {
+  width: 100%;
+  aspect-ratio: 21 / 9;
+  margin: 0 0 14px;
+  box-shadow: none;
+}
