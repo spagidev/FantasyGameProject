@@ -44,6 +44,14 @@ Browser tests use `/usr/bin/chromium` when present. On other machines, run `npx 
 
 The list above describes the first two rulesets. In combat your action resolves first, then poison, then the enemy's visible intention. **Guard lasts one enemy action. Flasks also end your turn.** Open “How to play” for the complete introduction.
 
+## Boons, a handier map, and play anywhere · v0.11
+
+- **Province boons.** Recover a province's legend and its relic joins every later road: eight new relics, from a coronation offcut to the last lit window.
+- **A map you can handle.** Drag, pinch and wheel to zoom, arrow keys to pan, one button to centre on the keeper.
+- **Installable and offline.** Add Emberwake to a home screen; once cached it plays without a connection.
+- **Share a road.** Copy a link to the road you just walked; it opens the lobby with the same seed, keeper and night.
+- [Art brief 3](docs/ART_BRIEF_3.md) asks for the eight province relic icons.
+
 ## Free roads and guarded troves · v0.10
 
 - **Any order within a realm.** On the Lost Atlas the three encounters of a realm can be taken in any order; the bell guardian waits for all three. With lamp oil and the wagon, the order is a route to plan.

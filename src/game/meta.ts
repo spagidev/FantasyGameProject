@@ -1,3 +1,4 @@
+import { campaignProgress } from '../atlas/provinces';
 import { FOES } from './bestiary';
 import { KEEPERS, LORE, RELICS, STARTING_RELICS, type KeeperId, type RelicId } from './data';
 import { DUSK_MAX, encountersWon, type Run } from './engine';
@@ -282,9 +283,15 @@ export const DEEDS: Deed[] = [
   },
 ];
 
-/** The relics a new expedition can find: the starting set plus everything deeds have unlocked. */
+/** The relics a new expedition can find: the starting set, deed unlocks and province boons. */
 export function unlockedRelics(meta: Meta): RelicId[] {
-  const earned = DEEDS.filter((d) => d.unlocks && meta.deeds.includes(d.id)).map((d) => d.unlocks!);
+  const earned = [
+    ...DEEDS.filter((d) => d.unlocks && meta.deeds.includes(d.id)).map((d) => d.unlocks!),
+    // Province boons: one relic for every province whose legend is recovered.
+    ...campaignProgress(meta.cities)
+      .filter((p) => p.recovered)
+      .map((p) => p.province.boon),
+  ];
   return (Object.keys(RELICS) as RelicId[]).filter(
     (id) => STARTING_RELICS.includes(id) || earned.includes(id),
   );

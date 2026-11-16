@@ -28,7 +28,15 @@ export type RelicId =
   | 'lodestar'
   | 'cinder'
   | 'idol'
-  | 'mirror';
+  | 'mirror'
+  | 'offcut'
+  | 'spa'
+  | 'wellrope'
+  | 'chapelstone'
+  | 'wire'
+  | 'clapperboard'
+  | 'joinery'
+  | 'window';
 export type Rarity = 'common' | 'uncommon' | 'rare';
 export type NodeKind = 'battle' | 'elite' | 'event' | 'camp' | 'shop' | 'boss';
 export type EnemyArt = 'wraith' | 'stag' | 'sentinel' | 'king';
@@ -428,6 +436,63 @@ export const RELICS: Record<
     description: 'A perfect guard also reflects half the blocked damage.',
     flavor: 'A soldier’s last look at the sky, kept in glass.',
     icon: 'gem',
+    rarity: 'rare',
+  },
+  // Province boons (v0.11): each joins future roads when its province's legend is recovered.
+  offcut: {
+    name: 'Coronation Offcut',
+    description: 'Gain 6 maximum health and 1 armor.',
+    flavor: 'Gold left over from a crown made for somebody else’s king.',
+    icon: 'sun',
+    rarity: 'uncommon',
+  },
+  spa: {
+    name: 'Warm-spring Flask',
+    description: 'Flasks restore 6 more health, and so does every rest.',
+    flavor: 'Filled where the plain still steams, nine hundred winters on.',
+    icon: 'flask',
+    rarity: 'uncommon',
+  },
+  wellrope: {
+    name: 'Captive’s Well-rope',
+    description: 'Begin every battle with 6 guard against the first blow.',
+    flavor: 'Three winters of digging, for love. The rope never frayed.',
+    icon: 'thread',
+    rarity: 'uncommon',
+  },
+  chapelstone: {
+    name: 'Chapel Cornerstone',
+    description: 'Every bell you ring restores 15 health.',
+    flavor: 'The first stone of the first chapel. It has heard every bell since.',
+    icon: 'bell',
+    rarity: 'uncommon',
+  },
+  wire: {
+    name: 'Tinker’s Wire',
+    description: 'Entering a trader’s stall restores 10 health.',
+    flavor: 'Enough to mend a pot, a fence, or a traveller.',
+    icon: 'seed',
+    rarity: 'uncommon',
+  },
+  clapperboard: {
+    name: 'Miners’ Clapper',
+    description: 'Every perfect guard also strikes 3 coins.',
+    flavor: 'They beat it to wake one another before a dawn that never came.',
+    icon: 'coins',
+    rarity: 'uncommon',
+  },
+  joinery: {
+    name: 'Nail-less Joint',
+    description: 'Thorns and plating have no effect on you.',
+    flavor: 'Iron remembers violence. Good joinery remembers only the tree.',
+    icon: 'leaf',
+    rarity: 'rare',
+  },
+  window: {
+    name: 'The Last Lit Window',
+    description: 'Nights never toughen your enemies, and every dawn restores 3 health.',
+    flavor: 'The last window in Veyr to go dark. It does not intend to again.',
+    icon: 'sparkles',
     rarity: 'rare',
   },
 };

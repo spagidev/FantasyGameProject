@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { RELICS, RELIC_SETS, setOf, type RelicId, type SetId } from './data';
-import { hasSet, makeEnemy, newRun, nodeOf, transition, type Run } from './engine';
+import {
+  flaskHealing,
+  hasSet,
+  makeEnemy,
+  newRun,
+  nightsOf,
+  nodeOf,
+  restAmount,
+  transition,
+  type Run,
+} from './engine';
 
 const ALL = Object.keys(RELICS) as RelicId[];
 function fight(relics: RelicId[], patch: Partial<Run> = {}): Run {
@@ -21,6 +31,54 @@ function fight(relics: RelicId[], patch: Partial<Run> = {}): Run {
     ...patch,
   };
 }
+
+describe('province boons', () => {
+  const plated = (relics: RelicId[]) => {
+    const r = fight(relics, { keeper: 'warden', attack: 7 });
+    r.enemy = { ...r.enemy!, traits: { plated: 2, thorns: 3 } };
+    return transition(r, { type: 'strike' });
+  };
+  it('Nail-less Joint ignores plating and thorns', () => {
+    const plain = plated([]);
+    const joined = plated(['joinery']);
+    expect(joined.enemy!.health - plain.enemy!.health).toBe(-2);
+    expect(joined.health - plain.health).toBe(3);
+  });
+  it('Coronation Offcut, Warm-spring Flask, Miners’ Clapper and the Well-rope', () => {
+    const base = fight([], { health: 20 });
+    const offcut = transition(
+      { ...base, phase: 'reward', rewards: ['offcut'] },
+      { type: 'reward', id: 'offcut' },
+    );
+    expect([offcut.maxHealth - base.maxHealth, offcut.armor - base.armor]).toEqual([6, 1]);
+    expect(flaskHealing({ ...base, relics: ['spa'] })).toBe(flaskHealing(base) + 6);
+    expect(restAmount({ ...base, relics: ['spa'] })).toBe(restAmount(base) + 6);
+    const jab = (relics: RelicId[]) => {
+      const r = fight(relics);
+      r.enemy = { ...r.enemy!, pattern: [{ name: 'Jab', damage: 5 }] };
+      return transition(r, { type: 'guard' });
+    };
+    expect(jab(['clapperboard']).coins - jab([]).coins).toBe(3);
+    const roped = transition(
+      { ...newRun('warden', 1), relics: ['wellrope'] },
+      { type: 'travel', lane: 0 },
+    );
+    expect(roped.guard).toBe(6);
+    const unroped = transition(newRun('warden', 1), { type: 'travel', lane: 0 });
+    expect(unroped.guard).toBe(0);
+  });
+  it('The Last Lit Window stops the gathering dark and warms each dawn', () => {
+    const r = { ...newRun('warden', 1, true), relics: ['window'] as RelicId[], health: 20 };
+    const later = { ...r, atlas: { ...r.atlas!, day: 9 } };
+    expect(nightsOf(later)).toBe(0);
+    expect(nightsOf({ ...later, relics: [] })).toBe(8);
+    const dawn = transition(
+      { ...r, atlas: { ...r.atlas!, works: [] } },
+      { type: 'atlas-camp', work: 'wheel' },
+    );
+    expect(dawn.health).toBe(23);
+  });
+});
 
 describe('relic sets', () => {
   it('four sets of three distinct existing relics, none shared between sets', () => {

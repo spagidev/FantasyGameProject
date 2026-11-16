@@ -10,6 +10,14 @@ House rules for every item: the engine in `src/game/` is pure and deterministic 
 - **The provinces of Veyr.** A real map of Slovakia with eight fantasy provinces mirroring the eight kraje; choose where to go on the map; a province campaign reaches both of its cities; rekindle both to recover its legend. (`src/atlas/provinces.ts`, `src/components/CampaignMap.tsx`.)
 - **Voices.** Guardians and elites speak when a fight begins, turns and ends; each keeper writes their own page after each bell and has their own epilogue for each ending — fifteen new chronicle pages, three tellings of one story. (`src/game/lore.ts`.)
 
+## Shipped in v0.11
+
+- **Province boons** (item 7): eight province relics, one per recovered legend.
+- **Installable and offline** (item 6): manifest, service worker, “Available offline”.
+- **A map you can handle** (item 5): drag, wheel and pinch zoom, keyboard, centre on keeper.
+- **Evening dialog polish** (item 9).
+- **Share a road** (item 10): `?road=&keeper=&dusk=` links and a copy button on the ending screen.
+
 ## Shipped in v0.10
 
 - **Relic sets** (item 4): four sets with one bonus each.
@@ -45,18 +53,18 @@ House rules for every item: the engine in `src/game/` is pure and deterministic 
 **What.** Four sets of three existing relics; carrying all three adds one bonus line, shown on each member's card (“2 of 3 · The Bell-ringer's kit”). Proposed: _Bell-ringer's kit_ (clapper, chime, echo): breaking poise restores 1 focus. _The long watch_ (buckle, psalm, mirror): perfect guards heal 2. _Night garden_ (censer, gravebloom, briar): poison fades every second turn. _Pilgrim's purse_ (ferrycoin, scale, thread): +1 flask at every trader visit. Re-run `npm run balance` and the scripted-player sim; adjust numbers if Dusk 0 novice win rates move more than five points.
 **Where.** `data.ts` (`RELIC_SETS`), hooks in `engine.ts`, cards in `App.tsx`/`Chronicle.tsx`.
 
-### 5. A map you can handle · Build
+### 5. ✓ A map you can handle · Build (shipped v0.11)
 
 **Why.** Mapy-style maps are dragged and pinched; ours has one zoom switch.
 **What.** In `AtlasMap`: drag to pan, wheel and pinch to zoom between the whole chart and 4×, `+`/`−`/“centre on keeper” buttons, keyboard arrows when the map has focus. Keep the keeper centred after a walk unless the player has panned. No library. Reduced-motion: no animated easing.
 **Where.** `Atlas.tsx`, `nightfall.css`. **Done when.** Playwright drags and zooms; axe passes; nothing overflows at 390 px.
 
-### 6. Installable and offline · Build
+### 6. ✓ Installable and offline · Build (shipped v0.11)
 
 **Why.** The bundled charts are the game's “downloaded maps”; the site should work on a train.
 **What.** Web app manifest, icons from the existing favicon, a small hand-written service worker that precaches the built assets (cache-first, versioned by build hash, never caching `/api/atlas`). “Available offline” line in the footer once cached. The Worker build (`scripts/build-worker.mjs`) must serve the manifest and worker with correct MIME types.
 
-### 7. Province boons · Lead (content), Build (wiring)
+### 7. ✓ Province boons · Lead (shipped v0.11)
 
 **Why.** Recovering a legend should change what future roads can hold — variety, never power.
 **What.** Each recovered province adds one province-themed relic or story scene to the pool (eight in all), written to echo its legend (a miner's wooden clapper, a nail-less joint, a coronation offcut…). Needs eight designs with exact rules, then `unlockedRelics` reads province progress.
@@ -66,11 +74,11 @@ House rules for every item: the engine in `src/game/` is pure and deterministic 
 **Why.** The charts are Slovak; the player may be too.
 **What.** Extract interface strings to a typed dictionary (`src/i18n/en.ts`, `sk.ts`), a language switch in the footer stored in `meta`. Lore and legends need a careful literary translation — flag for human review rather than shipping machine prose.
 
-### 9. Evening dialog polish · Chore
+### 9. ✓ Evening dialog polish · Chore (shipped v0.11)
 
 Move the dawn preview above the options so it is visible without scrolling; show the keeper's coins in the dialog header; painted work icons arrive via `src/art/works/` (already wired).
 
-### 10. Share a road · Chore
+### 10. ✓ Share a road · Chore (shipped v0.11)
 
 `?road=<seed>&keeper=<id>&dusk=<n>` pre-fills the lobby; a “copy link to this road” button on the ending screen. Never auto-starts.
 

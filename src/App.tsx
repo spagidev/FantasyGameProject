@@ -62,6 +62,7 @@ import { VOICES, pageFor } from './game/lore';
 import { Journal } from './components/Journal';
 import { Scout, TalentChoice, WaylightsPanel } from './components/Strategy';
 import { AtlasMap, AtlasJournal } from './components/Atlas';
+import { OfflineBadge } from './components/OfflineBadge';
 
 function load(): { save: Save; warning: string } {
   try {
@@ -86,12 +87,41 @@ function seedFrom(text: string) {
   return Array.from(text).reduce((n, c) => (Math.imul(n, 31) + c.charCodeAt(0)) | 0, 5381) >>> 0;
 }
 
+// A shared road: ?road=<seed in base36>&keeper=<id>&dusk=<n>, read once at load.
+function readShare() {
+  if (typeof location === 'undefined') return null;
+  const q = new URLSearchParams(location.search);
+  const road = q.get('road');
+  const who = q.get('keeper');
+  if (road === null && who === null && q.get('dusk') === null) return null;
+  const exact = road !== null && /^[0-9a-z]{1,7}$/.test(road) ? parseInt(road, 36) : NaN;
+  const duskNum = Number(q.get('dusk'));
+  return {
+    road: Number.isFinite(exact) && exact <= 0xffffffff ? road : null,
+    exact,
+    keeper: keeperIds.find((id) => id === who),
+    dusk: Number.isInteger(duskNum) && duskNum >= 0 ? duskNum : 0,
+  };
+}
+const SHARED = readShare();
+
 export default function App() {
   const [loaded] = useState(load);
+  const share = loaded.save.run ? null : SHARED;
+  useEffect(() => {
+    if (!SHARED) return;
+    const q = new URLSearchParams(location.search);
+    ['road', 'keeper', 'dusk'].forEach((k) => q.delete(k));
+    const rest = q.toString();
+    history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+  }, []);
+  const [sharedSeed] = useState(() =>
+    share?.road ? { text: share.road, value: share.exact } : null,
+  );
   const [save, setSave] = useState(loaded.save);
   const [warning, setWarning] = useState(loaded.warning);
-  const [keeper, setKeeper] = useState<KeeperId>(loaded.save.profile.lastKeeper);
-  const [seed, setSeed] = useState('');
+  const [keeper, setKeeper] = useState<KeeperId>(share?.keeper ?? loaded.save.profile.lastKeeper);
+  const [seed, setSeed] = useState(share?.road ?? '');
   const [expedition, setExpedition] = useState<'classic' | 'atlas'>(
     loaded.save.run?.atlas ? 'atlas' : 'classic',
   );
@@ -109,7 +139,14 @@ export default function App() {
   const boardRef = useRef<HTMLDivElement>(null);
   const run = save.run;
   const meta = metaOf(save.profile);
-  const [dusk, setDusk] = useState(0);
+  const [dusk, setDusk] = useState(() =>
+    share
+      ? Math.min(
+          share.dusk,
+          duskUnlocked(metaOf(loaded.save.profile), share.keeper ?? loaded.save.profile.lastKeeper),
+        )
+      : 0,
+  );
   const night = Math.min(dusk, duskUnlocked(meta, keeper));
   // Deeds completed since this page opened, for the toast and the ending screen.
   const knownDeeds = useRef(meta.deeds);
@@ -209,7 +246,9 @@ export default function App() {
     const newSeed = options.daily
       ? today.seed
       : seed.trim() && !options.keeper
-        ? seedFrom(seed.trim())
+        ? sharedSeed && seed.trim() === sharedSeed.text
+          ? sharedSeed.value
+          : seedFrom(seed.trim())
         : crypto.getRandomValues(new Uint32Array(1))[0];
     let selectedChart: boolean | RegionalChart = mode === 'atlas';
     if (mode === 'atlas' && !offlineAtlas) {
@@ -834,6 +873,7 @@ export default function App() {
           {saved ? 'Saved on this device' : 'Playing in this tab'} · Journal{' '}
           <Icon name="book" size={12} />
         </button>
+        <OfflineBadge />
         <button
           className="sound-toggle"
           aria-label={meta.sound ? 'Turn sound off' : 'Turn sound on'}
@@ -1317,6 +1357,36 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
   );
 }
 
+function ShareRoad({ run }: { run: Run }) {
+  const [note, setNote] = useState('');
+  useEffect(() => {
+    if (!note) return;
+    const t = setTimeout(() => setNote(''), 5000);
+    return () => clearTimeout(t);
+  }, [note]);
+  const url = `${location.origin}/?road=${run.seed.toString(36)}&keeper=${run.keeper}&dusk=${run.dusk ?? 0}`;
+  return (
+    <div className="share-road">
+      <button
+        className="secondary-button"
+        onClick={() => {
+          const write = navigator.clipboard?.writeText(url);
+          if (!write) return setNote(`Copying is unavailable here. The link is ${url}`);
+          write.then(
+            () => setNote('Link copied'),
+            () => setNote(`Copying is unavailable here. The link is ${url}`),
+          );
+        }}
+      >
+        <Icon name="book" size={17} /> Copy a link to this road
+      </button>
+      <span className="scene-hint" role="status" aria-live="polite">
+        {note}
+      </span>
+    </div>
+  );
+}
+
 function Ending({
   run,
   dispatch,
@@ -1439,6 +1509,7 @@ function Ending({
                 {onAgain ? 'Choose another road' : 'Walk another road'}
               </button>
             </div>
+            {run.ruleset === 3 && !run.atlas && !run.daily && <ShareRoad run={run} />}
             <p className="scene-hint">
               Your memories remain in the chronicle. Each keeper starts equal.
             </p>

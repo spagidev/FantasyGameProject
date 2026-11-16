@@ -10,6 +10,7 @@ const types = {
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
+  '.webmanifest': 'application/manifest+json',
   '.webp': 'image/webp',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
@@ -87,6 +88,20 @@ assert.equal(database.status, 200, 'ODbL geographic database must be downloadabl
 assert.equal(
   Object.keys(JSON.parse(gunzipSync(Buffer.from(await database.arrayBuffer())))).length,
   16,
+);
+for (const [file, type] of [
+  ['/manifest.webmanifest', 'application/manifest+json'],
+  ['/sw.js', 'text/javascript; charset=utf-8'],
+]) {
+  const res = await worker.fetch(new Request('https://emberwake.example' + file), {});
+  assert.equal(res.status, 200, `Worker must serve ${file}`);
+  assert.equal(res.headers.get('Content-Type'), type);
+}
+assert.equal(
+  (await worker.fetch(new Request('https://emberwake.example/sw.js'), {})).headers.get(
+    'Cache-Control',
+  ),
+  'no-cache',
 );
 console.log(
   'Verified Worker HTML, JavaScript, artwork, 16 bundled charts, geographic download, and API routing.',

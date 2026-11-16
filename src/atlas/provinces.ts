@@ -1,4 +1,5 @@
-import map from './slovakia-map.json';
+import type { RelicId } from '../game/data';
+import map from './slovakia-map.json' with { type: 'json' };
 
 /**
  * The provinces of Veyr that lie over Slovakia. Each is a fantasy mirror of a real kraj:
@@ -12,6 +13,8 @@ export type ProvinceCode =
   'SK-BL' | 'SK-TA' | 'SK-TC' | 'SK-NI' | 'SK-ZI' | 'SK-BC' | 'SK-PV' | 'SK-KI';
 export type Province = {
   code: ProvinceCode;
+  /** The relic that joins future roads once this province's legend is recovered. */
+  boon: RelicId;
   /** The real region, shown as the public clue. */
   kraj: string;
   /** Its name in Veyr. */
@@ -26,6 +29,7 @@ export type Province = {
 export const PROVINCES: Province[] = [
   {
     code: 'SK-BL',
+    boon: 'offcut',
     kraj: 'Bratislavský kraj',
     name: 'The Reedmarch',
     tint: '#cdb98a',
@@ -35,6 +39,7 @@ export const PROVINCES: Province[] = [
   },
   {
     code: 'SK-TA',
+    boon: 'spa',
     kraj: 'Trnavský kraj',
     name: 'The Belled Plain',
     tint: '#b9c398',
@@ -44,6 +49,7 @@ export const PROVINCES: Province[] = [
   },
   {
     code: 'SK-TC',
+    boon: 'wellrope',
     kraj: 'Trenčiansky kraj',
     name: 'The Castled Narrows',
     tint: '#a9b9b4',
@@ -53,6 +59,7 @@ export const PROVINCES: Province[] = [
   },
   {
     code: 'SK-NI',
+    boon: 'chapelstone',
     kraj: 'Nitriansky kraj',
     name: 'The Old Seat',
     tint: '#d6c59c',
@@ -62,6 +69,7 @@ export const PROVINCES: Province[] = [
   },
   {
     code: 'SK-ZI',
+    boon: 'wire',
     kraj: 'Žilinský kraj',
     name: 'The Tinkers’ Fells',
     tint: '#a3bfa0',
@@ -71,6 +79,7 @@ export const PROVINCES: Province[] = [
   },
   {
     code: 'SK-BC',
+    boon: 'clapperboard',
     kraj: 'Banskobystrický kraj',
     name: 'The Copper Heart',
     tint: '#c9a583',
@@ -80,6 +89,7 @@ export const PROVINCES: Province[] = [
   },
   {
     code: 'SK-PV',
+    boon: 'joinery',
     kraj: 'Prešovský kraj',
     name: 'The Wooden Spires',
     tint: '#b3b3cc',
@@ -89,6 +99,7 @@ export const PROVINCES: Province[] = [
   },
   {
     code: 'SK-KI',
+    boon: 'window',
     kraj: 'Košický kraj',
     name: 'The Eastern Lantern',
     tint: '#d3aa97',
