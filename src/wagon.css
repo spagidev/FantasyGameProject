@@ -172,3 +172,20 @@
   margin-top: 0;
   filter: drop-shadow(0 1px 2px #3a2a1233);
 }
+
+/* Open encounters on the chart (v0.10). */
+.atlas-open-ring {
+  animation: open-ring 2.4s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes open-ring {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .atlas-open-ring {
+    animation: none;
+  }
+}

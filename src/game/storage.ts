@@ -1,4 +1,4 @@
-import { validAtlas } from './atlas';
+import { atlasSites, encounterState, validAtlas } from './atlas';
 import { FOES } from './bestiary';
 import { KEEPERS, LORE, NEW_TALENTS, RELICS, TALENTS, WAYLIGHTS, type KeeperId } from './data';
 import { DUSK_MAX, nodeOf, type Run } from './engine';
@@ -77,6 +77,7 @@ export function validRun(x: unknown): x is Run {
   )
     return false;
   const v3 = x.ruleset === 3;
+  const freeAtlas = record(x.atlas) && x.atlas.done !== undefined;
   const relicIds = (v: unknown, max: number): v is string[] =>
     strings(v, max) && v.every((id) => Object.hasOwn(RELICS, id)) && new Set(v).size === v.length;
   for (const key of ['relics', 'rewards']) {
@@ -138,7 +139,7 @@ export function validRun(x: unknown): x is Run {
   if (
     !strings(x.log, 8) ||
     !strings(x.path, 12) ||
-    x.path.length !== x.depth + 1 ||
+    (!freeAtlas && x.path.length !== x.depth + 1) ||
     !knownLore(x.lore) ||
     !strings(x.purchased, v3 ? 6 : 3) ||
     !x.purchased.every(
@@ -146,6 +147,7 @@ export function validRun(x: unknown): x is Run {
     )
   )
     return false;
+  if (freeAtlas && !validFreeOrder(x as unknown as Run)) return false;
   if (x.ending !== null && x.ending !== 'dawn' && x.ending !== 'hearth') return false;
   if (x.enemy !== null) {
     const e = x.enemy;
@@ -222,6 +224,35 @@ export function validRun(x: unknown): x is Run {
     if (['camp', 'shop'].includes(String(x.phase)) && x.depth % 4 !== 2) return false;
   }
   return true;
+}
+
+/**
+ * A free-order chart's entered sites must replay as a legal sequence: each one open when it
+ * was entered, path and position agreeing with it, bells matching the guardians beaten.
+ */
+function validFreeOrder(run: Run): boolean {
+  const a = run.atlas!;
+  const done = a.done!;
+  if (run.path.length !== done.length) return false;
+  let bells = 0;
+  const replay: Run = { ...run, atlas: { ...a, done: [] }, bells: 0 };
+  for (let i = 0; i < done.length; i++) {
+    const site = atlasSites(a).find((s) => s.id === done[i]);
+    if (!site || site.depth === undefined) return false;
+    replay.bells = bells;
+    if (encounterState(replay, site) !== 'open') return false;
+    if (run.path[i] !== `${site.depth}-${site.lane}`) return false;
+    replay.atlas!.done = done.slice(0, i + 1);
+    // A guardian already left behind has rung its bell.
+    if (site.depth % 4 === 3 && i < done.length - 1) bells++;
+  }
+  const last = done.length ? atlasSites(a).find((s) => s.id === done.at(-1))! : null;
+  if (last ? run.depth !== last.depth || run.lane !== last.lane : run.depth !== -1) return false;
+  // The last entered may be a guardian whose bell has rung (after victory) or not (in combat).
+  return (
+    run.bells === bells ||
+    (last?.depth !== undefined && last.depth % 4 === 3 && run.bells === bells + 1)
+  );
 }
 
 export function decodeSave(raw: string): Save | null {

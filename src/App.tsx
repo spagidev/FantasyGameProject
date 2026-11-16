@@ -17,6 +17,8 @@ import {
 } from './game/data';
 import {
   attackOf,
+  encountersEntered,
+  encountersWon,
   canBuy,
   canEvent,
   incomingDamage,
@@ -447,9 +449,7 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <span className="encounter-count">
-                  {Math.max(0, run.depth + 1)} / 12 encounters
-                </span>
+                <span className="encounter-count">{encountersEntered(run)} / 12 encounters</span>
               </div>
             )}
 
@@ -1387,7 +1387,7 @@ function Ending({
                 <span>Relics carried</span>
               </div>
               <div>
-                <strong>{Math.max(0, lost ? run.depth : run.depth + 1)}/12</strong>
+                <strong>{encountersWon(run)}/12</strong>
                 <span>Encounters won</span>
               </div>
             </div>
@@ -1554,16 +1554,17 @@ function Help() {
         <div>
           <h3>The Lost Atlas</h3>
           <p>
-            A second kind of expedition, drawn over real OpenStreetMap roads. Each day your lamp oil
-            carries you a fixed distance; then you make camp. Your camp is a hearth-wagon, a small
-            town that travels with you: each evening either build one work onto it (a stove, a
-            still, a toll-box…) or rest by its fire for 8 health — never both. Works and waylights
-            pay at dawn, and every night the enemies ahead grow a little tougher. Choose a province
-            on the map of the realm to decide where the veil falls; rekindle both of its hidden
-            cities to recover its legend. Select a landmark to plan a route: the map shows its
-            distance and walking time, and one button walks it. Small finds lie on some roads. If
-            you recognize the real city, name it in the field journal for +2 attack. One guess per
-            bell.
+            A second kind of expedition, drawn over real OpenStreetMap roads. Inside each realm the
+            three encounters may be taken in any order; its bell guardian waits for all three, so
+            plan a route that spends your lamp oil well. Each day your lamp oil carries you a fixed
+            distance; then you make camp. Your camp is a hearth-wagon, a small town that travels
+            with you: each evening either build one work onto it (a stove, a still, a toll-box…) or
+            rest by its fire for 8 health — never both. Works and waylights pay at dawn, and every
+            night the enemies ahead grow a little tougher. Choose a province on the map of the realm
+            to decide where the veil falls; rekindle both of its hidden cities to recover its
+            legend. Select a landmark to plan a route: the map shows its distance and walking time,
+            and one button walks it. Small finds lie on some roads. If you recognize the real city,
+            name it in the field journal for +2 attack. One guess per bell.
           </p>
         </div>
       </div>

@@ -216,6 +216,12 @@ export type AtlasState = {
   finds?: number[];
   /** Works built onto the hearth-wagon (v0.9). Absent means none. */
   works?: WorkId[];
+  /**
+   * Encounter sites entered, in order (v0.10). Present only on charts with free order: inside
+   * a realm the three encounters may be taken in any order; its bell guardian opens when all
+   * three are done. Charts begun earlier keep the strict order.
+   */
+  done?: string[];
 };
 /**
  * The hearth-wagon: the keeper's camp is a small town that travels with her. Each evening
@@ -298,7 +304,7 @@ export function newAtlas(chart?: RegionalChart, travel = true): AtlasState {
   };
   if (!travel) return state;
   const range = dayRange(state);
-  return { ...state, day: 1, oil: range, range, finds: [], works: [] };
+  return { ...state, day: 1, oil: range, range, finds: [], works: [], done: [] };
 }
 
 /** Shortest road distances from one site to every other, over the whole chart. */
@@ -398,8 +404,45 @@ export function atlasRoute(state: AtlasState, to: string) {
 }
 export const atlasSite = (id: string, state?: AtlasState) =>
   atlasSites(state).find((s) => s.id === id)!;
-export const atlasObjective = (run: Run) =>
-  atlasSites(run.atlas).find((s) => s.depth === run.depth + 1);
+/** Whether this chart lets the realm's encounters be taken in any order. */
+export const freeOrder = (a?: AtlasState): a is AtlasState & { done: string[] } =>
+  a?.done !== undefined;
+export type EncounterState = 'done' | 'open' | 'sealed';
+/**
+ * Where an encounter site stands in the expedition. Free order: everything in earlier realms
+ * is done; in the current realm (one per bell rung) the three encounters are open until
+ * entered, and the guardian opens once they are all done; later realms are sealed.
+ */
+export function encounterState(
+  run: Pick<Run, 'atlas' | 'depth' | 'bells'>,
+  site: { id: string; depth?: number },
+): EncounterState | null {
+  if (site.depth === undefined) return null;
+  const a = run.atlas;
+  if (!freeOrder(a))
+    return site.depth <= run.depth ? 'done' : site.depth === run.depth + 1 ? 'open' : 'sealed';
+  if (a.done.includes(site.id)) return 'done';
+  const chapter = Math.floor(site.depth / 4);
+  if (chapter !== run.bells) return chapter < run.bells ? 'done' : 'sealed';
+  if (site.depth % 4 !== 3) return 'open';
+  const rest = ATLAS_SITES.filter(
+    (s) => s.depth !== undefined && Math.floor(s.depth / 4) === chapter && s.depth % 4 !== 3,
+  );
+  return rest.every((s) => a.done.includes(s.id)) ? 'open' : 'sealed';
+}
+/** Every encounter the keeper may walk to and enter now. */
+export const atlasObjectives = (run: Run) =>
+  atlasSites(run.atlas).filter((s) => encounterState(run, s) === 'open');
+/** The open encounter nearest by road (the only one, on a strict-order chart). */
+export function atlasObjective(run: Run): AtlasSite | undefined {
+  const open = atlasObjectives(run);
+  if (open.length < 2 || !run.atlas) return open[0];
+  const { cost } = distances(run.atlas, run.atlas.position);
+  return [...open].sort((x, y) => (cost[x.id] ?? Infinity) - (cost[y.id] ?? Infinity))[0];
+}
+/** The site that holds the encounter at this depth and lane. */
+export const siteAt = (depth: number, lane: number, state?: AtlasState) =>
+  atlasSites(state).find((s) => s.depth === depth && s.lane === lane);
 export function atlasNeighbours(state: AtlasState) {
   return atlasGeography(state).edges.flatMap((e, index) =>
     e.a === state.position
@@ -572,7 +615,8 @@ export function validAtlas(x: unknown): x is AtlasState {
       ? a.oil === undefined &&
         a.range === undefined &&
         a.finds === undefined &&
-        a.works === undefined
+        a.works === undefined &&
+        a.done === undefined
       : Number.isInteger(a.day) &&
         a.day >= 1 &&
         a.day <= 10000 &&
@@ -586,6 +630,11 @@ export function validAtlas(x: unknown): x is AtlasState {
         a.finds.length <= 5 &&
         new Set(a.finds).size === a.finds.length &&
         a.finds.every((n) => Number.isInteger(n) && n >= 0 && n < atlasGeography(a).edges.length) &&
+        (a.done === undefined ||
+          (Array.isArray(a.done) &&
+            a.done.length <= 12 &&
+            new Set(a.done).size === a.done.length &&
+            a.done.every((id) => ATLAS_SITES.some((s) => s.id === id && s.depth !== undefined)))) &&
         (a.works === undefined ||
           (Array.isArray(a.works) &&
             a.works.length <= Object.keys(WORKS).length &&

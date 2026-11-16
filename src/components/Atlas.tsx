@@ -9,6 +9,9 @@ import {
   atlasSites,
   atlasSite,
   atlasObjective,
+  atlasObjectives,
+  encounterState,
+  freeOrder,
   atlasNeighbours,
   bearing,
   charted,
@@ -20,7 +23,14 @@ import {
   type WorkId,
   type Point,
 } from '../game/atlas';
-import { nodeOf, waylightFor, type Action, type Run, type MapNode } from '../game/engine';
+import {
+  nextNodes,
+  nodeOf,
+  waylightFor,
+  type Action,
+  type Run,
+  type MapNode,
+} from '../game/engine';
 import { SITE_ART, WORK_ART } from '../artwork';
 import { Modal } from './Modal';
 import { SceneArt } from './Art';
@@ -213,7 +223,9 @@ export function AtlasMap({
   const neighbours = atlasNeighbours(state);
   const movable = !!run && run.phase === 'map';
   const next = run ? atlasObjective(run) : ATLAS_SITES[1];
-  const canEnter = movable && current.depth === run!.depth + 1;
+  const canEnter = movable && nextNodes(run!).length > 0;
+  const open = run ? atlasObjectives(run) : [];
+  const anyOrder = run && freeOrder(state) && open.length > 1;
   const seen = sites.filter((s) => charted(state, s.id));
   const fogPoints = state.visited.map((id) => pack.points[id]);
   if (state.recognized) fogPoints.push(pack.points.haven);
@@ -274,7 +286,18 @@ export function AtlasMap({
         <p className="atlas-next">
           <Icon name="flag" size={15} />
           {canEnter ? (
-            'Your next encounter is here.'
+            anyOrder ? (
+              `An open encounter is here. ${open.length - 1} more ${open.length === 2 ? 'waits' : 'wait'} in this realm, in any order.`
+            ) : (
+              'Your next encounter is here.'
+            )
+          ) : anyOrder ? (
+            <>
+              {open.length} encounters are open in this realm: take them in any order; the bell
+              guardian waits for all three. Nearest:{' '}
+              {charted(state, next.id) ? next.name : 'an echo in the mist'} ·{' '}
+              {bearing(state.position, next.id, state)}.
+            </>
           ) : (
             <>
               Next: {charted(state, next.id) ? next.name : 'an echo in the mist'} ·{' '}
@@ -507,7 +530,7 @@ export function AtlasMap({
           {seen.map((s) => {
             const q = pack.points[s.id],
               active = selected === s.id,
-              done = s.depth !== undefined && run && s.depth <= run.depth;
+              done = !!run && encounterState(run, s) === 'done';
             return (
               <g
                 key={s.id}
@@ -516,6 +539,18 @@ export function AtlasMap({
                 onClick={() => setSelected(s.id)}
               >
                 {active && <circle cx={q[0]} cy={q[1]} r="31" fill={`url(#${uid}halo)`} />}
+                {run && run.phase === 'map' && encounterState(run, s) === 'open' && (
+                  <circle
+                    className="atlas-open-ring"
+                    cx={q[0]}
+                    cy={q[1]}
+                    r={s.id.startsWith('bell') ? 23 : 19}
+                    fill="none"
+                    stroke="#ffd27a"
+                    strokeWidth="2.5"
+                    strokeDasharray="5 4"
+                  />
+                )}
                 <circle
                   cx={q[0]}
                   cy={q[1]}
@@ -702,13 +737,13 @@ export function AtlasMap({
                 <span>No charted road leads there yet. Walk into the veil to find one.</span>
               </p>
             )}
-            {selected === state.position &&
-              current.depth !== undefined &&
-              current.depth > run.depth + 1 && (
-                <p className="atlas-ward">
-                  A bell ward seals this place. Resolve the next encounter first.
-                </p>
-              )}
+            {selected === state.position && encounterState(run, current) === 'sealed' && (
+              <p className="atlas-ward">
+                {current.depth! % 4 === 3 && Math.floor(current.depth! / 4) === run.bells
+                  ? 'The bell guardian waits until the other three encounters of this realm are done.'
+                  : 'A bell ward seals this place. Ring this realm’s bell first.'}
+              </p>
+            )}
           </div>
           {movable && (
             <div className="atlas-roads">

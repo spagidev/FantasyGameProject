@@ -3,6 +3,8 @@ import {
   applyAtlasAction,
   atlasSite,
   darkNights,
+  encounterState,
+  freeOrder,
   travels,
   newAtlas,
   cloneAtlasRun,
@@ -322,12 +324,18 @@ export function nodeAt(
 export const nodeOf = (r: Run, depth = r.depth, lane = r.lane): MapNode =>
   nodeAt(r.seed, depth, lane, layoutOf(r));
 
+/** Encounters entered so far, including one in progress. */
+export const encountersEntered = (r: Pick<Run, 'path'>) => r.path.length;
+/** Encounters won: those entered, less one lost in. */
+export const encountersWon = (r: Pick<Run, 'path' | 'phase'>) =>
+  Math.max(0, r.path.length - (r.phase === 'lost' ? 1 : 0));
+
 export function nextNodes(run: Run): MapNode[] {
   if (run.phase !== 'map' || run.depth >= 11) return [];
   const d = run.depth + 1;
   if (run.atlas) {
     const site = atlasSite(run.atlas.position, run.atlas);
-    return site.depth === d ? [nodeOf(run, d, site.lane!)] : [];
+    return encounterState(run, site) === 'open' ? [nodeOf(run, site.depth!, site.lane!)] : [];
   }
   return (d % 4 === 3 ? [1] : [0, 1, 2])
     .filter((l) => d % 4 === 0 || Math.abs(l - run.lane) <= 1)
@@ -976,15 +984,20 @@ export function transition(run: Run, action: Action): Run {
   const r = cloneAtlasRun(run);
   const v3 = r.ruleset === 3;
   if (action.type === 'travel') {
-    if (!nextNodes(r).some((n) => n.lane === action.lane)) return run;
+    const target = nextNodes(r).find((n) => n.lane === action.lane);
+    if (!target) return run;
     // On a chart with days, waylights pay at dawn instead of at each crossing.
     const benefits = travels(r.atlas) ? { health: 0, coins: 0 } : roadBenefits(r);
     heal(r, benefits.health);
     r.coins += benefits.coins;
-    r.depth += 1;
+    // On a free-order chart the encounter belongs to its site, so depth can step back within
+    // a realm; elsewhere the target is always the next depth.
+    r.depth = target.depth;
     r.lane = action.lane;
     const node = nodeOf(r);
     r.path.push(node.id);
+    if (freeOrder(r.atlas))
+      r.atlas.done = [...r.atlas.done, atlasSite(r.atlas.position, r.atlas).id];
     r.purchased = [];
     r.enemy = null;
     if (v3) r.shop = [];

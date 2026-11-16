@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   ATLAS_SITES,
+  atlasObjectives,
+  atlasSite,
+  encounterState,
   REST_HEALING,
   WORKS,
   workBlocked,
@@ -12,7 +15,7 @@ import {
   charted,
   dayRange,
 } from './atlas';
-import { makeEnemy, nightsOf, nodeOf } from './engine';
+import { makeEnemy, nextNodes, nightsOf, nodeOf } from './engine';
 import { scoreOf } from './meta';
 import { newRun, transition, type Run } from './engine';
 import { advanceSave, decodeSave, emptySave, validRun } from './storage';
@@ -90,7 +93,9 @@ describe('Lost Atlas expedition', () => {
     expect(transition(gift, { type: 'atlas-collect' })).toBe(gift);
   });
   it('keeps fog and recognition across journals; wrong guesses wait for the next bell', () => {
+    // This test skips ahead by setting bells by hand, which only a strict-order chart allows.
     let r = newRun('seer', 123, true);
+    r = { ...r, atlas: { ...r.atlas!, done: undefined } };
     expect(charted(r.atlas!, 'bell3')).toBe(false);
     r = transition(r, { type: 'atlas-name', name: 'Venice' });
     expect(r.attack).toBe(6);
@@ -260,6 +265,65 @@ describe('Lost Atlas expedition', () => {
       atlas: { ...r.atlas!, day: 8 },
     };
     expect(scoreOf(done).lines).toContainEqual({ label: 'Arrived on day 8', value: 60 });
+  });
+  it('a realm’s three encounters can be taken in any of the six orders; the guardian waits', () => {
+    const realm = ATLAS_SITES.filter((x) => x.depth !== undefined && x.depth < 3).map((x) => x.id);
+    const orders = [
+      [0, 1, 2],
+      [0, 2, 1],
+      [1, 0, 2],
+      [1, 2, 0],
+      [2, 0, 1],
+      [2, 1, 0],
+    ].map((o) => o.map((i) => realm[i]));
+    for (const order of orders) {
+      let r = rested({ ...newRun('warden', 123, true), health: 999, maxHealth: 999 });
+      expect(
+        atlasObjectives(r)
+          .map((x) => x.id)
+          .sort(),
+      ).toEqual([...realm].sort());
+      for (const [n, id] of order.entries()) {
+        r = rested(walk(r, id));
+        expect(encounterState(r, atlasSite('bell1', r.atlas))).toBe('sealed');
+        const before = r;
+        r = transition(r, { type: 'travel', lane: atlasSite(id, r.atlas).lane! });
+        expect(r).not.toBe(before);
+        expect(r.depth).toBe(atlasSite(id, r.atlas).depth);
+        expect(r.atlas!.done).toEqual(order.slice(0, n + 1));
+        expect(validRun(r)).toBe(true);
+        let steps = 0;
+        while (r.phase !== 'map' && steps++ < 200) r = transition(r, campaignAction(r));
+        expect(r.phase).toBe('map');
+        expect(encounterState(r, atlasSite(id, r.atlas))).toBe('done');
+        // A finished encounter cannot be entered again.
+        expect(nextNodes(r)).toEqual([]);
+        expect(decodeSave(JSON.stringify(advanceSave(emptySave(), r)))?.run).toEqual(r);
+      }
+      expect(r.path).toHaveLength(3);
+      expect(r.waylights).toHaveLength(1);
+      expect(encounterState(r, atlasSite('bell1', r.atlas))).toBe('open');
+      expect(atlasObjective(r)!.id).toBe('bell1');
+      // The next realm stays sealed until the bell rings.
+      expect(encounterState(r, atlasSite('kiln', r.atlas))).toBe('sealed');
+    }
+  });
+  it('rejects free-order journals that could not have happened', () => {
+    let r = rested({ ...newRun('warden', 123, true), health: 999, maxHealth: 999 });
+    r = walk(r, 'hearth');
+    r = transition(r, { type: 'travel', lane: atlasSite('hearth', r.atlas).lane! });
+    expect(validRun(r)).toBe(true);
+    const a = r.atlas!;
+    for (const bad of [
+      { ...r, atlas: { ...a, done: ['bell1'] }, path: ['3-1'], depth: 3, lane: 1 }, // guardian first
+      { ...r, atlas: { ...a, done: ['kiln'] }, path: ['4-1'], depth: 4, lane: 1 }, // next realm
+      { ...r, atlas: { ...a, done: ['hearth', 'hearth'] } }, // twice
+      { ...r, atlas: { ...a, done: [] } }, // path without a site
+      { ...r, path: ['0-0'] }, // path that disagrees with the site
+      { ...r, depth: 0 }, // position that disagrees with the site
+      { ...r, bells: 1 }, // a bell nobody rang
+    ])
+      expect(validRun(bad as Run), JSON.stringify(bad.atlas?.done)).toBe(false);
   });
   it.each(['warden', 'seer', 'wayfarer'] as const)(
     '%s can finish all twelve encounters without recognizing the geography',

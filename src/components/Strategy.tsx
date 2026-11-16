@@ -8,6 +8,7 @@ import {
   type WaylightId,
 } from '../game/data';
 import { describeTraits, FOES } from '../game/bestiary';
+import { encounterState, siteAt } from '../game/atlas';
 import {
   availableTalents,
   makeEnemy,
@@ -211,11 +212,23 @@ export function Scout({
         <p className="scout-unreachable">
           {!run
             ? 'Choose a keeper and begin an expedition to take this road.'
-            : node.depth <= run.depth
-              ? 'This crossing is behind you. The road leads forward.'
-              : node.depth === run.depth + 1
-                ? 'This lane is beyond reach from your current path. A neighboring lane stays open.'
-                : 'A future crossing. Plan your route, then advance one path at a time.'}
+            : run.atlas
+              ? {
+                  done: 'This encounter is behind you.',
+                  open: 'Walk to this place on the chart to enter it.',
+                  sealed:
+                    node.kind === 'boss'
+                      ? 'The guardian waits until the rest of its realm is done.'
+                      : 'A later realm. Ring this realm’s bell first.',
+                }[
+                  encounterState(run, siteAt(node.depth, node.lane, run.atlas) ?? { id: '' }) ??
+                    'sealed'
+                ]
+              : node.depth <= run.depth
+                ? 'This crossing is behind you. The road leads forward.'
+                : node.depth === run.depth + 1
+                  ? 'This lane is beyond reach from your current path. A neighboring lane stays open.'
+                  : 'A future crossing. Plan your route, then advance one path at a time.'}
         </p>
       )}
       <p className="scout-free">
