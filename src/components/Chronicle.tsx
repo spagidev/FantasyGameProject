@@ -6,6 +6,7 @@ import { EnemyPortrait, RelicIcon } from './Art';
 import { intentEffects } from './Combat';
 import { PROVINCES, campaignProgress, type ProvinceCode } from '../atlas/provinces';
 import { CampaignMap } from './CampaignMap';
+import { useT } from '../i18n';
 import { Icon } from './Icon';
 
 type Tab = 'memories' | 'deeds' | 'relics' | 'bestiary' | 'atlas' | 'records';
@@ -23,48 +24,51 @@ export function Chronicle({
   meta: Meta;
   onBack: () => void;
 }) {
+  const t = useT();
+  const c = t.chronicle;
   const [tab, setTab] = useState<Tab>('memories');
   const [province, setProvince] = useState<ProvinceCode | null>(null);
   const pool = unlockedRelics(meta);
   const relicIds = Object.keys(RELICS) as RelicId[];
   const foes = Object.keys(FOES);
   const tabs: { id: Tab; label: string; count: string }[] = [
-    { id: 'memories', label: 'Memories', count: `${lore.length}/${LORE.length}` },
-    { id: 'deeds', label: 'Deeds', count: `${meta.deeds.length}/${DEEDS.length}` },
+    { id: 'memories', label: c.tabMemories, count: `${lore.length}/${LORE.length}` },
+    { id: 'deeds', label: c.tabDeeds, count: `${meta.deeds.length}/${DEEDS.length}` },
     {
       id: 'relics',
-      label: 'Relics',
+      label: c.tabRelics,
       count: `${meta.relics.length}/${relicIds.length}`,
     },
-    { id: 'bestiary', label: 'Bestiary', count: `${meta.foes.length}/${foes.length}` },
+    { id: 'bestiary', label: c.tabBestiary, count: `${meta.foes.length}/${foes.length}` },
     {
       id: 'atlas',
-      label: 'Atlas',
+      label: c.tabAtlas,
       count: `${Object.keys(meta.cities).length}/${Math.max(KNOWN_CHARTS, Object.keys(meta.cities).length)}`,
     },
-    { id: 'records', label: 'Records', count: `${wins}/${runs}` },
+    { id: 'records', label: c.tabRecords, count: `${wins}/${runs}` },
   ];
   return (
     <section className="chronicle">
       <div className="chronicle-header">
-        <span className="eyebrow">THE THINGS THE FIRE COULD NOT TAKE</span>
+        <span className="eyebrow">{c.eyebrow}</span>
         <h1>
-          The keeper’s <em>chronicle.</em>
+          {c.titleA}
+          <em>{c.titleEm}</em>
         </h1>
-        <p>A world is not gone while someone remembers its stories.</p>
+        <p>{c.sub}</p>
         <div className="chronicle-counts">
           <span>
-            <b>{lore.length}</b> / {LORE.length} memories
+            <b>{lore.length}</b> {c.memoriesTail(LORE.length)}
           </span>
           <span>
-            <b>{runs}</b> expeditions ended
+            <b>{runs}</b> {c.expeditionsTail(runs)}
           </span>
           <span>
-            <b>{wins}</b> crossings completed
+            <b>{wins}</b> {c.crossingsTail(wins)}
           </span>
         </div>
       </div>
-      <div className="chronicle-tabs" role="tablist" aria-label="Chronicle sections">
+      <div className="chronicle-tabs" role="tablist" aria-label={c.sections}>
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -87,15 +91,9 @@ export function Chronicle({
                 <article className={`lore-card ${unlocked ? 'unlocked' : 'locked'}`} key={entry.id}>
                   <span className="lore-number">{String(i + 1).padStart(2, '0')}</span>
                   <Icon name={unlocked ? 'book' : 'eye'} size={24} />
-                  <span className="eyebrow">
-                    {unlocked ? 'A MEMORY RETURNED' : 'WAITING IN THE DARK'}
-                  </span>
-                  <h2>{unlocked ? entry.title : 'An unwritten page'}</h2>
-                  <p>
-                    {unlocked
-                      ? entry.text
-                      : 'Walk a little farther. Speak to a stranger. Some stories can only be found on the road.'}
-                  </p>
+                  <span className="eyebrow">{unlocked ? c.memoryReturned : c.waiting}</span>
+                  <h2>{unlocked ? entry.title : c.unwritten}</h2>
+                  <p>{unlocked ? entry.text : c.unwrittenText}</p>
                 </article>
               );
             })}
@@ -103,10 +101,7 @@ export function Chronicle({
         )}
         {tab === 'deeds' && (
           <>
-            <p className="codex-note">
-              Deeds never make a keeper stronger. Some add a new relic to the ones future roads can
-              offer.
-            </p>
+            <p className="codex-note">{c.deedsNote}</p>
             <div className="codex-grid">
               {DEEDS.map((d) => {
                 const done = meta.deeds.includes(d.id);
@@ -117,7 +112,7 @@ export function Chronicle({
                     <p>{d.text}</p>
                     {d.unlocks && (
                       <small>
-                        {done ? 'Unlocked' : 'Unlocks'}: {RELICS[d.unlocks].name}
+                        {done ? c.unlocked : c.unlocks}: {RELICS[d.unlocks].name}
                       </small>
                     )}
                   </article>
@@ -129,8 +124,7 @@ export function Chronicle({
         {tab === 'relics' && (
           <>
             <p className="codex-note">
-              {pool.length} of {relicIds.length} relics can appear on your roads. You have carried{' '}
-              {meta.relics.length}.
+              {c.relicsNote(pool.length, relicIds.length, meta.relics.length)}
             </p>
             <div className="codex-grid">
               {relicIds.map((id) => {
@@ -149,23 +143,23 @@ export function Chronicle({
                       <Icon name="eye" size={18} />
                     )}
                     <span className={`eyebrow rarity-${RELICS[id].rarity}`}>
-                      {RELICS[id].rarity.toUpperCase()}
+                      {t.app.rarity[RELICS[id].rarity].toUpperCase()}
                     </span>
-                    <h2>{open ? RELICS[id].name : 'A relic not yet in the world'}</h2>
+                    <h2>{open ? RELICS[id].name : c.notInWorld}</h2>
                     <p>
                       {open
                         ? RELICS[id].description
                         : province
-                          ? `A boon of ${province.name}.`
-                          : `Unlocked by the deed “${deed?.name}”.`}
+                          ? c.boonOf(province.name)
+                          : c.byDeed(deed?.name ?? '')}
                     </p>
                     <small>
                       {found
                         ? RELICS[id].flavor
                         : open
-                          ? 'Not yet carried.'
+                          ? c.notCarried
                           : province
-                            ? `Rekindle both hidden cities of ${province.name} to recover its legend.`
+                            ? c.rekindleBoth(province.name)
                             : deed?.text}
                     </small>
                   </article>
@@ -176,21 +170,22 @@ export function Chronicle({
         )}
         {tab === 'bestiary' && (
           <>
-            <p className="codex-note">
-              Defeat a creature to record its pattern here. Scouting on the road always shows what
-              stands ahead.
-            </p>
-            {CHAPTERS.map((chapter, c) => (
+            <p className="codex-note">{c.bestiaryNote}</p>
+            {CHAPTERS.map((chapter, ci) => (
               <div key={chapter.name} className="bestiary-realm">
                 <h2>{chapter.name}</h2>
                 <div className="codex-grid">
-                  {[...ORDINARY[c], ...ELITES[c], BOSSES[c]].map((foe) => (
+                  {[...ORDINARY[ci], ...ELITES[ci], BOSSES[ci]].map((foe) => (
                     <FoeCard
                       key={foe.id}
                       foe={foe}
                       met={meta.foes.includes(foe.id)}
                       rank={
-                        BOSSES[c] === foe ? 'Bell guardian' : ELITES[c].includes(foe) ? 'Elite' : ''
+                        BOSSES[ci] === foe
+                          ? c.rankBoss
+                          : ELITES[ci].includes(foe)
+                            ? c.rankElite
+                            : ''
                       }
                     />
                   ))}
@@ -201,12 +196,9 @@ export function Chronicle({
         )}
         {tab === 'atlas' && (
           <>
-            <p className="codex-note">
-              Every chart is a real place. Walk it for a stamp, finish its expedition, and name the
-              city beneath the veil to write its true name here.
-            </p>
+            <p className="codex-note">{c.atlasNote}</p>
             <CampaignMap cities={meta.cities} selected={province} onSelect={setProvince} />
-            <h2 className="campaign-heading">Legends of the provinces</h2>
+            <h2 className="campaign-heading">{c.legends}</h2>
             <div className="codex-grid campaign-legends">
               {campaignProgress(meta.cities).map((p) => (
                 <article
@@ -215,18 +207,16 @@ export function Chronicle({
                 >
                   <span className="eyebrow">{p.province.kraj.toUpperCase()}</span>
                   <h2>{p.province.name}</h2>
-                  <small>
-                    {p.completed}/{p.total} rekindled · {p.walked} walked · {p.named} named
-                  </small>
+                  <small>{c.provinceCounts(p.completed, p.total, p.walked, p.named)}</small>
                   <p>{p.recovered ? p.province.legend : p.province.rumor}</p>
                   <small>
-                    {p.recovered ? 'Boon recovered: ' : 'Its boon: '}
+                    {p.recovered ? c.boonRecovered : c.itsBoon}
                     {RELICS[p.province.boon].name} — {RELICS[p.province.boon].description}
                   </small>
                 </article>
               ))}
             </div>
-            <h2 className="campaign-heading">Passport</h2>
+            <h2 className="campaign-heading">{c.passport}</h2>
             <div className="codex-grid">
               {Object.entries(meta.cities).map(([key, city]) => (
                 <article
@@ -236,12 +226,11 @@ export function Chronicle({
                   <Icon name={city.name ? 'map' : 'compass'} size={18} />
                   <span className="eyebrow">{city.area.toUpperCase()}</span>
                   <h2>{city.name ?? city.title}</h2>
-                  <p>
-                    {city.name ? `Charted as ${city.title}.` : 'Its true name is still veiled.'}
-                  </p>
+                  <p>{city.name ? c.chartedAs(city.title) : c.stillVeiled}</p>
                   <small>
-                    Walked{city.completed ? ' · expedition completed' : ''}
-                    {city.name ? ' · named' : ''}
+                    {c.walkedTag}
+                    {city.completed ? c.completedTag : ''}
+                    {city.name ? c.namedTag : ''}
                   </small>
                 </article>
               ))}
@@ -250,8 +239,8 @@ export function Chronicle({
                 (_, i) => (
                   <article key={i} className="codex-card is-open passport">
                     <Icon name="eye" size={18} />
-                    <h2>An uncharted place</h2>
-                    <p>Begin a Lost Atlas expedition to find it.</p>
+                    <h2>{c.uncharted}</h2>
+                    <p>{c.beginAtlas}</p>
                   </article>
                 ),
               )}
@@ -261,20 +250,22 @@ export function Chronicle({
         {tab === 'records' && <Records meta={meta} runs={runs} wins={wins} />}
       </div>
       <button className="secondary-button" onClick={onBack}>
-        <Icon name="compass" size={17} /> Return to the expedition
+        <Icon name="compass" size={17} /> {c.back}
       </button>
     </section>
   );
 }
 
 function FoeCard({ foe, met, rank }: { foe: Foe; met: boolean; rank: string }) {
+  const t = useT();
+  const c = t.chronicle;
   if (!met)
     return (
       <article className="codex-card is-open foe-card">
         <Icon name="eye" size={18} />
         {rank && <span className="eyebrow">{rank.toUpperCase()}</span>}
-        <h2>Not yet defeated</h2>
-        <p>Something waits in {rank ? 'a harder place' : 'the dark'}.</p>
+        <h2>{c.notDefeated}</h2>
+        <p>{c.somethingWaits(!!rank)}</p>
       </article>
     );
   const line = (pattern: Foe['pattern']) =>
@@ -283,7 +274,7 @@ function FoeCard({ foe, met, rank }: { foe: Foe; met: boolean; rank: string }) {
         [
           i.name,
           ...(i.damage ? [(i.hits ?? 1) > 1 ? `${i.hits} × ${i.damage}` : `${i.damage}`] : []),
-          ...intentEffects(i),
+          ...intentEffects(i, t),
         ].join(' · '),
       )
       .join('  →  ');
@@ -296,7 +287,7 @@ function FoeCard({ foe, met, rank }: { foe: Foe; met: boolean; rank: string }) {
       <h2>{foe.name}</h2>
       <p>{foe.blurb}</p>
       <small>
-        {foe.health} health · {foe.poise} poise
+        {c.foeStats(foe.health, foe.poise)}
         {describeTraits(foe.traits)
           .map((t) => ` · ${t.label}`)
           .join('')}
@@ -312,6 +303,8 @@ function FoeCard({ foe, met, rank }: { foe: Foe; met: boolean; rank: string }) {
 }
 
 function Records({ meta, runs, wins }: { meta: Meta; runs: number; wins: number }) {
+  const t = useT();
+  const c = t.chronicle;
   const days = Object.entries(meta.daily).sort().reverse().slice(0, 7);
   return (
     <div className="records">
@@ -321,61 +314,57 @@ function Records({ meta, runs, wins }: { meta: Meta; runs: number; wins: number 
             <span className="eyebrow">{KEEPERS[id].title.toUpperCase()}</span>
             <h2>{KEEPERS[id].name}</h2>
             <p>
-              Best score <b>{(meta.best[id] ?? 0).toLocaleString('en')}</b>
+              {c.bestScore} <b>{(meta.best[id] ?? 0).toLocaleString(t.locale)}</b>
             </p>
-            <small>Deepest night open: Dusk {duskUnlocked(meta, id)}</small>
+            <small>{c.deepestNight(duskUnlocked(meta, id))}</small>
           </article>
         ))}
         <article className="codex-card is-done">
-          <span className="eyebrow">ALL ROADS</span>
-          <h2>
-            {wins} of {runs}
-          </h2>
-          <p>expeditions completed</p>
-          <small>
-            Current streak {meta.streak} · longest {meta.bestStreak}
-          </small>
+          <span className="eyebrow">{c.allRoads}</span>
+          <h2>{c.winsOfRuns(wins, runs)}</h2>
+          <p>{c.expeditionsCompleted}</p>
+          <small>{c.streakLine(meta.streak, meta.bestStreak)}</small>
         </article>
       </div>
-      <h2 className="records-title">The last roads</h2>
+      <h2 className="records-title">{c.lastRoads}</h2>
       {meta.history.length ? (
         <div className="history-scroll">
           <table className="history">
             <thead>
               <tr>
-                <th>Keeper</th>
-                <th>Road</th>
-                <th>Night</th>
-                <th>Outcome</th>
-                <th>Turns</th>
-                <th>Score</th>
+                <th>{c.colKeeper}</th>
+                <th>{c.colRoad}</th>
+                <th>{c.colNight}</th>
+                <th>{c.colOutcome}</th>
+                <th>{c.colTurns}</th>
+                <th>{c.colScore}</th>
               </tr>
             </thead>
             <tbody>
               {meta.history.map((h, i) => (
                 <tr key={i}>
                   <td>{KEEPERS[h.keeper].name}</td>
-                  <td>{h.daily ? `Daily ${h.daily}` : h.atlas ? 'Lost Atlas' : 'Crossing'}</td>
-                  <td>Dusk {h.dusk}</td>
-                  <td>{h.won ? 'Completed' : `Fell after ${h.crossed}`}</td>
+                  <td>{h.daily ? c.daily(h.daily) : h.atlas ? c.lostAtlas : c.crossing}</td>
+                  <td>{t.night.duskLine(h.dusk)}</td>
+                  <td>{h.won ? c.completed : c.fellAfter(h.crossed)}</td>
                   <td>{h.turns || '–'}</td>
-                  <td>{h.score.toLocaleString('en')}</td>
+                  <td>{h.score.toLocaleString(t.locale)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : (
-        <p className="codex-note">No expedition has ended yet.</p>
+        <p className="codex-note">{c.noneEnded}</p>
       )}
       {days.length > 0 && (
         <>
-          <h2 className="records-title">Daily roads</h2>
+          <h2 className="records-title">{c.dailyRoads}</h2>
           <ul className="daily-list">
             {days.map(([date, score]) => (
               <li key={date}>
                 <span>{date}</span>
-                <b>{score.toLocaleString('en')}</b>
+                <b>{score.toLocaleString(t.locale)}</b>
               </li>
             ))}
           </ul>

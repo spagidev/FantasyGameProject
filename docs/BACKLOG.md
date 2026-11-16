@@ -69,7 +69,7 @@ House rules for every item: the engine in `src/game/` is pure and deterministic 
 **Why.** Recovering a legend should change what future roads can hold — variety, never power.
 **What.** Each recovered province adds one province-themed relic or story scene to the pool (eight in all), written to echo its legend (a miner's wooden clapper, a nail-less joint, a coronation offcut…). Needs eight designs with exact rules, then `unlockedRelics` reads province progress.
 
-### 8. Slovak language · Build + native review
+### 8. ◐ Slovak language · Build + native review (interface shipped v0.12; lore awaits review)
 
 **Why.** The charts are Slovak; the player may be too.
 **What.** Extract interface strings to a typed dictionary (`src/i18n/en.ts`, `sk.ts`), a language switch in the footer stored in `meta`. Lore and legends need a careful literary translation — flag for human review rather than shipping machine prose.

@@ -1,6 +1,7 @@
 import { KEEPERS, RELICS, type KeeperId } from '../game/data';
 import { DUSK_MAX, DUSK_RULES, type Run } from '../game/engine';
 import { DEEDS, duskUnlocked, scoreOf, type Meta } from '../game/meta';
+import { useT } from '../i18n';
 import { Icon } from './Icon';
 
 /** Choose how hard the night is. Every active rule is listed before leaving. */
@@ -17,20 +18,21 @@ export function DuskPicker({
   onDusk: (level: number) => void;
   disabled?: boolean;
 }) {
+  const t = useT();
   const open = duskUnlocked(meta, keeper);
   const best = meta.best[keeper];
   return (
     <div className="night-picker">
       <div className="sidebar-heading">
-        <span className="eyebrow">03 · CHOOSE YOUR NIGHT</span>
-        <h2>How deep is the dark?</h2>
+        <span className="eyebrow">{t.night.step3}</span>
+        <h2>{t.night.howDeep}</h2>
       </div>
-      <div className="dusk-levels" role="group" aria-label="Dusk level">
+      <div className="dusk-levels" role="group" aria-label={t.night.duskLevel}>
         {Array.from({ length: DUSK_MAX + 1 }, (_, level) => (
           <button
             key={level}
             aria-pressed={dusk === level}
-            aria-label={`Dusk ${level}${level > open ? ', locked' : ''}`}
+            aria-label={t.night.duskAria(level, level > open)}
             disabled={disabled || level > open}
             onClick={() => onDusk(level)}
           >
@@ -40,14 +42,13 @@ export function DuskPicker({
       </div>
       {dusk === 0 ? (
         <p className="dusk-summary">
-          <b>Dusk 0 · The road as written.</b> No added hardship.
-          {open === 0 && ` Complete an expedition with ${KEEPERS[keeper].name} to open Dusk 1.`}
+          <b>{t.night.dusk0}</b>
+          {t.night.noHardship}
+          {open === 0 && t.night.openDusk1(KEEPERS[keeper].name)}
         </p>
       ) : (
         <div className="dusk-summary">
-          <b>
-            Dusk {dusk} · score ×{(1 + dusk * 0.2).toFixed(1)}
-          </b>
+          <b>{t.night.duskScore(dusk, (1 + dusk * 0.2).toFixed(1).replace('.', t.decimalSep))}</b>
           <ol>
             {DUSK_RULES.slice(0, dusk).map((rule) => (
               <li key={rule}>{rule}</li>
@@ -58,9 +59,9 @@ export function DuskPicker({
       <p className="night-record">
         <Icon name="flame" size={13} />
         {best
-          ? `${KEEPERS[keeper].name}’s best: ${best.toLocaleString('en')} · Dusk ${open} open`
-          : `${KEEPERS[keeper].name} has no record yet.`}
-        {meta.streak > 1 && ` · ${meta.streak} roads completed in a row`}
+          ? t.night.best(KEEPERS[keeper].name, best.toLocaleString(t.locale), open)
+          : t.night.noRecord(KEEPERS[keeper].name)}
+        {meta.streak > 1 && t.night.streak(meta.streak)}
       </p>
     </div>
   );
@@ -78,33 +79,34 @@ export function ScoreCard({
   earned: string[];
   previousBest: number;
 }) {
+  const t = useT();
   const score = scoreOf(run);
   const deeds = DEEDS.filter((d) => earned.includes(d.id));
   const record = score.total > previousBest && score.total > 0;
   return (
     <div className="score-card">
       <div className="score-total">
-        <span className="eyebrow">{record ? 'A NEW BEST' : 'THIS ROAD'}</span>
-        <strong>{score.total.toLocaleString('en')}</strong>
+        <span className="eyebrow">{record ? t.night.newBest : t.night.thisRoad}</span>
+        <strong>{score.total.toLocaleString(t.locale)}</strong>
         <small>
           {previousBest > 0 && !record
-            ? `${KEEPERS[run.keeper].name}’s best: ${previousBest.toLocaleString('en')}`
+            ? t.night.bestOf(KEEPERS[run.keeper].name, previousBest.toLocaleString(t.locale))
             : record && previousBest > 0
-              ? `Previous best: ${previousBest.toLocaleString('en')}`
-              : `${KEEPERS[run.keeper].name}’s first record`}
+              ? t.night.previousBest(previousBest.toLocaleString(t.locale))
+              : t.night.firstRecord(KEEPERS[run.keeper].name)}
         </small>
       </div>
       <dl className="score-lines">
-        {score.lines.map((line) => (
-          <div key={line.label}>
-            <dt>{line.label}</dt>
+        {score.lines.map((line, i) => (
+          <div key={score.parts[i].id}>
+            <dt>{t.night.scoreLine(score.parts[i].id, score.parts[i].n, line.label)}</dt>
             <dd>{line.value}</dd>
           </div>
         ))}
         {score.multiplier > 1 && (
           <div>
-            <dt>Dusk {run.dusk}</dt>
-            <dd>×{score.multiplier.toFixed(1)}</dd>
+            <dt>{t.night.duskLine(run.dusk ?? 0)}</dt>
+            <dd>×{score.multiplier.toFixed(1).replace('.', t.decimalSep)}</dd>
           </div>
         )}
       </dl>
@@ -117,8 +119,8 @@ export function ScoreCard({
               <li>
                 <Icon name="eye" size={15} />
                 <span>
-                  <b>Dusk {(run.dusk ?? 0) + 1} is open</b> for {KEEPERS[run.keeper].name}: a harder
-                  night, a higher score.
+                  <b>{t.night.duskOpen((run.dusk ?? 0) + 1)}</b>
+                  {t.night.duskOpenFor(KEEPERS[run.keeper].name)}
                 </span>
               </li>
             )}
@@ -127,7 +129,7 @@ export function ScoreCard({
               <Icon name="sparkles" size={15} />
               <span>
                 <b>{d.name}</b> · {d.text}
-                {d.unlocks && ` New relic on future roads: ${RELICS[d.unlocks].name}.`}
+                {d.unlocks && t.night.newRelic(RELICS[d.unlocks].name)}
               </span>
             </li>
           ))}

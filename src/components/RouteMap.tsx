@@ -1,4 +1,5 @@
-import { CHAPTERS, NODE_LABELS, WAYLIGHTS } from '../game/data';
+import { CHAPTERS, WAYLIGHTS } from '../game/data';
+import { useT } from '../i18n';
 import { layoutOf, nextNodes, nodeAt, waylightFor, type MapNode, type Run } from '../game/engine';
 import { Landscape, SiteIcon } from './Art';
 import { Icon } from './Icon';
@@ -10,6 +11,7 @@ export function RouteMap({
   run: Run | null;
   onInspect: (node: MapNode) => void;
 }) {
+  const t = useT();
   const chapter = run ? Math.floor(Math.min(11, run.depth + 1) / 4) : 0;
   const start = chapter * 4;
   const available = run ? nextNodes(run) : [];
@@ -17,12 +19,12 @@ export function RouteMap({
   const xs = [23, 50, 77];
   const ys = [79, 59, 39, 19];
   return (
-    <section className={`route-board chapter-${chapter}`} aria-label="Expedition route">
+    <section className={`route-board chapter-${chapter}`} aria-label={t.route.label}>
       <Landscape chapter={chapter} />
       <div className="board-shade" />
       <div className="board-top">
         <div>
-          <span className="eyebrow">CHAPTER {['I', 'II', 'III'][chapter]} / III</span>
+          <span className="eyebrow">{t.route.chapter(['I', 'II', 'III'][chapter])}</span>
           <h2>{CHAPTERS[chapter].name}</h2>
           <p>{CHAPTERS[chapter].subtitle}</p>
         </div>
@@ -71,9 +73,13 @@ export function RouteMap({
               >
                 <button
                   className={`map-node node-${node.kind}`}
-                  aria-label={`Scout ${NODE_LABELS[node.kind]}: ${node.name}${site ? ` · ${WAYLIGHTS[site].name}` : ''}`}
+                  aria-label={t.route.scoutAria(
+                    t.node[node.kind],
+                    node.name,
+                    site ? WAYLIGHTS[site].name : '',
+                  )}
                   onClick={() => onInspect(node)}
-                  title={`Scout ${node.name}`}
+                  title={t.route.scoutTitle(node.name)}
                 >
                   {visited ? (
                     <Icon name="check" size={20} />
@@ -91,7 +97,7 @@ export function RouteMap({
                     ? node.name
                     : site
                       ? WAYLIGHTS[site].name
-                      : NODE_LABELS[node.kind]}
+                      : t.node[node.kind]}
                   {node.foe && node.kind !== 'boss' && <small>{node.name}</small>}
                 </span>
               </div>
@@ -100,16 +106,15 @@ export function RouteMap({
         )}
         <div className="map-origin">
           <Icon name="flame" size={17} />
-          <span>{chapter === 0 ? 'CINDERFALL' : 'THE ROAD CONTINUES'}</span>
+          <span>{chapter === 0 ? t.route.cinderfall : t.route.continues}</span>
         </div>
       </div>
       <div className="map-legend">
         <span>
-          <i className="legend-dot" />{' '}
-          {run ? 'Scout any node · travel glowing paths' : 'Click a node to scout the road'}
+          <i className="legend-dot" /> {run ? t.route.legendRun : t.route.legendLobby}
         </span>
         <span>
-          <Icon name="compass" size={14} /> A road worth remembering
+          <Icon name="compass" size={14} /> {t.route.worthRemembering}
         </span>
       </div>
     </section>

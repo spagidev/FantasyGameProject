@@ -9,7 +9,6 @@ import {
   EVENTS,
   KEEPERS,
   LORE,
-  NODE_LABELS,
   RELICS,
   RELIC_SETS,
   setOf,
@@ -63,20 +62,25 @@ import { Journal } from './components/Journal';
 import { Scout, TalentChoice, WaylightsPanel } from './components/Strategy';
 import { AtlasMap, AtlasJournal } from './components/Atlas';
 import { OfflineBadge } from './components/OfflineBadge';
+import { DICTS, LanguageProvider, useT, type Lang } from './i18n';
 
-function load(): { save: Save; warning: string } {
+type Warning = '' | 'unreadable' | 'unavailable' | 'full';
+// Errors that are ours are kept as codes and written in the current language when shown.
+const MAP_CANCELLED = '\u0000cancelled';
+const MAP_FAILED = '\u0000failed';
+function load(): { save: Save; warning: Warning } {
   try {
     const raw = localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(LEGACY_SAVE_KEY);
     if (!raw) return { save: emptySave(), warning: '' };
     const save = decodeSave(raw);
     return {
       save: save ?? emptySave(),
-      warning: save ? '' : 'The previous save could not be read. A new journey is available.',
+      warning: save ? '' : 'unreadable',
     };
   } catch {
     return {
       save: emptySave(),
-      warning: 'Browser storage is unavailable. Your journey will last only for this tab.',
+      warning: 'unavailable',
     };
   }
 }
@@ -119,7 +123,7 @@ export default function App() {
     share?.road ? { text: share.road, value: share.exact } : null,
   );
   const [save, setSave] = useState(loaded.save);
-  const [warning, setWarning] = useState(loaded.warning);
+  const [warning, setWarning] = useState<Warning>(loaded.warning);
   const [keeper, setKeeper] = useState<KeeperId>(share?.keeper ?? loaded.save.profile.lastKeeper);
   const [seed, setSeed] = useState(share?.road ?? '');
   const [expedition, setExpedition] = useState<'classic' | 'atlas'>(
@@ -139,6 +143,11 @@ export default function App() {
   const boardRef = useRef<HTMLDivElement>(null);
   const run = save.run;
   const meta = metaOf(save.profile);
+  const lang: Lang = meta.lang ?? 'en';
+  const t = DICTS[lang];
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
   const [dusk, setDusk] = useState(() =>
     share
       ? Math.min(
@@ -171,9 +180,7 @@ export default function App() {
       localStorage.setItem(SAVE_KEY, JSON.stringify(save));
       setSaved(true);
     } catch {
-      setWarning(
-        'Browser storage is unavailable or full. Keep this tab open to continue your journey.',
-      );
+      setWarning('full');
       setSaved(false);
     }
   }, [save]);
@@ -269,19 +276,15 @@ export default function App() {
         );
         if (atlasRequest.current !== controller || controller.signal.aborted) return;
         selectedChart = result.chart;
-        setAtlasNotice(
-          result.fallback
-            ? `The live provider could not prepare a map. You’re playing a bundled chart inside ${atlasArea.trim()}.`
-            : '',
-        );
+        setAtlasNotice(result.fallback ? atlasArea.trim() : '');
       } catch (error) {
         if (atlasRequest.current === controller)
           setAtlasError(
             controller.signal.aborted
-              ? 'Map preparation was cancelled or timed out. Your saved journey has not changed.'
+              ? MAP_CANCELLED
               : error instanceof Error
                 ? error.message
-                : 'The map could not be prepared. Please try again.',
+                : MAP_FAILED,
           );
         return;
       } finally {
@@ -308,674 +311,750 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }
 
+  const setLang = (next: Lang) =>
+    setSave((s) => ({
+      ...s,
+      profile: { ...s.profile, meta: { ...metaOf(s.profile), lang: next } },
+    }));
+  const atlasErrorText =
+    atlasError === MAP_CANCELLED
+      ? t.app.atlasCancelled
+      : atlasError === MAP_FAILED
+        ? t.app.atlasFailed
+        : atlasError;
+  const warningText = {
+    unreadable: t.app.warnUnreadable,
+    unavailable: t.app.warnUnavailable,
+    full: t.app.warnFull,
+    '': '',
+  }[warning];
+
   return (
-    <div
-      className={`app-shell ${run ? 'is-playing' : 'is-lobby'} ${view === 'chronicle' ? 'show-chronicle' : ''}`}
-      data-phase={run?.phase ?? 'setup'}
-    >
-      <header className="site-header">
-        <a
-          className="brand"
-          href="#"
-          aria-label="Emberwake home"
-          onClick={(e) => {
-            e.preventDefault();
-            setView('journey');
-          }}
-        >
-          <span className="brand-sigil">
-            <Icon name="flame" size={27} />
-          </span>
-          <span>
-            EMBERWAKE<small>THE LAST LIGHT</small>
-          </span>
-        </a>
-        <nav aria-label="Main navigation">
-          <button
-            className={view === 'journey' ? 'nav-item active' : 'nav-item'}
-            onClick={() => setView('journey')}
-          >
-            <Icon name="compass" />
-            <span>Expedition</span>
-          </button>
-          <button
-            className={view === 'chronicle' ? 'nav-item active' : 'nav-item'}
-            onClick={() => {
-              cancelAtlas();
-              setView('chronicle');
+    <LanguageProvider lang={lang}>
+      <div
+        className={`app-shell ${run ? 'is-playing' : 'is-lobby'} ${view === 'chronicle' ? 'show-chronicle' : ''}`}
+        data-phase={run?.phase ?? 'setup'}
+      >
+        <header className="site-header">
+          <a
+            className="brand"
+            href="#"
+            aria-label={t.app.homeLabel}
+            onClick={(e) => {
+              e.preventDefault();
+              setView('journey');
             }}
           >
-            <Icon name="book" />
-            <span>Chronicle</span>
-            <small>
-              {save.profile.lore.length}/{LORE.length}
-            </small>
-          </button>
-        </nav>
-        <div className="header-tools">
-          <button
-            aria-label="Open journal"
-            className="journal-shortcut"
-            onClick={() => setModal('journal')}
-          >
-            <Icon name="book" size={17} />
-            <span>Journal</span>
-          </button>
-          <button aria-label="How to play" className="help-button" onClick={() => setModal('help')}>
-            <Icon name="info" size={17} />
-            <span>How to play</span>
-          </button>
-        </div>
-      </header>
+            <span className="brand-sigil">
+              <Icon name="flame" size={27} />
+            </span>
+            <span>
+              EMBERWAKE<small>{t.app.brandSub}</small>
+            </span>
+          </a>
+          <nav aria-label={t.app.navLabel}>
+            <button
+              className={view === 'journey' ? 'nav-item active' : 'nav-item'}
+              onClick={() => setView('journey')}
+            >
+              <Icon name="compass" />
+              <span>{t.app.navExpedition}</span>
+            </button>
+            <button
+              className={view === 'chronicle' ? 'nav-item active' : 'nav-item'}
+              onClick={() => {
+                cancelAtlas();
+                setView('chronicle');
+              }}
+            >
+              <Icon name="book" />
+              <span>{t.app.navChronicle}</span>
+              <small>
+                {save.profile.lore.length}/{LORE.length}
+              </small>
+            </button>
+          </nav>
+          <div className="header-tools">
+            <button
+              aria-label={t.app.openJournal}
+              className="journal-shortcut"
+              onClick={() => setModal('journal')}
+            >
+              <Icon name="book" size={17} />
+              <span>{t.app.journal}</span>
+            </button>
+            <button
+              aria-label={t.app.howToPlayLabel}
+              className="help-button"
+              onClick={() => setModal('help')}
+            >
+              <Icon name="info" size={17} />
+              <span>{t.app.howToPlay}</span>
+            </button>
+          </div>
+        </header>
 
-      {warning && (
-        <div className="storage-warning" role="alert">
-          <Icon name="info" />
-          {warning}
-          <button aria-label="Dismiss storage message" onClick={() => setWarning('')}>
-            <Icon name="close" size={16} />
-          </button>
-        </div>
-      )}
+        {warning && (
+          <div className="storage-warning" role="alert">
+            <Icon name="info" />
+            {warningText}
+            <button aria-label={t.app.dismissStorage} onClick={() => setWarning('')}>
+              <Icon name="close" size={16} />
+            </button>
+          </div>
+        )}
 
-      <main id="main-content">
-        {view === 'chronicle' ? (
-          <Chronicle
-            lore={save.profile.lore}
-            runs={save.profile.runs}
-            wins={save.profile.wins}
-            meta={meta}
-            onBack={() => setView('journey')}
-          />
-        ) : (
-          <>
-            <section className="page-intro">
-              {!run && <div className="hero-atmosphere" aria-hidden="true" />}
-              <div>
-                <div className="eyebrow intro-eyebrow">
-                  <span className="tiny-line" />{' '}
-                  {run
-                    ? `${CHAPTERS[chapter].name.toUpperCase()} · ${run.phase === 'combat' ? 'THE ENCOUNTER' : 'THE EXPEDITION'}`
-                    : 'A TURN-BASED TALE OF THE LAST LIGHT'}
-                </div>
-                <h1>
-                  {!run ? (
-                    <>
-                      Carry the light.<em>Defy the hollow.</em>
-                    </>
-                  ) : terminal(run) ? (
-                    run.phase === 'won' ? (
+        <main id="main-content">
+          {view === 'chronicle' ? (
+            <Chronicle
+              lore={save.profile.lore}
+              runs={save.profile.runs}
+              wins={save.profile.wins}
+              meta={meta}
+              onBack={() => setView('journey')}
+            />
+          ) : (
+            <>
+              <section className="page-intro">
+                {!run && <div className="hero-atmosphere" aria-hidden="true" />}
+                <div>
+                  <div className="eyebrow intro-eyebrow">
+                    <span className="tiny-line" />{' '}
+                    {run
+                      ? t.app.eyebrowRun(
+                          CHAPTERS[chapter].name.toUpperCase(),
+                          run.phase === 'combat',
+                        )
+                      : t.app.eyebrowLobby}
+                  </div>
+                  <h1>
+                    {!run ? (
                       <>
-                        Some lights<em>never go out.</em>
+                        {t.app.h1Lobby}
+                        <em>{t.app.h1LobbyEm}</em>
                       </>
+                    ) : terminal(run) ? (
+                      run.phase === 'won' ? (
+                        <>
+                          {t.app.h1Won}
+                          <em>{t.app.h1WonEm}</em>
+                        </>
+                      ) : (
+                        <>
+                          {t.app.h1Lost}
+                          <em>{t.app.h1LostEm}</em>
+                        </>
+                      )
                     ) : (
                       <>
-                        The ember fades.<em>The story remains.</em>
+                        {t.app.h1Mid}
+                        <em>{t.app.h1MidEm}</em>
                       </>
+                    )}
+                  </h1>
+                  <p>
+                    {!run
+                      ? t.app.leadLobby
+                      : terminal(run)
+                        ? t.app.leadEnded
+                        : run.bells > chapter
+                          ? CHAPTERS[chapter].memory
+                          : CHAPTERS[chapter].passage}
+                  </p>
+                  {!run && (
+                    <div className="hero-actions">
+                      <button
+                        className="primary-button"
+                        onClick={() =>
+                          document.getElementById('expedition-builder')?.scrollIntoView({
+                            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                              ? 'instant'
+                              : 'smooth',
+                            block: 'start',
+                          })
+                        }
+                      >
+                        {t.app.prepare} <Icon name="arrow" size={17} />
+                      </button>
+                      <button className="hero-rules" onClick={() => setModal('help')}>
+                        <Icon name="book" size={17} /> {t.app.guide}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="journey-metadata">
+                  <span className="edition-badge">
+                    <i />{' '}
+                    {run?.atlas || (!run && expedition === 'atlas')
+                      ? t.app.editionAtlas
+                      : run?.ruleset === 1
+                        ? t.app.editionFirst
+                        : run?.ruleset === 2
+                          ? t.app.editionRekindled
+                          : run?.daily
+                            ? t.app.editionToday(run.daily)
+                            : `${t.app.editionNight}${run ? ` · ${t.app.duskTag(run.dusk ?? 0)}` : ''}`}
+                  </span>
+                  <div className="meta-items">
+                    <span>
+                      <Icon name="map" size={15} /> {t.app.realms3}
+                    </span>
+                    <span>
+                      <Icon name="eye" size={15} /> {t.app.noHiddenRolls}
+                    </span>
+                    <span>
+                      <Icon name="heart" size={15} /> {t.app.ownPace}
+                    </span>
+                  </div>
+                </div>
+              </section>
+
+              {run && !terminal(run) && (
+                <div className="expedition-bar">
+                  <div className="chapter-progress">
+                    {CHAPTERS.map((c, i) => (
+                      <div
+                        key={c.name}
+                        className={`${chapter === i ? 'current' : ''} ${run.bells > i ? 'complete' : ''}`}
+                      >
+                        <span>{run.bells > i ? <Icon name="check" size={13} /> : `0${i + 1}`}</span>
+                        <strong>{c.short}</strong>
+                      </div>
+                    ))}
+                  </div>
+                  <span className="encounter-count">
+                    {t.app.encountersCount(encountersEntered(run))}
+                  </span>
+                </div>
+              )}
+
+              {!run && (
+                <div className="builder-heading" id="expedition-builder">
+                  <div>
+                    <span className="eyebrow">{t.app.builderEyebrow}</span>
+                    <h2>{t.app.builderTitle}</h2>
+                  </div>
+                  <span>
+                    <Icon name="flame" size={16} />
+                    {t.app.builderNote}
+                  </span>
+                </div>
+              )}
+              {run && atlasNotice && (
+                <p className="atlas-fallback-notice" role="status">
+                  <Icon name="info" size={17} />
+                  {t.app.atlasFallback(atlasNotice)}
+                </p>
+              )}
+              <div className={`game-layout ${run ? 'play-layout' : 'launch-layout'}`}>
+                <div className="game-main" ref={boardRef}>
+                  {run?.atlas && run.phase !== 'map' && (
+                    <details className="atlas-fold">
+                      <summary>{t.app.atlasFold}</summary>
+                      <AtlasMap run={run} onInspect={setScouted} />
+                    </details>
+                  )}
+                  {!run || run.phase === 'map' ? (
+                    !run && expedition === 'atlas' && !offlineAtlas ? (
+                      <RegionalAtlasPreview area={atlasArea} />
+                    ) : run?.atlas || (!run && expedition === 'atlas') ? (
+                      <AtlasMap run={run} dispatch={dispatch} onInspect={setScouted} />
+                    ) : (
+                      <RouteMap run={run} onInspect={setScouted} />
                     )
+                  ) : run.phase === 'combat' ? (
+                    <Combat
+                      run={run}
+                      dispatch={dispatch}
+                      coach={save.profile.wins === 0 && run.depth < 4}
+                    />
+                  ) : run.phase === 'reward' ? (
+                    <Rewards run={run} dispatch={dispatch} />
+                  ) : run.phase === 'talent' ? (
+                    <TalentChoice run={run} dispatch={dispatch} />
+                  ) : ['camp', 'shop', 'event'].includes(run.phase) ? (
+                    <Encounter run={run} dispatch={dispatch} />
+                  ) : (
+                    <Ending
+                      run={run}
+                      dispatch={dispatch}
+                      meta={meta}
+                      earned={earned}
+                      previousBest={bestBefore.current}
+                      onAgain={
+                        run.ruleset === 3 && !run.atlas && !run.daily
+                          ? () =>
+                              void start({
+                                keeper: run.keeper,
+                                classic: true,
+                                dusk:
+                                  run.phase === 'won'
+                                    ? Math.min(duskUnlocked(meta, run.keeper), (run.dusk ?? 0) + 1)
+                                    : (run.dusk ?? 0),
+                              })
+                          : undefined
+                      }
+                      onRestart={() => {
+                        setKeeper(run.keeper);
+                        setDusk(duskUnlocked(meta, run.keeper));
+                        setSave((s) => ({ ...s, run: null }));
+                        window.scrollTo({ top: 0, behavior: 'instant' });
+                      }}
+                    />
+                  )}
+                  <div className="beneath-board">
+                    <span>
+                      <Icon name="flame" size={15} />{' '}
+                      {run ? t.app.bellsAwakened(run.bells) : t.app.emberLine}
+                    </span>
+                    <span>
+                      {run
+                        ? t.app.roadCode(run.seed.toString(36).toUpperCase())
+                        : t.app.strategyNotSpeed}
+                    </span>
+                  </div>
+                </div>
+
+                <aside
+                  className="journey-sidebar"
+                  aria-label={run ? t.app.sidebarRun : t.app.sidebarLobby}
+                >
+                  {!run ? (
+                    <>
+                      <div className="setup-section-label">
+                        <span>01</span>
+                        <div>
+                          <small>{t.app.step1}</small>
+                          <h2>{t.app.step1Title}</h2>
+                        </div>
+                      </div>
+                      <div
+                        className="expedition-picker"
+                        role="group"
+                        aria-label={t.app.chooseExpedition}
+                      >
+                        <button
+                          aria-pressed={expedition === 'classic'}
+                          disabled={atlasLoading}
+                          onClick={() => {
+                            setExpedition('classic');
+                            setAtlasError('');
+                          }}
+                        >
+                          <Icon name="flame" size={18} />
+                          <span>
+                            {t.app.firstCrossing}
+                            <small>{t.app.firstCrossingNote}</small>
+                          </span>
+                        </button>
+                        <button
+                          aria-pressed={expedition === 'atlas'}
+                          disabled={atlasLoading}
+                          onClick={() => {
+                            setExpedition('atlas');
+                            setAtlasError('');
+                          }}
+                        >
+                          <Icon name="compass" size={19} />
+                          <span>
+                            {t.app.lostAtlas} <i>{t.app.explore}</i>
+                            <small>{t.app.lostAtlasNote}</small>
+                          </span>
+                        </button>
+                      </div>
+                      {expedition === 'atlas' && (
+                        <AtlasSetup
+                          meta={meta}
+                          area={atlasArea}
+                          onArea={(v) => {
+                            setAtlasArea(v);
+                            setAtlasError('');
+                          }}
+                          source={atlasSource}
+                          onSource={(v) => {
+                            setAtlasSource(v);
+                            setAtlasError('');
+                          }}
+                          loading={atlasLoading}
+                          error={atlasErrorText}
+                          onCancel={cancelAtlas}
+                        />
+                      )}
+                      <div className="sidebar-heading">
+                        <span className="eyebrow">{t.app.step2}</span>
+                        <h2>{t.app.step2Title}</h2>
+                      </div>
+                      <div className="keeper-picker" role="group" aria-label={t.app.chooseKeeper}>
+                        {keeperIds.map((id) => (
+                          <button
+                            key={id}
+                            className={`keeper-option ${keeper === id ? 'selected' : ''}`}
+                            aria-label={KEEPERS[id].title.replace('The ', '')}
+                            aria-pressed={keeper === id}
+                            disabled={atlasLoading}
+                            onClick={() => setKeeper(id)}
+                          >
+                            <KeeperPortrait keeper={id} />
+                            <span>
+                              <small>{KEEPERS[id].name}</small>
+                              {KEEPERS[id].title.replace('The ', '')}
+                            </span>
+                            <i>{keeper === id ? <Icon name="check" size={10} /> : null}</i>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="keeper-description" key={keeper}>
+                        <div className="keeper-name">
+                          <h3>
+                            {KEEPERS[keeper].name}
+                            <span>{KEEPERS[keeper].title}</span>
+                          </h3>
+                          <Icon
+                            name={
+                              keeper === 'warden'
+                                ? 'shield'
+                                : keeper === 'seer'
+                                  ? 'sparkles'
+                                  : 'leaf'
+                            }
+                            size={23}
+                          />
+                        </div>
+                        <p>{KEEPERS[keeper].description}</p>
+                        <div className="keeper-base-stats">
+                          <span>
+                            <Icon name="heart" size={14} />
+                            {t.app.healthN(KEEPERS[keeper].health)}
+                          </span>
+                          <span>
+                            <Icon name="sword" size={14} />
+                            {t.app.attackN(KEEPERS[keeper].attack)}
+                          </span>
+                          <span>
+                            <Icon name="shield" size={14} />
+                            {t.app.armorN(KEEPERS[keeper].armor)}
+                          </span>
+                        </div>
+                        <span className="keeper-style">{KEEPERS[keeper].style}</span>
+                      </div>
+                      <DuskPicker
+                        meta={meta}
+                        keeper={keeper}
+                        dusk={night}
+                        onDusk={setDusk}
+                        disabled={atlasLoading}
+                      />
+                      <div className="start-section">
+                        <label className="seed-label" htmlFor="journey-seed">
+                          {t.app.seedLabel} <span>{t.app.seedHint}</span>
+                        </label>
+                        <input
+                          disabled={atlasLoading}
+                          id="journey-seed"
+                          maxLength={64}
+                          placeholder={t.app.seedPlaceholder}
+                          value={seed}
+                          onChange={(e) => setSeed(e.target.value)}
+                        />
+                        <button
+                          className="primary-button"
+                          onClick={() => void start()}
+                          disabled={
+                            atlasLoading ||
+                            (expedition === 'atlas' &&
+                              !offlineAtlas &&
+                              (atlasArea.trim().length < 2 ||
+                                (atlasSource === 'bundled' && !bundledCount(atlasArea))))
+                          }
+                        >
+                          {atlasLoading ? t.app.preparing : t.app.begin}
+                          <Icon name="arrow" size={18} />
+                        </button>
+                        <span className="start-note">
+                          <Icon name="check" size={13} /> {t.app.savedNote}
+                        </span>
+                        <button
+                          className="daily-button"
+                          disabled={atlasLoading}
+                          onClick={() => void start({ daily: true })}
+                        >
+                          <Icon name="sun" size={16} />
+                          <span>
+                            {t.app.todaysRoad(today.id)}
+                            <small>
+                              {t.app.dailyBlurb(KEEPERS[today.keeper].name)}{' '}
+                              {meta.daily[today.id]
+                                ? t.app.dailyBest(meta.daily[today.id].toLocaleString(t.locale))
+                                : t.app.dailyNone}
+                            </small>
+                          </span>
+                        </button>
+                      </div>
+                      <div className="lore-note">
+                        <Icon name="book" size={18} />
+                        <p>
+                          {t.app.loreNote1}
+                          <br />
+                          {t.app.loreNote2}
+                        </p>
+                      </div>
+                    </>
                   ) : (
                     <>
-                      Every path<em>leaves a memory.</em>
+                      <KeeperPanel run={run} />
+                      {run.atlas ? (
+                        <AtlasJournal run={run} dispatch={dispatch} />
+                      ) : run.phase === 'map' ? (
+                        <div className="route-choices">
+                          <span className="eyebrow">{t.app.roadAhead}</span>
+                          <h3>{t.app.choosePath}</h3>
+                          <p className="muted">{t.app.everyCrossing}</p>
+                          {nextNodes(run).map((node) => (
+                            <button
+                              className={`route-choice choice-${node.kind}`}
+                              key={node.id}
+                              onClick={() => dispatch({ type: 'travel', lane: node.lane })}
+                            >
+                              <span className="choice-icon">
+                                <Icon name={node.kind} />
+                              </span>
+                              <span>
+                                <small>{t.node[node.kind]}</small>
+                                <strong>{node.name}</strong>
+                                <em>
+                                  {['battle', 'boss', 'elite'].includes(node.kind)
+                                    ? t.app.fightLine(
+                                        makeEnemy(node, run.ruleset, run.dusk).maxHealth,
+                                        victoryCoins(run, node),
+                                      )
+                                    : node.kind === 'event'
+                                      ? t.app.eventLine
+                                      : node.kind === 'camp'
+                                        ? t.app.campLine
+                                        : t.app.shopLine}
+                                </em>
+                                {run.ruleset >= 2 && waylightFor(node) && (
+                                  <span className="route-site-benefit">
+                                    <Icon name="flame" size={11} />
+                                    {WAYLIGHTS[waylightFor(node)!].name} ·{' '}
+                                    {WAYLIGHTS[waylightFor(node)!].short}
+                                  </span>
+                                )}
+                              </span>
+                              <Icon name="chevron" size={16} />
+                            </button>
+                          ))}
+                          <div className="road-memory">
+                            <Icon name="book" size={15} />
+                            <p>{run.log.at(-1)}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="battle-log">
+                          <div className="section-label">
+                            <Icon name="book" size={15} />
+                            <span>{t.app.storySoFar}</span>
+                          </div>
+                          <ol aria-label={t.app.journeyLog}>
+                            {run.log.slice(-5).map((entry, i) => (
+                              <li key={`${entry}-${i}`}>{entry}</li>
+                            ))}
+                          </ol>
+                        </div>
+                      )}
+                      {!terminal(run) && (
+                        <button className="abandon-button" onClick={() => setModal('abandon')}>
+                          <Icon name="flag" size={13} /> {t.app.leaveThis}
+                        </button>
+                      )}
                     </>
                   )}
-                </h1>
-                <p>
-                  {!run
-                    ? 'The sun is gone. The world has forgotten why.\nOne ember, three bells, and a road into the unknown.'
-                    : terminal(run)
-                      ? 'Every crossing changes the keeper. Every ending leaves a beginning.'
-                      : run.bells > chapter
-                        ? CHAPTERS[chapter].memory
-                        : CHAPTERS[chapter].passage}
-                </p>
-                {!run && (
-                  <div className="hero-actions">
-                    <button
-                      className="primary-button"
-                      onClick={() =>
-                        document.getElementById('expedition-builder')?.scrollIntoView({
-                          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-                            ? 'instant'
-                            : 'smooth',
-                          block: 'start',
-                        })
-                      }
-                    >
-                      Prepare your journey <Icon name="arrow" size={17} />
-                    </button>
-                    <button className="hero-rules" onClick={() => setModal('help')}>
-                      <Icon name="book" size={17} /> A keeper’s guide
-                    </button>
+                </aside>
+                {run && (
+                  <div className="run-supplies">
+                    <RelicInventory ids={run.relics} />
+                    <WaylightsPanel run={run} />
                   </div>
                 )}
               </div>
-              <div className="journey-metadata">
-                <span className="edition-badge">
-                  <i />{' '}
-                  {run?.atlas || (!run && expedition === 'atlas')
-                    ? 'THE LOST ATLAS'
-                    : run?.ruleset === 1
-                      ? 'THE FIRST CROSSING'
-                      : run?.ruleset === 2
-                        ? 'ROADS REKINDLED'
-                        : run?.daily
-                          ? `TODAY’S ROAD · ${run.daily}`
-                          : `THE LONG NIGHT${run ? ` · DUSK ${run.dusk ?? 0}` : ''}`}
-                </span>
-                <div className="meta-items">
-                  <span>
-                    <Icon name="map" size={15} /> 3 realms
-                  </span>
-                  <span>
-                    <Icon name="eye" size={15} /> No hidden rolls
-                  </span>
-                  <span>
-                    <Icon name="heart" size={15} /> Your own pace
-                  </span>
-                </div>
-              </div>
-            </section>
-
-            {run && !terminal(run) && (
-              <div className="expedition-bar">
-                <div className="chapter-progress">
-                  {CHAPTERS.map((c, i) => (
-                    <div
-                      key={c.name}
-                      className={`${chapter === i ? 'current' : ''} ${run.bells > i ? 'complete' : ''}`}
-                    >
-                      <span>{run.bells > i ? <Icon name="check" size={13} /> : `0${i + 1}`}</span>
-                      <strong>{c.short}</strong>
-                    </div>
-                  ))}
-                </div>
-                <span className="encounter-count">{encountersEntered(run)} / 12 encounters</span>
-              </div>
-            )}
-
-            {!run && (
-              <div className="builder-heading" id="expedition-builder">
-                <div>
-                  <span className="eyebrow">THE NEXT CHAPTER IS YOURS</span>
-                  <h2>A road worth remembering.</h2>
-                </div>
-                <span>
-                  <Icon name="flame" size={16} />
-                  Every choice leaves a little light.
-                </span>
-              </div>
-            )}
-            {run && atlasNotice && (
-              <p className="atlas-fallback-notice" role="status">
-                <Icon name="info" size={17} />
-                {atlasNotice}
-              </p>
-            )}
-            <div className={`game-layout ${run ? 'play-layout' : 'launch-layout'}`}>
-              <div className="game-main" ref={boardRef}>
-                {run?.atlas && run.phase !== 'map' && (
-                  <details className="atlas-fold">
-                    <summary>Unfold the atlas · return to your chart after this encounter</summary>
-                    <AtlasMap run={run} onInspect={setScouted} />
-                  </details>
-                )}
-                {!run || run.phase === 'map' ? (
-                  !run && expedition === 'atlas' && !offlineAtlas ? (
-                    <RegionalAtlasPreview area={atlasArea} />
-                  ) : run?.atlas || (!run && expedition === 'atlas') ? (
-                    <AtlasMap run={run} dispatch={dispatch} onInspect={setScouted} />
-                  ) : (
-                    <RouteMap run={run} onInspect={setScouted} />
-                  )
-                ) : run.phase === 'combat' ? (
-                  <Combat
-                    run={run}
-                    dispatch={dispatch}
-                    coach={save.profile.wins === 0 && run.depth < 4}
-                  />
-                ) : run.phase === 'reward' ? (
-                  <Rewards run={run} dispatch={dispatch} />
-                ) : run.phase === 'talent' ? (
-                  <TalentChoice run={run} dispatch={dispatch} />
-                ) : ['camp', 'shop', 'event'].includes(run.phase) ? (
-                  <Encounter run={run} dispatch={dispatch} />
-                ) : (
-                  <Ending
-                    run={run}
-                    dispatch={dispatch}
-                    meta={meta}
-                    earned={earned}
-                    previousBest={bestBefore.current}
-                    onAgain={
-                      run.ruleset === 3 && !run.atlas && !run.daily
-                        ? () =>
-                            void start({
-                              keeper: run.keeper,
-                              classic: true,
-                              dusk:
-                                run.phase === 'won'
-                                  ? Math.min(duskUnlocked(meta, run.keeper), (run.dusk ?? 0) + 1)
-                                  : (run.dusk ?? 0),
-                            })
-                        : undefined
-                    }
-                    onRestart={() => {
-                      setKeeper(run.keeper);
-                      setDusk(duskUnlocked(meta, run.keeper));
-                      setSave((s) => ({ ...s, run: null }));
-                      window.scrollTo({ top: 0, behavior: 'instant' });
-                    }}
-                  />
-                )}
-                <div className="beneath-board">
-                  <span>
-                    <Icon name="flame" size={15} />{' '}
-                    {run
-                      ? `${run.bells} of 3 bells awakened`
-                      : 'A small ember. An impossible journey.'}
-                  </span>
-                  <span>
-                    {run ? `ROAD ${run.seed.toString(36).toUpperCase()}` : 'STRATEGY, NOT SPEED'}
-                  </span>
-                </div>
-              </div>
-
-              <aside
-                className="journey-sidebar"
-                aria-label={run ? 'Keeper and journey details' : 'Choose your keeper'}
-              >
-                {!run ? (
-                  <>
-                    <div className="setup-section-label">
-                      <span>01</span>
-                      <div>
-                        <small>CHOOSE YOUR JOURNEY</small>
-                        <h2>Where does your story begin?</h2>
-                      </div>
-                    </div>
-                    <div className="expedition-picker" role="group" aria-label="Choose expedition">
-                      <button
-                        aria-pressed={expedition === 'classic'}
-                        disabled={atlasLoading}
-                        onClick={() => {
-                          setExpedition('classic');
-                          setAtlasError('');
-                        }}
-                      >
-                        <Icon name="flame" size={18} />
-                        <span>
-                          The First Crossing<small>The original adventure</small>
-                        </span>
-                      </button>
-                      <button
-                        aria-pressed={expedition === 'atlas'}
-                        disabled={atlasLoading}
-                        onClick={() => {
-                          setExpedition('atlas');
-                          setAtlasError('');
-                        }}
-                      >
-                        <Icon name="compass" size={19} />
-                        <span>
-                          The Lost Atlas <i>EXPLORE</i>
-                          <small>Real terrain. A hidden world.</small>
-                        </span>
-                      </button>
-                    </div>
-                    {expedition === 'atlas' && (
-                      <AtlasSetup
-                        meta={meta}
-                        area={atlasArea}
-                        onArea={(v) => {
-                          setAtlasArea(v);
-                          setAtlasError('');
-                        }}
-                        source={atlasSource}
-                        onSource={(v) => {
-                          setAtlasSource(v);
-                          setAtlasError('');
-                        }}
-                        loading={atlasLoading}
-                        error={atlasError}
-                        onCancel={cancelAtlas}
-                      />
-                    )}
-                    <div className="sidebar-heading">
-                      <span className="eyebrow">02 · CHOOSE YOUR KEEPER</span>
-                      <h2>Who carries the ember?</h2>
-                    </div>
-                    <div className="keeper-picker" role="group" aria-label="Choose your keeper">
-                      {keeperIds.map((id) => (
-                        <button
-                          key={id}
-                          className={`keeper-option ${keeper === id ? 'selected' : ''}`}
-                          aria-label={KEEPERS[id].title.replace('The ', '')}
-                          aria-pressed={keeper === id}
-                          disabled={atlasLoading}
-                          onClick={() => setKeeper(id)}
-                        >
-                          <KeeperPortrait keeper={id} />
-                          <span>
-                            <small>{KEEPERS[id].name}</small>
-                            {KEEPERS[id].title.replace('The ', '')}
-                          </span>
-                          <i>{keeper === id ? <Icon name="check" size={10} /> : null}</i>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="keeper-description" key={keeper}>
-                      <div className="keeper-name">
-                        <h3>
-                          {KEEPERS[keeper].name}
-                          <span>{KEEPERS[keeper].title}</span>
-                        </h3>
-                        <Icon
-                          name={
-                            keeper === 'warden' ? 'shield' : keeper === 'seer' ? 'sparkles' : 'leaf'
-                          }
-                          size={23}
-                        />
-                      </div>
-                      <p>{KEEPERS[keeper].description}</p>
-                      <div className="keeper-base-stats">
-                        <span>
-                          <Icon name="heart" size={14} />
-                          {KEEPERS[keeper].health} health
-                        </span>
-                        <span>
-                          <Icon name="sword" size={14} />
-                          {KEEPERS[keeper].attack} attack
-                        </span>
-                        <span>
-                          <Icon name="shield" size={14} />
-                          {KEEPERS[keeper].armor} armor
-                        </span>
-                      </div>
-                      <span className="keeper-style">{KEEPERS[keeper].style}</span>
-                    </div>
-                    <DuskPicker
-                      meta={meta}
-                      keeper={keeper}
-                      dusk={night}
-                      onDusk={setDusk}
-                      disabled={atlasLoading}
-                    />
-                    <div className="start-section">
-                      <label className="seed-label" htmlFor="journey-seed">
-                        Journey seed <span>optional · the same word, the same road</span>
-                      </label>
-                      <input
-                        disabled={atlasLoading}
-                        id="journey-seed"
-                        maxLength={64}
-                        placeholder="A word to shape your road…"
-                        value={seed}
-                        onChange={(e) => setSeed(e.target.value)}
-                      />
-                      <button
-                        className="primary-button"
-                        onClick={() => void start()}
-                        disabled={
-                          atlasLoading ||
-                          (expedition === 'atlas' &&
-                            !offlineAtlas &&
-                            (atlasArea.trim().length < 2 ||
-                              (atlasSource === 'bundled' && !bundledCount(atlasArea))))
-                        }
-                      >
-                        {atlasLoading ? 'Preparing your atlas…' : 'Begin expedition'}
-                        <Icon name="arrow" size={18} />
-                      </button>
-                      <span className="start-note">
-                        <Icon name="check" size={13} /> Your progress is saved after every move.
-                      </span>
-                      <button
-                        className="daily-button"
-                        disabled={atlasLoading}
-                        onClick={() => void start({ daily: true })}
-                      >
-                        <Icon name="sun" size={16} />
-                        <span>
-                          Today’s road · {today.id}
-                          <small>
-                            The same seeded crossing for everyone today, as{' '}
-                            {KEEPERS[today.keeper].name}.{' '}
-                            {meta.daily[today.id]
-                              ? `Your best: ${meta.daily[today.id].toLocaleString('en')}.`
-                              : 'Not yet walked.'}
-                          </small>
-                        </span>
-                      </button>
-                    </div>
-                    <div className="lore-note">
-                      <Icon name="book" size={18} />
-                      <p>
-                        “The dark is not empty.
-                        <br />
-                        It is full of things waiting to be remembered.”
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <KeeperPanel run={run} />
-                    {run.atlas ? (
-                      <AtlasJournal run={run} dispatch={dispatch} />
-                    ) : run.phase === 'map' ? (
-                      <div className="route-choices">
-                        <span className="eyebrow">THE ROAD AHEAD</span>
-                        <h3>Choose your path</h3>
-                        <p className="muted">Every crossing asks something of you.</p>
-                        {nextNodes(run).map((node) => (
-                          <button
-                            className={`route-choice choice-${node.kind}`}
-                            key={node.id}
-                            onClick={() => dispatch({ type: 'travel', lane: node.lane })}
-                          >
-                            <span className="choice-icon">
-                              <Icon name={node.kind} />
-                            </span>
-                            <span>
-                              <small>{NODE_LABELS[node.kind]}</small>
-                              <strong>{node.name}</strong>
-                              <em>
-                                {['battle', 'boss', 'elite'].includes(node.kind)
-                                  ? `${makeEnemy(node, run.ruleset, run.dusk).maxHealth} health · ${victoryCoins(run, node)} coins + relic`
-                                  : node.kind === 'event'
-                                    ? 'A story. A choice. A little consequence.'
-                                    : node.kind === 'camp'
-                                      ? 'Rest, refill a flask, or improve your blade.'
-                                      : 'Trade coins for supplies and strength.'}
-                              </em>
-                              {run.ruleset >= 2 && waylightFor(node) && (
-                                <span className="route-site-benefit">
-                                  <Icon name="flame" size={11} />
-                                  {WAYLIGHTS[waylightFor(node)!].name} ·{' '}
-                                  {WAYLIGHTS[waylightFor(node)!].short}
-                                </span>
-                              )}
-                            </span>
-                            <Icon name="chevron" size={16} />
-                          </button>
-                        ))}
-                        <div className="road-memory">
-                          <Icon name="book" size={15} />
-                          <p>{run.log.at(-1)}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="battle-log">
-                        <div className="section-label">
-                          <Icon name="book" size={15} />
-                          <span>THE STORY SO FAR</span>
-                        </div>
-                        <ol aria-label="Journey log">
-                          {run.log.slice(-5).map((entry, i) => (
-                            <li key={`${entry}-${i}`}>{entry}</li>
-                          ))}
-                        </ol>
-                      </div>
-                    )}
-                    {!terminal(run) && (
-                      <button className="abandon-button" onClick={() => setModal('abandon')}>
-                        <Icon name="flag" size={13} /> Leave this expedition
-                      </button>
-                    )}
-                  </>
-                )}
-              </aside>
-              {run && (
-                <div className="run-supplies">
-                  <RelicInventory ids={run.relics} />
-                  <WaylightsPanel run={run} />
+              {!run && (
+                <div className="feature-strip">
+                  <div>
+                    <Icon name="swords" />
+                    <span>
+                      <strong>{t.app.feature1}</strong>
+                      <small>{t.app.feature1Note}</small>
+                    </span>
+                  </div>
+                  <div>
+                    <Icon name="gem" />
+                    <span>
+                      <strong>{t.app.feature2}</strong>
+                      <small>{t.app.feature2Note}</small>
+                    </span>
+                  </div>
+                  <div>
+                    <Icon name="book" />
+                    <span>
+                      <strong>{t.app.feature3}</strong>
+                      <small>{t.app.feature3Note}</small>
+                    </span>
+                  </div>
                 </div>
               )}
-            </div>
-            {!run && (
-              <div className="feature-strip">
-                <div>
-                  <Icon name="swords" />
-                  <span>
-                    <strong>A battle of choices</strong>
-                    <small>Read their intent. Make your move.</small>
-                  </span>
-                </div>
-                <div>
-                  <Icon name="gem" />
-                  <span>
-                    <strong>A different road each time</strong>
-                    <small>Find relics. Build your own strength.</small>
-                  </span>
-                </div>
-                <div>
-                  <Icon name="book" />
-                  <span>
-                    <strong>A world worth remembering</strong>
-                    <small>Discover the truth behind the dark.</small>
-                  </span>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </main>
+            </>
+          )}
+        </main>
 
-      <footer className="site-footer">
-        <span>
-          EMBERWAKE <i>·</i> Made for the wanderers.
-        </span>
-        <button
-          className="save-status"
-          aria-label="Manage journal"
-          onClick={() => setModal('journal')}
-        >
-          <i className={saved ? 'saved-dot' : ''} />
-          {saved ? 'Saved on this device' : 'Playing in this tab'} · Journal{' '}
-          <Icon name="book" size={12} />
-        </button>
-        <OfflineBadge />
-        <button
-          className="sound-toggle"
-          aria-label={meta.sound ? 'Turn sound off' : 'Turn sound on'}
-          aria-pressed={meta.sound}
-          onClick={() => {
-            setSound(!meta.sound);
-            setSave((s) => ({
-              ...s,
-              profile: { ...s.profile, meta: { ...metaOf(s.profile), sound: !meta.sound } },
-            }));
-          }}
-        >
-          <Icon name="bell" size={17} />
-          <span>{meta.sound ? 'Sound on' : 'Sound off'}</span>
-        </button>
-        <button onClick={() => setModal('help')}>
-          Keep a little light with you <Icon name="external" size={12} />
-        </button>
-      </footer>
-      {toast.length > 0 && (
-        <div className="deed-toast" role="status">
-          {DEEDS.filter((d) => toast.includes(d.id)).map((d) => (
-            <p key={d.id}>
-              <Icon name="sparkles" size={16} />
-              <span>
-                <b>Deed · {d.name}</b>
-                {d.unlocks ? `Future roads can now offer the ${RELICS[d.unlocks].name}.` : d.text}
-              </span>
-            </p>
-          ))}
-        </div>
-      )}
-      <div className="sr-only" role="status" aria-live="polite">
-        {run
-          ? `${run.phase === 'combat' ? `Turn ${run.turn + 1}. Health ${run.health}. ${intentFor(run)?.name}: ${intentFor(run)?.damage} raw damage.` : run.phase === 'map' ? 'Choose your next path.' : run.phase === 'reward' ? 'Victory. Choose your reward.' : run.phase === 'lost' ? 'Your expedition has ended.' : run.phase === 'won' ? 'Your expedition is complete.' : run.phase}`
-          : 'Choose a keeper and begin an expedition.'}
-      </div>
-
-      {modal === 'help' && (
-        <Modal title="A little knowledge. A longer road." onClose={() => setModal(null)}>
-          <Help />
-        </Modal>
-      )}
-      {scouted && (
-        <Modal title={scouted.name} onClose={() => setScouted(null)}>
-          <Scout
-            run={run}
-            node={scouted}
-            onTravel={() => {
-              dispatch({ type: 'travel', lane: scouted.lane });
-              setScouted(null);
+        <footer className="site-footer">
+          <span>
+            EMBERWAKE <i>·</i> {t.app.footerMade}
+          </span>
+          <button
+            className="save-status"
+            aria-label={t.app.manageJournal}
+            onClick={() => setModal('journal')}
+          >
+            <i className={saved ? 'saved-dot' : ''} />
+            {saved ? t.app.savedHere : t.app.playingTab} · {t.app.journal}{' '}
+            <Icon name="book" size={12} />
+          </button>
+          <OfflineBadge />
+          <button
+            className="sound-toggle"
+            aria-label={meta.sound ? t.app.soundOff : t.app.soundOn}
+            aria-pressed={meta.sound}
+            onClick={() => {
+              setSound(!meta.sound);
+              setSave((s) => ({
+                ...s,
+                profile: { ...s.profile, meta: { ...metaOf(s.profile), sound: !meta.sound } },
+              }));
             }}
-          />
-        </Modal>
-      )}
-      {modal === 'journal' && (
-        <Modal title="Keep your story close." onClose={() => setModal(null)}>
-          <Journal
-            save={save}
-            onRestore={(restored) => {
-              setSave(restored);
-              setKeeper(restored.profile.lastKeeper);
-              setWarning('');
-              setView('journey');
-              setModal(null);
-              requestAnimationFrame(() =>
-                boardRef.current?.parentElement?.scrollIntoView({
-                  behavior: 'instant',
-                  block: 'start',
-                }),
-              );
-            }}
-          />
-        </Modal>
-      )}
-      {modal === 'abandon' && (
-        <Modal title="Leave the ember behind?" onClose={() => setModal(null)}>
-          <p>
-            Your current expedition will end. Discovered memories stay in your chronicle. You can
-            also close this dialog and return whenever you like — your progress is saved.
-          </p>
-          <div className="modal-actions">
-            <button className="secondary-button" onClick={() => setModal(null)}>
-              Keep walking
-            </button>
+          >
+            <Icon name="bell" size={17} />
+            <span>{meta.sound ? t.app.soundIsOn : t.app.soundIsOff}</span>
+          </button>
+          <div className="lang-switch" role="group" aria-label={t.app.languageGroup}>
             <button
-              className="danger-button"
-              onClick={() => {
-                setSave((s) => ({ ...s, run: null }));
-                setModal(null);
-              }}
+              lang="en"
+              aria-label="English"
+              aria-pressed={lang === 'en'}
+              onClick={() => setLang('en')}
             >
-              Leave expedition
+              EN
+            </button>
+            <i aria-hidden="true">·</i>
+            <button
+              lang="sk"
+              aria-label="Slovenčina"
+              aria-pressed={lang === 'sk'}
+              onClick={() => setLang('sk')}
+            >
+              SK
             </button>
           </div>
-        </Modal>
-      )}
-    </div>
+          <button onClick={() => setModal('help')}>
+            {t.app.keepLight} <Icon name="external" size={12} />
+          </button>
+        </footer>
+        {toast.length > 0 && (
+          <div className="deed-toast" role="status">
+            {DEEDS.filter((d) => toast.includes(d.id)).map((d) => (
+              <p key={d.id}>
+                <Icon name="sparkles" size={16} />
+                <span>
+                  <b>{t.app.deed(d.name)}</b>
+                  {d.unlocks ? t.app.deedFuture(RELICS[d.unlocks].name) : d.text}
+                </span>
+              </p>
+            ))}
+          </div>
+        )}
+        <div className="sr-only" role="status" aria-live="polite">
+          {run
+            ? run.phase === 'combat'
+              ? t.app.srCombat(
+                  run.turn + 1,
+                  run.health,
+                  intentFor(run)?.name ?? '',
+                  intentFor(run)?.damage ?? 0,
+                )
+              : run.phase === 'map'
+                ? t.app.srMap
+                : run.phase === 'reward'
+                  ? t.app.srReward
+                  : run.phase === 'lost'
+                    ? t.app.srLost
+                    : run.phase === 'won'
+                      ? t.app.srWon
+                      : run.phase
+            : t.app.srLobby}
+        </div>
+
+        {modal === 'help' && (
+          <Modal title={t.app.helpTitle} onClose={() => setModal(null)}>
+            <Help />
+          </Modal>
+        )}
+        {scouted && (
+          <Modal title={scouted.name} onClose={() => setScouted(null)}>
+            <Scout
+              run={run}
+              node={scouted}
+              onTravel={() => {
+                dispatch({ type: 'travel', lane: scouted.lane });
+                setScouted(null);
+              }}
+            />
+          </Modal>
+        )}
+        {modal === 'journal' && (
+          <Modal title={t.app.journalTitle} onClose={() => setModal(null)}>
+            <Journal
+              save={save}
+              onRestore={(restored) => {
+                setSave(restored);
+                setKeeper(restored.profile.lastKeeper);
+                setWarning('');
+                setView('journey');
+                setModal(null);
+                requestAnimationFrame(() =>
+                  boardRef.current?.parentElement?.scrollIntoView({
+                    behavior: 'instant',
+                    block: 'start',
+                  }),
+                );
+              }}
+            />
+          </Modal>
+        )}
+        {modal === 'abandon' && (
+          <Modal title={t.app.abandonTitle} onClose={() => setModal(null)}>
+            <p>{t.app.abandonBody}</p>
+            <div className="modal-actions">
+              <button className="secondary-button" onClick={() => setModal(null)}>
+                {t.app.keepWalking}
+              </button>
+              <button
+                className="danger-button"
+                onClick={() => {
+                  setSave((s) => ({ ...s, run: null }));
+                  setModal(null);
+                }}
+              >
+                {t.app.leaveExpedition}
+              </button>
+            </div>
+          </Modal>
+        )}
+      </div>
+    </LanguageProvider>
   );
 }
 
 function KeeperPanel({ run }: { run: Run }) {
+  const t = useT();
   return (
     <div className="keeper-panel">
       <div className="keeper-mini">
@@ -983,7 +1062,7 @@ function KeeperPanel({ run }: { run: Run }) {
           <KeeperPortrait keeper={run.keeper} />
         </div>
         <div>
-          <span className="eyebrow">YOUR KEEPER</span>
+          <span className="eyebrow">{t.app.yourKeeper}</span>
           <h2>{KEEPERS[run.keeper].name}</h2>
           <span className="muted">{KEEPERS[run.keeper].title}</span>
         </div>
@@ -991,7 +1070,7 @@ function KeeperPanel({ run }: { run: Run }) {
       </div>
       <div className="health-label">
         <span>
-          <Icon name="heart" size={14} /> Vitality
+          <Icon name="heart" size={14} /> {t.app.vitality}
         </span>
         <strong>
           {run.health}
@@ -1001,7 +1080,7 @@ function KeeperPanel({ run }: { run: Run }) {
       <div
         className="health-bar"
         role="meter"
-        aria-label="Keeper health"
+        aria-label={t.app.keeperHealth}
         aria-valuenow={run.health}
         aria-valuemin={0}
         aria-valuemax={run.maxHealth}
@@ -1011,15 +1090,15 @@ function KeeperPanel({ run }: { run: Run }) {
       <div className="run-stats">
         <span>
           <Icon name="sword" /> <b>{attackOf(run)}</b>
-          <small>Attack</small>
+          <small>{t.common.attack}</small>
         </span>
         <span>
           <Icon name="shield" /> <b>{run.armor}</b>
-          <small>Armor</small>
+          <small>{t.common.armor}</small>
         </span>
         <span>
           <Icon name="coins" /> <b>{run.coins}</b>
-          <small>Coins</small>
+          <small>{t.common.coinsLabel}</small>
         </span>
         <span>
           <Icon name="flask" />{' '}
@@ -1027,7 +1106,7 @@ function KeeperPanel({ run }: { run: Run }) {
             {run.flasks}
             <i>/5</i>
           </b>
-          <small>Flasks</small>
+          <small>{t.common.flasks}</small>
         </span>
       </div>
     </div>
@@ -1036,23 +1115,25 @@ function KeeperPanel({ run }: { run: Run }) {
 
 /** A relic's set, how many of it are carried, and the bonus once all three are. */
 function SetLine({ id, carried }: { id: RelicId; carried: RelicId[] }) {
+  const t = useT();
   const set = setOf(id);
   if (!set) return null;
   const { name, relics, bonus } = RELIC_SETS[set];
   const have = relics.filter((r) => carried.includes(r)).length;
   return (
     <span className={`relic-set ${have === 3 ? 'is-complete' : ''}`}>
-      {name} · {have}/3{have === 3 ? ` · ${bonus}` : ` · all three: ${bonus}`}
+      {name} · {have}/3{have === 3 ? ` · ${bonus}` : ` · ${t.app.allThree(bonus)}`}
     </span>
   );
 }
 
 function RelicInventory({ ids }: { ids: RelicId[] }) {
+  const t = useT();
   return (
     <section className="relic-inventory">
       <div className="section-label">
         <Icon name="gem" size={15} />
-        <span>RELICS CARRIED</span>
+        <span>{t.app.relicsCarried}</span>
         <small>{ids.length}</small>
       </div>
       {ids.length ? (
@@ -1070,9 +1151,9 @@ function RelicInventory({ ids }: { ids: RelicId[] }) {
         </div>
       ) : (
         <p className="empty-relics">
-          Every relic has a story.
+          {t.app.noRelics1}
           <br />
-          You have yet to find your first.
+          {t.app.noRelics2}
         </p>
       )}
     </section>
@@ -1080,6 +1161,7 @@ function RelicInventory({ ids }: { ids: RelicId[] }) {
 }
 
 function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) {
+  const t = useT();
   const trove = run.side;
   const boss = !trove && run.depth % 4 === 3;
   const site = !trove && run.ruleset >= 2 ? waylightFor(nodeOf(run)) : null;
@@ -1092,31 +1174,23 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
         </span>
         {run.enemy && (
           <p className="victory-beat">
-            <b>{run.enemy.name} falls.</b>
-            {run.stats && run.turn > 0 && ` ${run.turn} turns.`}
+            <b>{t.app.falls(run.enemy.name)}</b>
+            {run.stats && run.turn > 0 && t.app.turnsN(run.turn)}
           </p>
         )}
         <span className="eyebrow">
-          {trove
-            ? 'THE TROVE IS YOURS'
-            : boss
-              ? 'A BELL REMEMBERS ITS SONG'
-              : 'THE DARK YIELDS A LITTLE'}
+          {trove ? t.app.troveYours : boss ? t.app.bellRemembers : t.app.darkYields}
         </span>
-        <h2>{boss ? 'A memory awakens.' : 'Something worth carrying.'}</h2>
+        <h2>{boss ? t.app.memoryAwakens : t.app.somethingWorth}</h2>
         {boss && run.enemy?.id && VOICES[run.enemy.id]?.fall && (
           <p className="voice-fall">{VOICES[run.enemy.id].fall}</p>
         )}
-        <p className="scene-lead">
-          {boss
-            ? CHAPTERS[realmOf(run)].memory
-            : 'Among the ashes, a small thing catches the light.\nChoose one gift for the road ahead.'}
-        </p>
+        <p className="scene-lead">{boss ? CHAPTERS[realmOf(run)].memory : t.app.rewardLead}</p>
         {boss && pageFor(`${run.keeper}-bell-${run.bells}`) && run.ruleset === 3 && (
           <blockquote className="keeper-page">
             <SceneArt id={`journal-${run.keeper}`} />
             <p>{pageFor(`${run.keeper}-bell-${run.bells}`)!.text}</p>
-            <cite>— {KEEPERS[run.keeper].name}’s journal · a new page in your chronicle</cite>
+            <cite>{t.app.journalPage(KEEPERS[run.keeper].name)}</cite>
           </blockquote>
         )}
         <div className="reward-coins">
@@ -1126,16 +1200,16 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
             </>
           ) : (
             <>
-              <Icon name="coins" size={16} /> +{victoryCoins(run)} coins collected
+              <Icon name="coins" size={16} /> {t.app.coinsCollected(victoryCoins(run))}
             </>
           )}
-          {run.relics.includes('thread') && <span> · +5 health</span>}
+          {run.relics.includes('thread') && <span>{t.app.plusHealth}</span>}
         </div>
         {site && (
           <div className="reward-waylight">
             <Icon name="flame" size={20} />
             <span>
-              <strong>{WAYLIGHTS[site].name} rekindled</strong>
+              <strong>{t.app.rekindled(WAYLIGHTS[site].name)}</strong>
               <small>{WAYLIGHTS[site].benefit}</small>
             </span>
           </div>
@@ -1151,14 +1225,16 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
                 <RelicIcon id={id} size={56} />
               </span>
               <span className={`eyebrow rarity-${RELICS[id].rarity}`}>
-                {run.ruleset === 3 ? `${RELICS[id].rarity.toUpperCase()} RELIC` : 'RELIC'}
+                {run.ruleset === 3
+                  ? t.app.relicTagRarity(t.app.rarity[RELICS[id].rarity])
+                  : t.app.relicTag}
               </span>
               <h3>{RELICS[id].name}</h3>
               <p>{RELICS[id].description}</p>
               <SetLine id={id} carried={run.relics} />
               <em>{RELICS[id].flavor}</em>
               <span className="take-relic">
-                Carry this relic <Icon name="arrow" size={14} />
+                {t.app.carryRelic} <Icon name="arrow" size={14} />
               </span>
             </button>
           ))}
@@ -1167,7 +1243,7 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
           className="secondary-button heal-reward"
           onClick={() => dispatch({ type: 'reward', id: 'heal' })}
         >
-          <Icon name="heart" size={16} /> Leave the relics · recover 12 health{' '}
+          <Icon name="heart" size={16} /> {t.app.leaveRelics}{' '}
           <span>
             ({run.health}/{run.maxHealth})
           </span>
@@ -1178,6 +1254,7 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
 }
 
 function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) {
+  const t = useT();
   const node = nodeOf(run);
   const event = EVENTS[node.eventIndex];
   const shop = run.phase === 'shop';
@@ -1193,16 +1270,12 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
           {run.phase === 'event'
             ? event.eyebrow.toUpperCase()
             : shop
-              ? 'EVERYTHING HAS A PRICE. NOT EVERYTHING IS GOLD.'
-              : 'EVEN THE BRAVE NEED A LITTLE WARMTH'}
+              ? t.app.shopEyebrow
+              : t.app.campEyebrow}
         </span>
         <h2>{node.name}</h2>
         <p className="scene-lead">
-          {run.phase === 'event'
-            ? event.text
-            : shop
-              ? 'A lantern sways above a stall of impossible things. The trader smiles as though she has been expecting you. “Just what you need. Always just what you need.”'
-              : 'A fire burns in the hollow of an ancient tree. There is no one here, but two cups sit beside the coals. For a moment, the world feels almost kind.'}
+          {run.phase === 'event' ? event.text : shop ? t.app.shopLead : t.app.campLead}
         </p>
         <div className="encounter-options">
           {run.phase === 'event' ? (
@@ -1233,7 +1306,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
                   <span>
                     <strong>{RELICS[id].name}</strong>
                     <small>
-                      {RELICS[id].rarity[0].toUpperCase() + RELICS[id].rarity.slice(1)} relic ·{' '}
+                      {t.app.relicInShop(t.app.rarity[RELICS[id].rarity])}
                       {RELICS[id].description}
                       <SetLine id={id} carried={run.relics} />
                     </small>
@@ -1248,20 +1321,20 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
                 [
                   {
                     item: 'flask',
-                    title: 'A bottled sunrise',
-                    description: 'Gain 1 flask · restores health in combat',
+                    title: t.app.flaskTitle,
+                    description: t.app.flaskDesc,
                     icon: 'flask',
                   },
                   {
                     item: 'heal',
-                    title: 'A little kindness',
-                    description: 'Restore 20 health immediately',
+                    title: t.app.healTitle,
+                    description: t.app.healDesc,
                     icon: 'heart',
                   },
                   {
                     item: 'forge',
-                    title: 'An edge of dawn',
-                    description: 'Permanently gain 2 attack',
+                    title: t.app.forgeTitle,
+                    description: t.app.forgeDesc,
                     icon: 'sword',
                   },
                 ] as { item: ShopItem; title: string; description: string; icon: IconName }[]
@@ -1276,9 +1349,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
                   <span>
                     <strong>{o.title}</strong>
                     <small>
-                      {run.purchased.includes(o.item)
-                        ? 'Already purchased this visit'
-                        : o.description}
+                      {run.purchased.includes(o.item) ? t.app.alreadyBought : o.description}
                     </small>
                   </span>
                   <span className="price">
@@ -1303,10 +1374,8 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
               >
                 <Icon name="heart" size={22} />
                 <span>
-                  <strong>Rest by the embers</strong>
-                  <small>
-                    Restore {restAmount(run)} health · {run.health}/{run.maxHealth} now
-                  </small>
+                  <strong>{t.app.restTitle}</strong>
+                  <small>{t.app.restDesc(restAmount(run), run.health, run.maxHealth)}</small>
                 </span>
                 <Icon name="arrow" size={17} />
               </button>
@@ -1317,8 +1386,8 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
               >
                 <Icon name="flask" size={22} />
                 <span>
-                  <strong>Bottle a little warmth</strong>
-                  <small>Gain 1 flask · {run.flasks}/5 carried</small>
+                  <strong>{t.app.bottleTitle}</strong>
+                  <small>{t.app.bottleDesc(run.flasks)}</small>
                 </span>
                 <Icon name="arrow" size={17} />
               </button>
@@ -1329,8 +1398,8 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
               >
                 <Icon name="sword" size={22} />
                 <span>
-                  <strong>Temper your blade</strong>
-                  <small>Permanently gain 2 attack</small>
+                  <strong>{t.app.temperTitle}</strong>
+                  <small>{t.app.temperDesc}</small>
                 </span>
                 <span className="price">
                   30
@@ -1343,13 +1412,9 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
         {run.phase !== 'event' && (
           <>
             <button className="text-button" onClick={() => dispatch({ type: 'leave' })}>
-              Continue without {shop ? 'buying' : 'resting'} <Icon name="arrow" size={15} />
+              {shop ? t.app.continueBuying : t.app.continueResting} <Icon name="arrow" size={15} />
             </button>
-            <p className="scene-hint">
-              {shop
-                ? `You carry ${run.coins} coins. Each item can be bought once per visit.`
-                : 'Choose one comfort, then return to the road.'}
-            </p>
+            <p className="scene-hint">{shop ? t.app.shopHint(run.coins) : t.app.campHint}</p>
           </>
         )}
       </div>
@@ -1358,6 +1423,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
 }
 
 function ShareRoad({ run }: { run: Run }) {
+  const t = useT();
   const [note, setNote] = useState('');
   useEffect(() => {
     if (!note) return;
@@ -1371,14 +1437,14 @@ function ShareRoad({ run }: { run: Run }) {
         className="secondary-button"
         onClick={() => {
           const write = navigator.clipboard?.writeText(url);
-          if (!write) return setNote(`Copying is unavailable here. The link is ${url}`);
+          if (!write) return setNote(t.app.copyUnavailable(url));
           write.then(
-            () => setNote('Link copied'),
-            () => setNote(`Copying is unavailable here. The link is ${url}`),
+            () => setNote(t.app.linkCopied),
+            () => setNote(t.app.copyUnavailable(url)),
           );
         }}
       >
-        <Icon name="book" size={17} /> Copy a link to this road
+        <Icon name="book" size={17} /> {t.app.copyLink}
       </button>
       <span className="scene-hint" role="status" aria-live="polite">
         {note}
@@ -1404,6 +1470,7 @@ function Ending({
   onAgain?: () => void;
   onRestart: () => void;
 }) {
+  const t = useT();
   const lost = run.phase === 'lost';
   const choosing = run.phase === 'ending';
   return (
@@ -1416,33 +1483,33 @@ function Ending({
         </span>
         <span className="eyebrow">
           {lost
-            ? 'NOT ALL ROADS END AT DAWN'
+            ? t.app.endLost
             : choosing
-              ? 'THE LAST BELL RINGS'
+              ? t.app.endChoosing
               : run.atlas
-                ? 'THE LOST ATLAS · COMPLETE'
+                ? t.app.endAtlas
                 : run.daily
-                  ? `TODAY’S ROAD · ${run.daily} · COMPLETE`
+                  ? t.app.endDaily(run.daily)
                   : run.ruleset === 3
-                    ? `THE LONG NIGHT · DUSK ${run.dusk ?? 0} · COMPLETE`
+                    ? t.app.endNight(run.dusk ?? 0)
                     : run.ruleset === 2
-                      ? 'ROADS REKINDLED · COMPLETE'
-                      : 'THE FIRST CROSSING · COMPLETE'}
+                      ? t.app.endRekindled
+                      : t.app.endFirst}
         </span>
         <h2>
           {lost
-            ? 'Rest now, keeper.'
+            ? t.app.endTitleLost
             : choosing
-              ? 'What is the light for?'
+              ? t.app.endTitleChoosing
               : run.ending === 'dawn'
-                ? 'A thousand little suns.'
-                : 'A different kind of light.'}
+                ? t.app.endTitleDawn
+                : t.app.endTitleHearth}
         </h2>
         <p className="scene-lead">
           {lost
-            ? `You fall in ${CHAPTERS[realmOf(run)].name}. The ember goes quiet, but the memories you found will outlive the dark. Another keeper will take the road.`
+            ? t.app.endLeadLost(CHAPTERS[realmOf(run)].name)
             : choosing
-              ? '“Eira,” the king whispers. The heart of the sun opens in his hands. You could wake it, if the world will share its burden. Or you could carry him home, and teach Cinderfall another way to keep warm.'
+              ? t.app.endLeadChoosing
               : LORE.find((l) => l.id === run.ending)?.text}
         </p>
         {run.phase === 'won' && run.ruleset === 3 && pageFor(`${run.keeper}-${run.ending}`) && (
@@ -1458,8 +1525,8 @@ function Ending({
             >
               <Icon name="sun" size={25} />
               <span>
-                <strong>Share the sunrise</strong>
-                <small>Wake the sun. Let every name carry a little light.</small>
+                <strong>{t.app.shareSunrise}</strong>
+                <small>{t.app.shareSunriseNote}</small>
               </span>
               <Icon name="arrow" />
             </button>
@@ -1469,8 +1536,8 @@ function Ending({
             >
               <Icon name="book" size={25} />
               <span>
-                <strong>Bring the stories home</strong>
-                <small>Keep the night. Build a library around the hearth.</small>
+                <strong>{t.app.bringStories}</strong>
+                <small>{t.app.bringStoriesNote}</small>
               </span>
               <Icon name="arrow" />
             </button>
@@ -1480,15 +1547,15 @@ function Ending({
             <div className="ending-stats">
               <div>
                 <strong>{run.bells}/3</strong>
-                <span>Bells awakened</span>
+                <span>{t.app.bellsAwake}</span>
               </div>
               <div>
                 <strong>{run.relics.length}</strong>
-                <span>Relics carried</span>
+                <span>{t.app.relicsCarriedStat}</span>
               </div>
               <div>
                 <strong>{encountersWon(run)}/12</strong>
-                <span>Encounters won</span>
+                <span>{t.app.encountersWonStat}</span>
               </div>
             </div>
             <ScoreCard run={run} meta={meta} earned={earned} previousBest={previousBest} />
@@ -1497,22 +1564,19 @@ function Ending({
                 <button className="primary-button" onClick={onAgain}>
                   <Icon name="flame" size={17} />
                   {lost
-                    ? `Try again as ${KEEPERS[run.keeper].name}`
-                    : `Walk again as ${KEEPERS[run.keeper].name}`}
+                    ? t.app.tryAgain(KEEPERS[run.keeper].name)
+                    : t.app.walkAgain(KEEPERS[run.keeper].name)}
                 </button>
               )}
               <button
                 className={onAgain ? 'secondary-button' : 'primary-button'}
                 onClick={onRestart}
               >
-                <Icon name="reset" size={17} />{' '}
-                {onAgain ? 'Choose another road' : 'Walk another road'}
+                <Icon name="reset" size={17} /> {onAgain ? t.app.chooseAnother : t.app.walkAnother}
               </button>
             </div>
             {run.ruleset === 3 && !run.atlas && !run.daily && <ShareRoad run={run} />}
-            <p className="scene-hint">
-              Your memories remain in the chronicle. Each keeper starts equal.
-            </p>
+            <p className="scene-hint">{t.app.memoriesRemain}</p>
           </>
         )}
       </div>

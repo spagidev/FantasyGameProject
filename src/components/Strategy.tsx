@@ -1,12 +1,4 @@
-import {
-  CHAPTERS,
-  EVENTS,
-  KEEPERS,
-  NODE_LABELS,
-  TALENTS,
-  WAYLIGHTS,
-  type WaylightId,
-} from '../game/data';
+import { CHAPTERS, EVENTS, KEEPERS, TALENTS, WAYLIGHTS, type WaylightId } from '../game/data';
 import { describeTraits, FOES } from '../game/bestiary';
 import { encounterState, siteAt } from '../game/atlas';
 import {
@@ -28,8 +20,10 @@ import { Landscape } from './Art';
 import { intentEffects } from './Combat';
 import { Icon, type IconName } from './Icon';
 import type { Intent } from '../game/data';
+import { useT } from '../i18n';
 
 function PatternList({ pattern, armor }: { pattern: Intent[]; armor: number | null }) {
+  const t = useT();
   return (
     <ol className="scout-pattern">
       {pattern.map((intent, i) => {
@@ -43,14 +37,14 @@ function PatternList({ pattern, armor }: { pattern: Intent[]; armor: number | nu
                 {[
                   ...(intent.damage > 0
                     ? [
-                        `${hits > 1 ? `${hits} hits of ${intent.damage}` : intent.damage} raw damage${
-                          armor !== null
-                            ? ` · ${Math.max(0, intent.damage - armor) * hits} after your armor`
-                            : ''
-                        }`,
+                        t.strategy.rawDamage(
+                          hits,
+                          intent.damage,
+                          armor !== null ? Math.max(0, intent.damage - armor) * hits : null,
+                        ),
                       ]
                     : []),
-                  ...intentEffects(intent),
+                  ...intentEffects(intent, t),
                 ].join(' · ')}
               </p>
             </div>
@@ -70,6 +64,8 @@ export function Scout({
   node: MapNode;
   onTravel: () => void;
 }) {
+  const t = useT();
+  const s = t.strategy;
   const combat = ['battle', 'elite', 'boss'].includes(node.kind);
   const enemy = combat
     ? makeEnemy(node, run?.ruleset ?? 3, run?.dusk ?? 0, run ? nightsOf(run) : 0)
@@ -83,10 +79,10 @@ export function Scout({
       <div className="scout-meta">
         <span>
           <Icon name={node.kind} />
-          {NODE_LABELS[node.kind]}
+          {t.node[node.kind]}
         </span>
         <span>
-          {CHAPTERS[Math.floor(node.depth / 4)].short} · crossing {(node.depth % 4) + 1}/4
+          {s.crossingOf(CHAPTERS[Math.floor(node.depth / 4)].short, (node.depth % 4) + 1)}
         </span>
       </div>
       {enemy && (
@@ -94,7 +90,7 @@ export function Scout({
           <div className="scout-rewards">
             <span>
               <Icon name="heart" size={17} />
-              <b>{enemy.maxHealth}</b> enemy health
+              <b>{enemy.maxHealth}</b> {s.enemyHealth}
             </span>
             <span>
               <Icon name="coins" size={17} />
@@ -107,15 +103,13 @@ export function Scout({
                       ? 32
                       : 18}
               </b>{' '}
-              coins + relic choice
+              {s.coinsRelic}
             </span>
           </div>
           {enemy.id && <p className="scout-blurb">{FOES[enemy.id].blurb}</p>}
           {enemy.maxPoise !== undefined && (
             <div className="scout-traits">
-              <span title="Hit damage wears poise down. At zero it is staggered.">
-                Poise {enemy.maxPoise}
-              </span>
+              <span title={s.poiseTitle}>{s.poiseN(enemy.maxPoise)}</span>
               {traits.map((t) => (
                 <span key={t.label} title={t.text}>
                   {t.label} · {t.text}
@@ -123,11 +117,11 @@ export function Scout({
               ))}
             </div>
           )}
-          <span className="eyebrow">THEIR PATTERN · REPEATS IN THIS ORDER</span>
+          <span className="eyebrow">{s.patternEyebrow}</span>
           <PatternList pattern={enemy.pattern} armor={run ? run.armor : null} />
           {enemy.phase2 && (
             <>
-              <span className="eyebrow">BELOW HALF HEALTH · {enemy.phase2.name.toUpperCase()}</span>
+              <span className="eyebrow">{s.belowHalf(enemy.phase2.name)}</span>
               <PatternList pattern={enemy.phase2.pattern} armor={run ? run.armor : null} />
             </>
           )}
@@ -137,13 +131,11 @@ export function Scout({
         <div className="scout-site">
           <Icon name={WAYLIGHTS[site].icon as IconName} size={26} />
           <div>
-            <span className="eyebrow">A WAYLIGHT TO REKINDLE</span>
+            <span className="eyebrow">{s.waylightEyebrow}</span>
             <h3>{WAYLIGHTS[site].name}</h3>
             <p>{WAYLIGHTS[site].text}</p>
             <strong>{WAYLIGHTS[site].benefit}</strong>
-            <small>
-              Freed after victory. Benefits begin on later crossings; never while you are away.
-            </small>
+            <small>{s.waylightNote}</small>
           </div>
         </div>
       )}
@@ -160,104 +152,97 @@ export function Scout({
       )}
       {node.kind === 'camp' && (
         <div className="scout-story">
-          <p>A quiet place to prepare. Choose one comfort, then continue.</p>
+          <p>{s.campIntro}</p>
           <div>
-            <strong>Rest</strong>
-            <span>Restore {run ? restAmount(run) : 20} health</span>
+            <strong>{s.rest}</strong>
+            <span>{s.restDesc(run ? restAmount(run) : 20)}</span>
           </div>
           <div>
-            <strong>Refill</strong>
-            <span>Gain 1 flask, maximum 5</span>
+            <strong>{s.refill}</strong>
+            <span>{s.refillDesc}</span>
           </div>
           <div>
-            <strong>Temper your blade</strong>
-            <span>Pay 30 coins · gain 2 attack</span>
+            <strong>{s.temper}</strong>
+            <span>{s.temperDesc}</span>
           </div>
         </div>
       )}
       {node.kind === 'shop' && (
         <div className="scout-story">
-          <p>
-            Each item is available once per visit. Buy any combination you can afford, then leave
-            freely.
-          </p>
+          <p>{s.shopIntro}</p>
           {v3 && (
             <div>
-              <strong>Three relics</strong>
+              <strong>{s.threeRelics}</strong>
               <span>
                 {run
-                  ? `${priceOf(run, 'briar')}–${priceOf(run, 'chime')} coins, by rarity`
-                  : '40–75 coins, by rarity'}
+                  ? s.relicPrices(priceOf(run, 'briar'), priceOf(run, 'chime'))
+                  : s.relicPricesDefault}
               </span>
             </div>
           )}
           <div>
-            <strong>A flask</strong>
-            <span>{run ? priceOf(run, 'flask') : 14} coins</span>
+            <strong>{s.aFlask}</strong>
+            <span>{s.nCoins(run ? priceOf(run, 'flask') : 14)}</span>
           </div>
           <div>
-            <strong>Restore 20 health</strong>
-            <span>{run ? priceOf(run, 'heal') : 18} coins</span>
+            <strong>{s.restore20}</strong>
+            <span>{s.nCoins(run ? priceOf(run, 'heal') : 18)}</span>
           </div>
           <div>
-            <strong>Gain 2 attack</strong>
-            <span>{run ? priceOf(run, 'forge') : 35} coins</span>
+            <strong>{s.gain2}</strong>
+            <span>{s.nCoins(run ? priceOf(run, 'forge') : 35)}</span>
           </div>
         </div>
       )}
       {reachable ? (
         <button className="primary-button" onClick={onTravel}>
-          Take this path <Icon name="arrow" size={17} />
+          {s.takePath} <Icon name="arrow" size={17} />
         </button>
       ) : (
         <p className="scout-unreachable">
           {!run
-            ? 'Choose a keeper and begin an expedition to take this road.'
+            ? s.unreachableLobby
             : node.id.startsWith('trove-')
-              ? 'An optional fight. Challenge it from the chart; winning claims the trove and a choice of three rare relics.'
+              ? s.trove
               : run.atlas
                 ? {
-                    done: 'This encounter is behind you.',
-                    open: 'Walk to this place on the chart to enter it.',
-                    sealed:
-                      node.kind === 'boss'
-                        ? 'The guardian waits until the rest of its realm is done.'
-                        : 'A later realm. Ring this realm’s bell first.',
+                    done: s.done,
+                    open: s.open,
+                    sealed: node.kind === 'boss' ? s.sealedBoss : s.sealedLater,
                   }[
                     encounterState(run, siteAt(node.depth, node.lane, run.atlas) ?? { id: '' }) ??
                       'sealed'
                   ]
                 : node.depth <= run.depth
-                  ? 'This crossing is behind you. The road leads forward.'
+                  ? s.behind
                   : node.depth === run.depth + 1
-                    ? 'This lane is beyond reach from your current path. A neighboring lane stays open.'
-                    : 'A future crossing. Plan your route, then advance one path at a time.'}
+                    ? s.beyondReach
+                    : s.future}
         </p>
       )}
       <p className="scout-free">
-        <Icon name="eye" size={13} /> Scouting is free. Your expedition has not moved.
+        <Icon name="eye" size={13} /> {s.scoutFree}
       </p>
     </div>
   );
 }
 
 export function WaylightsPanel({ run }: { run: Run }) {
+  const t = useT();
+  const s = t.strategy;
   if (run.ruleset === 1)
     return (
       <div className="classic-notice">
         <Icon name="book" size={15} />
-        <span>
-          Classic crossing · your original rules are preserved. New expeditions include waylights
-          and remembered lessons.
-        </span>
+        <span>{s.classic}</span>
       </div>
     );
   const benefits = roadBenefits(run);
   return (
-    <section className="waylight-ledger" aria-label="Waylights and remembered lessons">
+    <section className="waylight-ledger" aria-label={s.ledger}>
       <div className="section-label">
         <Icon name="flame" size={15} />
-        <span>THE LIGHT YOU LEAVE BEHIND</span>
+        <span>{s.lightBehind}</span>
         <small>{run.waylights.length}/3</small>
       </div>
       {run.waylights.length ? (
@@ -279,21 +264,20 @@ export function WaylightsPanel({ run }: { run: Run }) {
               ))}
           </div>
           <p className="waylight-yield">
-            Each crossing: {benefits.coins ? `+${benefits.coins} coins` : ''}
+            {s.eachCrossing}
+            {benefits.coins ? s.plusCoins(benefits.coins) : ''}
             {benefits.coins && benefits.health ? ' · ' : ''}
-            {benefits.health ? `+${benefits.health} health` : ''}
-            {!benefits.health && !benefits.coins ? 'a road lit by the observatories' : ''}
-            {benefits.focus > 0 && <span>Battles start with +{benefits.focus} focus (cap 5).</span>}
+            {benefits.health ? s.plusHealth(benefits.health) : ''}
+            {!benefits.health && !benefits.coins ? s.observatories : ''}
+            {benefits.focus > 0 && <span>{s.startFocus(benefits.focus)}</span>}
           </p>
         </>
       ) : (
-        <p className="empty-relics">
-          Free a waylight at the start of each realm. Let the road give something back.
-        </p>
+        <p className="empty-relics">{s.freeWaylight}</p>
       )}
       {run.talents.length > 0 && (
         <div className="lesson-list">
-          <span className="eyebrow">LESSONS REMEMBERED</span>
+          <span className="eyebrow">{s.lessons}</span>
           {run.talents.map((id) => (
             <div className="inventory-relic" key={id}>
               <Icon name={TALENTS[id].icon as IconName} />
@@ -310,6 +294,7 @@ export function WaylightsPanel({ run }: { run: Run }) {
 }
 
 export function TalentChoice({ run, dispatch }: { run: Run; dispatch: (action: Action) => void }) {
+  const s = useT().strategy;
   return (
     <section className="scene-board talent-board">
       <Landscape chapter={realmOf(run)} />
@@ -317,12 +302,9 @@ export function TalentChoice({ run, dispatch }: { run: Run; dispatch: (action: A
         <span className="scene-sigil">
           <Icon name="sparkles" size={34} />
         </span>
-        <span className="eyebrow">THE BELL GIVES BACK WHAT THE FIRE TOOK</span>
-        <h2>Remember who you could be.</h2>
-        <p className="scene-lead">
-          {KEEPERS[run.keeper].name} hears a familiar voice inside the bell. Not a command. A
-          lesson. Choose one to carry into the next realm.
-        </p>
+        <span className="eyebrow">{s.talentEyebrow}</span>
+        <h2>{s.talentTitle}</h2>
+        <p className="scene-lead">{s.talentLead(KEEPERS[run.keeper].name)}</p>
         <div className="reward-grid">
           {availableTalents(run).map((id) => (
             <button
@@ -338,15 +320,12 @@ export function TalentChoice({ run, dispatch }: { run: Run; dispatch: (action: A
               <p>{TALENTS[id].description}</p>
               <em>{TALENTS[id].flavor}</em>
               <span className="take-relic">
-                Remember this lesson <Icon name="arrow" size={14} />
+                {s.rememberLesson} <Icon name="arrow" size={14} />
               </span>
             </button>
           ))}
         </div>
-        <p className="scene-hint">
-          One lesson after each of the first two bells. Lasts this expedition. Choose a different
-          road next time.
-        </p>
+        <p className="scene-hint">{s.talentHint}</p>
       </div>
     </section>
   );

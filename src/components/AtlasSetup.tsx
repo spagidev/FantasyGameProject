@@ -3,6 +3,7 @@ import { SLOVAK_REGIONS } from '../atlas/regions';
 import type { Meta } from '../game/meta';
 import { provinceOfKraj, PROVINCES } from '../atlas/provinces';
 import { CampaignMap } from './CampaignMap';
+import { useT } from '../i18n';
 import { Icon } from './Icon';
 export function AtlasSetup({
   area,
@@ -24,34 +25,33 @@ export function AtlasSetup({
   error: string;
   onCancel: () => void;
 }) {
+  const t = useT();
+  const s = t.setup;
   const offline = source === 'original';
   const count = bundledCount(area);
   const bundled = source === 'bundled';
   return (
-    <section className="atlas-setup" aria-label="Choose atlas geography">
-      <span className="eyebrow">WHERE SHOULD THE VEIL FALL?</span>
-      <h3>Somewhere you might remember.</h3>
-      <p>
-        Choose a country or administrative region. We’ll hide a city or town inside it. You still
-        have to discover and name the city.
-      </p>
-      <div className="atlas-source-picker" role="group" aria-label="Atlas map source">
+    <section className="atlas-setup" aria-label={s.geoLabel}>
+      <span className="eyebrow">{s.eyebrow}</span>
+      <h3>{s.title}</h3>
+      <p>{s.intro}</p>
+      <div className="atlas-source-picker" role="group" aria-label={s.sourceLabel}>
         <button
           aria-pressed={source === 'bundled'}
           disabled={loading}
           onClick={() => onSource('bundled')}
         >
-          Bundled maps
+          {s.bundled}
         </button>
         <button
           aria-pressed={source === 'live'}
           disabled={loading}
           onClick={() => onSource('live')}
         >
-          Live map
+          {s.live}
         </button>
         <button aria-pressed={offline} disabled={loading} onClick={() => onSource('original')}>
-          Original offline chart
+          {s.original}
         </button>
       </div>
       {bundled && (
@@ -65,22 +65,19 @@ export function AtlasSetup({
               )
             }
           />
-          <p className="campaign-note">
-            Choosing a province hides one of its two cities. Cities you have already rekindled are
-            passed over while another remains.
-          </p>
+          <p className="campaign-note">{s.campaignNote}</p>
         </>
       )}
       {!offline && (
         <>
-          <label htmlFor="atlas-region">Country or region</label>
+          <label htmlFor="atlas-region">{s.regionLabel}</label>
           <input
             id="atlas-region"
             value={area}
             onChange={(e) => onArea(e.target.value)}
             maxLength={100}
             disabled={loading}
-            placeholder="Slovakia, Bratislavský kraj, Austria…"
+            placeholder={s.regionPlaceholder}
             list="atlas-regions"
             autoComplete="off"
           />
@@ -94,10 +91,10 @@ export function AtlasSetup({
           </datalist>
           {!bundled && (
             <details className="slovak-regions">
-              <summary>Slovakia · choose one of the eight kraje</summary>
+              <summary>{s.krajSummary}</summary>
               <div>
                 <button disabled={loading} onClick={() => onArea('Slovakia')}>
-                  All of Slovakia
+                  {s.allSlovakia}
                 </button>
                 {SLOVAK_REGIONS.map((r) => (
                   <button key={r.code} disabled={loading} onClick={() => onArea(r.name)}>
@@ -109,32 +106,20 @@ export function AtlasSetup({
           )}
           <p className={`bundled-availability ${!count ? 'unavailable' : ''}`} role="status">
             <Icon name={count ? 'check' : 'info'} size={16} />
-            <span>
-              {count
-                ? `${count} bundled ${count === 1 ? 'chart' : 'charts'} in this area. ${source === 'live' ? 'Used automatically if the live provider fails.' : 'Ready to play without the map provider.'}`
-                : 'No bundled charts here yet. Choose Slovakia or a kraj, or use Live map.'}
-            </span>
+            <span>{count ? s.chartsHere(count, source === 'live') : s.noneHere}</span>
           </p>
-          <small>
-            Accents are optional for Slovak names. Elsewhere, use a full local or English
-            administrative name, or an ISO region code. Live maps need the provider; bundled maps
-            ship with Emberwake. Both save the complete chart with your journey.
-          </small>
+          <small>{s.accents}</small>
         </>
       )}
       {loading && (
         <div className="atlas-loading" role="status">
           <Icon name="compass" />
           <span>
-            Charting an unknown city inside {area}…
-            <small>
-              {source === 'bundled'
-                ? 'Opening a chart from your collection.'
-                : 'Finding the boundary, then tracing connected roads. This may take a minute.'}
-            </small>
+            {s.charting(area)}
+            <small>{source === 'bundled' ? s.openingChart : s.tracing}</small>
           </span>
           <button className="text-button" onClick={onCancel}>
-            Cancel
+            {t.common.cancel}
           </button>
         </div>
       )}
@@ -147,22 +132,22 @@ export function AtlasSetup({
   );
 }
 export function RegionalAtlasPreview({ area }: { area: string }) {
+  const s = useT().setup;
   return (
     <section className="regional-atlas-preview">
-      <span className="eyebrow">THE LOST ATLAS · YOUR CHOSEN REGION</span>
+      <span className="eyebrow">{s.previewEyebrow}</span>
       <Icon name="compass" size={70} />
-      <h2>A city without its name.</h2>
+      <h2>{s.previewTitle}</h2>
       <p>
-        Somewhere inside <strong>{area.trim() || 'your chosen country or region'}</strong>, familiar
-        roads lead to unfamiliar things.
+        {s.somewhereInside}
+        <strong>{area.trim() || s.yourRegion}</strong>
+        {s.familiarRoads}
       </p>
       <div className="veiled-city" aria-hidden="true">
         ✦ &nbsp; · &nbsp; ♜ &nbsp; · &nbsp; ✧
       </div>
       <p className="muted">
-        The chart stays sealed until you begin. Follow the roads, uncover the land, and remember
-        which city lies beneath the fantasy.{' '}
-        {bundledCount(area) > 0 && `${bundledCount(area)} bundled charts are ready in this area.`}
+        {s.sealed} {bundledCount(area) > 0 && s.chartsReady(bundledCount(area))}
       </p>
     </section>
   );
