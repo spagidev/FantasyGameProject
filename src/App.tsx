@@ -11,6 +11,8 @@ import {
   LORE,
   NODE_LABELS,
   RELICS,
+  RELIC_SETS,
+  setOf,
   WAYLIGHTS,
   type KeeperId,
   type RelicId,
@@ -992,6 +994,19 @@ function KeeperPanel({ run }: { run: Run }) {
   );
 }
 
+/** A relic's set, how many of it are carried, and the bonus once all three are. */
+function SetLine({ id, carried }: { id: RelicId; carried: RelicId[] }) {
+  const set = setOf(id);
+  if (!set) return null;
+  const { name, relics, bonus } = RELIC_SETS[set];
+  const have = relics.filter((r) => carried.includes(r)).length;
+  return (
+    <span className={`relic-set ${have === 3 ? 'is-complete' : ''}`}>
+      {name} · {have}/3{have === 3 ? ` · ${bonus}` : ` · all three: ${bonus}`}
+    </span>
+  );
+}
+
 function RelicInventory({ ids }: { ids: RelicId[] }) {
   return (
     <section className="relic-inventory">
@@ -1008,6 +1023,7 @@ function RelicInventory({ ids }: { ids: RelicId[] }) {
               <span>
                 <strong>{RELICS[id].name}</strong>
                 <small>{RELICS[id].description}</small>
+                <SetLine id={id} carried={ids} />
               </span>
             </div>
           ))}
@@ -1099,6 +1115,7 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
               </span>
               <h3>{RELICS[id].name}</h3>
               <p>{RELICS[id].description}</p>
+              <SetLine id={id} carried={run.relics} />
               <em>{RELICS[id].flavor}</em>
               <span className="take-relic">
                 Carry this relic <Icon name="arrow" size={14} />
@@ -1178,6 +1195,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
                     <small>
                       {RELICS[id].rarity[0].toUpperCase() + RELICS[id].rarity.slice(1)} relic ·{' '}
                       {RELICS[id].description}
+                      <SetLine id={id} carried={run.relics} />
                     </small>
                   </span>
                   <span className="price">

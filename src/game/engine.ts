@@ -25,6 +25,7 @@ import {
   LEGACY_RELICS,
   NEW_TALENTS,
   RELICS,
+  RELIC_SETS,
   STARTING_RELICS,
   TALENTS,
   WAYLIGHTS,
@@ -34,6 +35,7 @@ import {
   type KeeperId,
   type NodeKind,
   type RelicId,
+  type SetId,
   type TalentId,
   type WaylightId,
 } from './data';
@@ -628,6 +630,9 @@ function hitEnemy(r: Run, amount: number, piercing = false) {
   r.enemy.health = Math.max(0, r.enemy.health - (amount - blocked));
   note(r, `${amount - blocked} damage dealt${blocked ? ` · ${blocked} blocked` : ''}.`);
 }
+/** Whether the keeper carries every relic of a set. */
+export const hasSet = (r: Pick<Run, 'relics' | 'ruleset'>, id: SetId) =>
+  r.ruleset === 3 && RELIC_SETS[id].relics.every((relic) => r.relics.includes(relic));
 /** Ruleset 3: wear poise down; at zero the enemy is staggered and its poise hardens. */
 function wear(r: Run, amount: number) {
   const e = r.enemy!;
@@ -640,6 +645,7 @@ function wear(r: Run, amount: number) {
   r.stats!.staggers++;
   note(r, `${e.name} is staggered: it loses its next action and takes more damage.`);
   if (r.talents.includes('breaker')) gainFocus(r, 2);
+  if (hasSet(r, 'kit')) gainFocus(r, 1);
 }
 /**
  * What a hit of this base damage becomes against the current enemy, before its guard:
@@ -939,7 +945,8 @@ function combat3(
   if (e.poison > 0) {
     note(r, `Poison deals ${e.poison} damage.`);
     e.health = Math.max(0, e.health - e.poison);
-    e.poison -= 1;
+    // The night garden: poison fades only on odd turns.
+    if (!hasSet(r, 'garden') || r.turn % 2 === 1) e.poison -= 1;
     if (e.health <= 0) {
       victory(r);
       return r;
@@ -971,6 +978,7 @@ function combat3(
         note(r, 'A perfect guard.');
         if (r.relics.includes('whetstone')) r.charge = true;
         if (r.talents.includes('longsight')) gainFocus(r, 1);
+        if (hasSet(r, 'watch')) heal(r, 2);
         if (r.relics.includes('mirror')) e.health = Math.max(0, e.health - Math.floor(blocked / 2));
         wear(r, omenOf(r) === 'bells' ? Math.ceil(blocked * 1.25) : blocked);
       }
@@ -1082,7 +1090,13 @@ export function transition(run: Run, action: Action): Run {
       }
     } else {
       r.phase = node.kind as 'event' | 'camp' | 'shop';
-      if (v3 && node.kind === 'shop') r.shop = drawRelics(r, 'shop', 3, 6000 + r.depth * 17);
+      if (v3 && node.kind === 'shop') {
+        r.shop = drawRelics(r, 'shop', 3, 6000 + r.depth * 17);
+        if (hasSet(r, 'purse') && r.flasks < 5) {
+          r.flasks++;
+          note(r, 'The pilgrim’s purse: the trader presses a flask into your hand.');
+        }
+      }
     }
     return r;
   }

@@ -12,6 +12,7 @@ House rules for every item: the engine in `src/game/` is pure and deterministic 
 
 ## Shipped in v0.10
 
+- **Relic sets** (item 4): four sets with one bonus each.
 - **Free order within a realm** (item 1 below) and **guarded troves** (item 2), both on Atlas charts begun from v0.10. See RULES.md, “Free order and guarded troves”.
 - **Omens** (item 3 below): a seeded almanac names an omen every three days from day 4. See RULES.md, “Omens”.
 
@@ -38,7 +39,7 @@ House rules for every item: the engine in `src/game/` is pure and deterministic 
 **Where.** new `src/game/omens.ts`, hooks in `engine.ts`/`atlas.ts`, day bar in `Atlas.tsx`, scout and combat chips.
 **Done when.** Each omen has a unit test proving its one effect and its absence a day later; the same seed gives the same almanac.
 
-### 4. Relic sets · Build, then Lead for balance
+### 4. ✓ Relic sets · Build, then Lead for balance (shipped v0.10)
 
 **Why.** Combination artifacts turn single finds into a hunt.
 **What.** Four sets of three existing relics; carrying all three adds one bonus line, shown on each member's card (“2 of 3 · The Bell-ringer's kit”). Proposed: _Bell-ringer's kit_ (clapper, chime, echo): breaking poise restores 1 focus. _The long watch_ (buckle, psalm, mirror): perfect guards heal 2. _Night garden_ (censer, gravebloom, briar): poison fades every second turn. _Pilgrim's purse_ (ferrycoin, scale, thread): +1 flask at every trader visit. Re-run `npm run balance` and the scripted-player sim; adjust numbers if Dusk 0 novice win rates move more than five points.

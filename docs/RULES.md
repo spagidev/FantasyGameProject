@@ -100,6 +100,10 @@ On Atlas charts that count days, the almanac names an omen. It is a pure functio
 - **Clear bells:** perfect guards wear 25% more poise (rounded up).
 - **Kind weather:** resting by the wagon fire restores 12 instead of 8.
 
+### Relic sets (v0.10)
+
+Four sets of three existing relics. Carrying all three of a set adds one rule (ruleset 3 only): **The bell-ringer’s kit** (Bell Clapper, Executioner’s Chime, Echo Bell) — every stagger also gives 1 focus. **The long watch** (Oathkeeper’s Buckle, Iron Psalm, Shard of the March) — every perfect guard restores 2 health. **The night garden** (Nightshade Censer, Gravebloom, Briar Charm) — poison fades only on odd turns. **The pilgrim’s purse** (Ferryman’s Coin, Trader’s Scale, Pilgrim’s Thread) — entering a trader gives one flask (up to five). Relic cards show each relic's set and how many of it are carried.
+
 ### Records
 
 `src/game/meta.ts`. Score = 10 per crossing + 150 per bell + 40 per elite + 5 per stagger + 3 per perfect guard + 100 for naming an Atlas city + (on completion) 300 and 2 per remaining health, all multiplied by `1 + 0.2 × dusk`. Deeds are judged on every saved step; twelve of them add one relic each to the pool of future expeditions. Records never change a keeper’s starting statistics. Unreadable records in a journal are dropped without rejecting the journal.

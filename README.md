@@ -48,6 +48,8 @@ The list above describes the first two rulesets. In combat your action resolves 
 
 - **Any order within a realm.** On the Lost Atlas the three encounters of a realm can be taken in any order; the bell guardian waits for all three. With lamp oil and the wagon, the order is a route to plan.
 - **Guarded troves.** The arena, the spring and the hidden hearth are now guarded. Scout the guardian, then decide: an optional fight for the old gift and a choice of three rare relics. Leave it for later and something stronger stands guard.
+- **Omens.** From day 4 the almanac turns every three days: Moth-light, Hoarfrost, Fair days, Long shadows, Clear bells or Kind weather, each one visible rule.
+- **Relic sets.** Four sets of three relics; carry all three for one more rule. Cards show how many of a set you carry.
 
 ## The Hearth-wagon and the Provinces · v0.9
 

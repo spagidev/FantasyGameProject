@@ -1,4 +1,18 @@
-# Emberwake · Hearth-wagon and provinces checkpoint (v0.9.0)
+# Emberwake · Free roads checkpoint (v0.10.0)
+
+## v0.10
+
+Backlog items 1–4 shipped (see `docs/BACKLOG.md`, RULES.md sections “Free order and guarded troves”, “Omens”, “Relic sets”).
+
+- **Free order:** `atlas.done`, `freeOrder`, `encounterState`, `atlasObjectives`, `siteAt` in `src/game/atlas.ts`; `travel` sets `depth` to the site's own depth; `validFreeOrder` in `storage.ts` replays `done`. Use `encountersEntered`/`encountersWon` (path-based) for counts and `realmOf(run)` for the current realm — never `depth + 1` arithmetic.
+- **Troves:** `TROVES`, `isTrove`, `grantGift` (atlas.ts); `troveGuard`, action `atlas-challenge`, `run.side` (engine.ts). A trove fight never advances `depth`/`path` and never offers a lesson.
+- **Omens:** `src/game/omens.ts` (`omenAt(seed, day)`, `omenOf(run)`); Long shadows works through `roadCost(run, metres)`, which the interface and test player also use.
+- **Relic sets:** `RELIC_SETS`, `setOf` (data.ts), `hasSet` (engine.ts). Default relic pool cannot complete any set; they appear as deeds unlock relics.
+- Omens were built by a mid-tier subagent from the backlog spec and reviewed; Long shadows was redesigned after review because a dawn-oil cut was clamped away on almost every chart.
+
+---
+
+# Earlier checkpoint · Hearth-wagon and provinces (v0.9.0)
 
 ## Round three (v0.9)
 
