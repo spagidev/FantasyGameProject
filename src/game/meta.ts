@@ -72,16 +72,31 @@ export function scoreOf(run: Run): { total: number; lines: ScoreLine[]; multipli
   const crossed = Math.max(0, run.phase === 'lost' ? run.depth : run.depth + 1);
   const stats = run.stats;
   const lines: ScoreLine[] = [
-    { label: `${crossed} crossings`, value: crossed * 10 },
+    { label: `${crossed} ${crossed === 1 ? 'encounter' : 'encounters'} won`, value: crossed * 10 },
     { label: `${run.bells} bells awakened`, value: run.bells * 150 },
     ...(stats?.elites
-      ? [{ label: `${stats.elites} elites defeated`, value: stats.elites * 40 }]
+      ? [
+          {
+            label: `${stats.elites} ${stats.elites === 1 ? 'elite' : 'elites'} defeated`,
+            value: stats.elites * 40,
+          },
+        ]
       : []),
     ...(stats?.staggers
-      ? [{ label: `${stats.staggers} staggers`, value: stats.staggers * 5 }]
+      ? [
+          {
+            label: `${stats.staggers} ${stats.staggers === 1 ? 'stagger' : 'staggers'}`,
+            value: stats.staggers * 5,
+          },
+        ]
       : []),
     ...(stats?.parries
-      ? [{ label: `${stats.parries} perfect guards`, value: stats.parries * 3 }]
+      ? [
+          {
+            label: `${stats.parries} ${stats.parries === 1 ? 'perfect guard' : 'perfect guards'}`,
+            value: stats.parries * 3,
+          },
+        ]
       : []),
     ...(run.atlas?.recognized ? [{ label: 'The city named', value: 100 }] : []),
     ...(won && run.atlas?.day !== undefined && run.atlas.day < 12

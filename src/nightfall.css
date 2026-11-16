@@ -1068,15 +1068,15 @@
   line-height: 0;
 }
 .foe-card .enemy-portrait {
-  width: 52px;
-  height: 60px;
+  width: 64px;
+  height: 80px;
   border: 1px solid #a9b39a;
   border-radius: 50% 50% 4px 4px;
   mask-image: none;
 }
 .foe-card.is-done h2,
 .foe-card.is-done > p {
-  padding-right: 62px;
+  padding-right: 74px;
 }
 .foe-pattern {
   padding-top: 6px;
@@ -1339,4 +1339,35 @@
   .victory-beat {
     animation: none;
   }
+}
+
+/* v0.8 · fitting the delivered illustrations. */
+.guardian-stop .map-node > .site-art {
+  transform: rotate(-45deg);
+}
+.map-node > .site-art {
+  filter: drop-shadow(0 1px 2px #0a1f1f88);
+}
+.relic-large:has(.relic-art) {
+  background: radial-gradient(#f4ecd4, #dfe2c9);
+}
+.relic-large > .relic-art {
+  width: 82%;
+  height: 82%;
+}
+@media (min-width: 941px) {
+  .relic-large:has(.relic-art) {
+    width: 84px;
+    height: 84px;
+    margin-bottom: 12px;
+  }
+}
+.scene-content:has(> .scene-art) > .scene-sigil {
+  display: none;
+}
+.inventory-relic > .relic-art {
+  margin-top: 1px;
+}
+.codex-card > .relic-art {
+  align-self: flex-start;
 }

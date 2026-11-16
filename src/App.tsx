@@ -1305,7 +1305,13 @@ function Ending({
               ? 'THE LAST BELL RINGS'
               : run.atlas
                 ? 'THE LOST ATLAS · COMPLETE'
-                : 'THE FIRST CROSSING · COMPLETE'}
+                : run.daily
+                  ? `TODAY’S ROAD · ${run.daily} · COMPLETE`
+                  : run.ruleset === 3
+                    ? `THE LONG NIGHT · DUSK ${run.dusk ?? 0} · COMPLETE`
+                    : run.ruleset === 2
+                      ? 'ROADS REKINDLED · COMPLETE'
+                      : 'THE FIRST CROSSING · COMPLETE'}
         </span>
         <h2>
           {lost
@@ -1360,8 +1366,8 @@ function Ending({
                 <span>Relics carried</span>
               </div>
               <div>
-                <strong>{run.depth + 1}/12</strong>
-                <span>Roads crossed</span>
+                <strong>{Math.max(0, lost ? run.depth : run.depth + 1)}/12</strong>
+                <span>Encounters won</span>
               </div>
             </div>
             <ScoreCard run={run} meta={meta} earned={earned} previousBest={previousBest} />
