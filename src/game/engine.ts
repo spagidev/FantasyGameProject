@@ -16,6 +16,7 @@ import {
 } from './atlas';
 import { BOSSES, ELITES, FOES, ORDINARY, type Foe, type Traits } from './bestiary';
 import { VOICES } from './lore';
+import { omenOf } from './omens';
 import {
   CHAPTERS,
   EVENTS,
@@ -485,7 +486,8 @@ export function startingFocus(r: Run) {
       roadBenefits(r).focus +
       (r.ruleset === 3 && r.keeper === 'seer' ? 1 : 0) +
       (r.talents.includes('astral') ? 1 : 0) +
-      (r.relics.includes('vigil') ? 1 : 0),
+      (r.relics.includes('vigil') ? 1 : 0) +
+      (omenOf(r) === 'moth' ? 1 : 0),
   );
 }
 /** Attack as it stands right now, including conditional relics. */
@@ -596,9 +598,10 @@ export function priceOf(run: Run, item: ShopItem): number {
       ? BASE_PRICES[item]
       : RELIC_PRICES[RELICS[item].rarity];
   if (run.ruleset < 3) return base;
-  return Math.ceil(
+  const price = Math.ceil(
     base * ((run.dusk ?? 0) >= 7 ? 1.2 : 1) * (run.relics.includes('scale') ? 0.75 : 1),
   );
+  return omenOf(run) === 'fair' ? Math.ceil(price * 0.8) : price;
 }
 export function canBuy(run: Run, item: ShopItem): boolean {
   if (run.phase !== 'shop' || run.purchased.includes(item) || run.coins < priceOf(run, item))
@@ -704,6 +707,10 @@ export function drawRelics(
     picked.push(...pool.splice(index, 1));
   }
   return picked;
+}
+/** Hoarfrost: the keeper begins the battle with 1 frost, unless a sprig already forbids it. */
+function omenFrost(r: Run) {
+  if (r.ruleset === 3 && omenOf(r) === 'hoarfrost' && !r.relics.includes('sprig')) r.frost = 1;
 }
 function clearBattle(r: Run) {
   r.guard = 0;
@@ -965,7 +972,7 @@ function combat3(
         if (r.relics.includes('whetstone')) r.charge = true;
         if (r.talents.includes('longsight')) gainFocus(r, 1);
         if (r.relics.includes('mirror')) e.health = Math.max(0, e.health - Math.floor(blocked / 2));
-        wear(r, blocked);
+        wear(r, omenOf(r) === 'bells' ? Math.ceil(blocked * 1.25) : blocked);
       }
       if (taken > 0 && r.relics.includes('thornmail')) e.health = Math.max(0, e.health - 4);
     }
@@ -1034,6 +1041,7 @@ export function transition(run: Run, action: Action): Run {
     r.enemy = makeEnemy(guard, 3, r.dusk ?? 0, nightsOf(r));
     r.turn = 0;
     clearBattle(r);
+    omenFrost(r);
     r.focus = startingFocus(r);
     r.phase = 'combat';
     r.log = [`${guard.name} guards ${atlasSite(r.side, r.atlas).name}.`];
@@ -1061,6 +1069,7 @@ export function transition(run: Run, action: Action): Run {
       r.enemy = makeEnemy(node, r.ruleset, r.dusk ?? 0, nightsOf(r));
       r.turn = 0;
       clearBattle(r);
+      omenFrost(r);
       r.focus = startingFocus(r);
       r.phase = 'combat';
       r.log = [

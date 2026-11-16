@@ -4,6 +4,7 @@ import {
   FINDS,
   atlasFinds,
   atlasRoute,
+  roadCost,
   travels,
   atlasGeography,
   atlasSites,
@@ -33,6 +34,7 @@ import {
   type MapNode,
 } from '../game/engine';
 import { SITE_ART, WORK_ART } from '../artwork';
+import { omenOf, OMENS } from '../game/omens';
 import { Modal } from './Modal';
 import { SceneArt } from './Art';
 import { provinceOfKraj } from '../atlas/provinces';
@@ -217,6 +219,7 @@ export function AtlasMap({
   const [selected, setSelected] = useState(state.position);
   const [zoom, setZoom] = useState(true);
   const [evening, setEvening] = useState(false);
+  const [omenOpen, setOmenOpen] = useState(false);
   const uid = useId().replace(/:/g, '');
   useEffect(() => setSelected(state.position), [state.position]);
   const site = atlasSite(selected, state);
@@ -245,12 +248,13 @@ export function AtlasMap({
   if (route) {
     let left = reach;
     for (const i of route.edges) {
-      if (pack.edges[i].metres > left) break;
-      left -= pack.edges[i].metres;
+      const cost = roadCost(run!, pack.edges[i].metres);
+      if (cost > left) break;
+      left -= cost;
       affordable++;
     }
   }
-  const stranded = days && movable && neighbours.every((n) => n.metres > reach);
+  const stranded = days && movable && neighbours.every((n) => roadCost(run!, n.metres) > reach);
   const finds = run && days ? atlasFinds(run.seed, state) : [];
   const pinArt = (s: (typeof sites)[number]) => {
     if (s.depth === undefined) return SITE_ART[s.kind === 'cache' ? 'chest' : s.kind];
@@ -312,8 +316,21 @@ export function AtlasMap({
         </p>
       )}
       {days && run && (
-        <div className={`atlas-day ${stranded ? 'is-stranded' : ''}`}>
+        <div
+          className={`atlas-day ${stranded ? 'is-stranded' : ''} ${omenOf(run) ? 'has-omen' : ''}`}
+        >
           <strong>Day {state.day}</strong>
+          {omenOf(run) && (
+            <button
+              type="button"
+              className="omen-chip"
+              title={OMENS[omenOf(run)!].rule}
+              aria-expanded={omenOpen}
+              onClick={() => setOmenOpen((o) => !o)}
+            >
+              {OMENS[omenOf(run)!].name}
+            </button>
+          )}
           <div
             className="oil-meter"
             role="meter"
@@ -338,6 +355,12 @@ export function AtlasMap({
             Make camp
           </button>
         </div>
+      )}
+      {days && run && omenOf(run) && omenOpen && (
+        <p className="omen-line" role="status">
+          <b>{OMENS[omenOf(run)!].name}.</b> {OMENS[omenOf(run)!].rule}{' '}
+          <i>{OMENS[omenOf(run)!].flavor}</i>
+        </p>
       )}
       {days && run && <WagonSummary run={run} />}
       {evening && run && dispatch && (
@@ -790,7 +813,7 @@ export function AtlasMap({
                   <button
                     data-destination={n.id}
                     key={n.id}
-                    disabled={n.metres > reach}
+                    disabled={roadCost(run!, n.metres) > reach}
                     onClick={() => dispatch?.({ type: 'atlas-move', to: n.id })}
                   >
                     <Icon name="compass" size={17} />
@@ -801,7 +824,7 @@ export function AtlasMap({
                       <small>
                         {bearing(state.position, n.id, state)} · {metres(n.metres)} ·{' '}
                         {walkingTime(n.metres)}
-                        {n.metres > reach
+                        {roadCost(run!, n.metres) > reach
                           ? ' · needs a new day'
                           : state.roads.includes(n.index)
                             ? ' · walked'

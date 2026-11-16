@@ -89,6 +89,17 @@ On Atlas charts begun from v0.10 the three encounters of a realm may be entered 
 
 On those charts the three side sites are **guarded troves**. A trove cannot be gathered; from its site the keeper may _challenge_ its guardian, an ordinary enemy of the realm reached so far (scoutable; toughened by nights like any enemy). Winning grants the site's old gift (18 coins; a flask; 12 health and +1 attack) and a choice of three relics drawn with elite weights, or 12 health. A trove fight does not advance the road, pays no battle coins, frees no waylight and never offers a lesson. Losing it ends the expedition like any fight.
 
+### Omens (v0.10)
+
+On Atlas charts that count days, the almanac names an omen. It is a pure function of the run's seed and the day: days 1–3 have none; from day 4 the omen changes every three days (days 4–6, 7–9, 10–12, …). Each period's omen is drawn with `hash(seed, 6100 + period)` over the six omens and never repeats the previous period's (if the draw matches, the next omen in the list is taken). The dawn message announces a new omen on the first day of its period. Effects use the current day; the dawn effect uses the new day, and resting uses the evening's day. Charts without days and earlier rulesets are unaffected, and no save data changes.
+
+- **Moth-light:** battles start with 1 extra focus (still capped at 5).
+- **Hoarfrost:** when a battle begins, the keeper has 1 frost (the Sprig of Thaw still prevents it).
+- **Fair days:** trader prices are 20% lower (rounded up, after every other modifier).
+- **Long shadows:** walking a road costs 15% more lamp oil, rounded up, but never more than a full day's oil, so a fresh day can always walk any single road.
+- **Clear bells:** perfect guards wear 25% more poise (rounded up).
+- **Kind weather:** resting by the wagon fire restores 12 instead of 8.
+
 ### Records
 
 `src/game/meta.ts`. Score = 10 per crossing + 150 per bell + 40 per elite + 5 per stagger + 3 per perfect guard + 100 for naming an Atlas city + (on completion) 300 and 2 per remaining health, all multiplied by `1 + 0.2 × dusk`. Deeds are judged on every saved step; twelve of them add one relic each to the pool of future expeditions. Records never change a keeper’s starting statistics. Unreadable records in a journal are dropped without rejecting the journal.

@@ -2,6 +2,7 @@ import { normalizePlace } from '../atlas/regions';
 import { validRegionalChart, type Geography, type RegionalChart } from '../atlas/types';
 import geography from './atlas-geography.json' with { type: 'json' };
 import type { Run } from './engine';
+import { OMENS, omenAt, omenBegins } from './omens';
 
 export type Point = [number, number];
 export type AtlasSite = {
@@ -268,6 +269,8 @@ export const WORKS: Record<WorkId, { name: string; cost: number; effect: string;
     },
   };
 export const REST_HEALING = 8;
+/** Resting under the Kind weather omen. */
+export const KIND_HEALING = 12;
 export const worksOf = (a?: AtlasState): WorkId[] => a?.works ?? [];
 /** Nights that count toward the gathering dark. */
 export const darkNights = (a?: AtlasState) => {
@@ -336,7 +339,6 @@ function distances(state: AtlasState, from: string, allowed?: (index: number) =>
  * less than the longest single road, so a fresh day can always walk any one stretch.
  */
 export function dayRange(state: AtlasState): number {
-  const pack = atlasGeography(state);
   const stops = [
     'origin',
     ...ATLAS_SITES.filter((s) => s.depth !== undefined)
@@ -345,8 +347,20 @@ export function dayRange(state: AtlasState): number {
   ];
   let road = 0;
   for (let i = 1; i < stops.length; i++) road += distances(state, stops[i - 1]).cost[stops[i]] ?? 0;
-  const longest = Math.max(...pack.edges.map((e) => e.metres));
-  return Math.ceil(Math.max(longest, road / 7) / 100) * 100;
+  return Math.ceil(Math.max(longestRoad(state), road / 7) / 100) * 100;
+}
+/** The longest single road on the chart, in metres. */
+function longestRoad(state: AtlasState): number {
+  return Math.max(...atlasGeography(state).edges.map((e) => e.metres));
+}
+/**
+ * Lamp oil a road of this length costs today: its length, or 15% more under Long shadows,
+ * but never more than a full day, so a fresh day can always walk any single road.
+ */
+export function roadCost(run: Pick<Run, 'seed' | 'atlas'>, metres: number): number {
+  const a = run.atlas;
+  if (!a || a.day === undefined || omenAt(run.seed, a.day) !== 'shadows') return metres;
+  return Math.min(a.range!, Math.ceil(metres * 1.15));
 }
 /** Whether this chart uses days and lamp oil. */
 export const travels = (
@@ -509,8 +523,9 @@ export function applyAtlasAction(run: Run, action: AtlasAction): Run {
   let message = '';
   const step = (to: string): boolean => {
     const edge = atlasNeighbours(a).find((e) => e.id === to);
-    if (!edge || (travels(a) && a.oil < edge.metres)) return false;
-    if (travels(a)) a.oil -= edge.metres;
+    const cost = edge ? roadCost(r, edge.metres) : 0;
+    if (!edge || (travels(a) && a.oil < cost)) return false;
+    if (travels(a)) a.oil -= cost;
     a.position = to;
     a.steps++;
     if (!a.visited.includes(to)) a.visited.push(to);
@@ -550,7 +565,8 @@ export function applyAtlasAction(run: Run, action: AtlasAction): Run {
       if (action.work === 'rack') a.range = Math.round((a.range * 1.25) / 100) * 100;
       evening = `You build ${work.name.toLowerCase()} onto the wagon.`;
     } else {
-      r.health = Math.min(r.maxHealth, r.health + REST_HEALING);
+      const kind = omenAt(r.seed, a.day) === 'kind';
+      r.health = Math.min(r.maxHealth, r.health + (kind ? KIND_HEALING : REST_HEALING));
       evening = 'You rest by the wagon’s fire.';
     }
     // Dawn.
@@ -573,6 +589,11 @@ export function applyAtlasAction(run: Run, action: AtlasAction): Run {
     message = `${evening} Day ${a.day} dawns${
       gifts.length ? ` with ${gifts.join(', ')}` : ''
     }. The dark has gathered a little.`;
+    const omen = omenAt(r.seed, a.day);
+    if (omen && omenBegins(a.day))
+      message += ` The almanac turns: ${OMENS[omen].name} — ${OMENS[omen].rule
+        .charAt(0)
+        .toLowerCase()}${OMENS[omen].rule.slice(1)}`;
   } else if (action.type === 'atlas-collect') {
     const site = atlasSite(a.position, a);
     // On free-order charts the troves are guarded: they are won in a fight, not picked up.

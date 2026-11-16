@@ -189,3 +189,55 @@
     animation: none;
   }
 }
+
+/* Omens (v0.10): the almanac chip in the day bar and the combat chip. */
+.omen-chip {
+  justify-self: start;
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid #7a5d1c;
+  border-radius: 999px;
+  background: #f6e7bd;
+  color: #4a3608;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.omen-chip:focus-visible {
+  outline: 2px solid #234634;
+  outline-offset: 2px;
+}
+.omen-line {
+  margin: 0;
+  padding: 8px 20px;
+  border-bottom: 1px solid #c9cabb;
+  background: #f8f1da;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #3d4a38;
+}
+.omen-line b {
+  color: #2f4a33;
+}
+.chips > .chip.omen {
+  border-color: #e8c66a;
+  color: #f4e2ac;
+}
+.atlas-day.has-omen {
+  grid-template-columns: auto auto minmax(80px, 1fr) auto auto;
+}
+@media (max-width: 740px) {
+  .atlas-day.has-omen {
+    grid-template-columns: auto auto 1fr auto;
+  }
+  .atlas-day.has-omen > span {
+    grid-column: 1 / 4;
+  }
+  .atlas-day.has-omen .secondary-button {
+    grid-column: 4;
+  }
+  .omen-line {
+    padding: 8px 14px;
+  }
+}

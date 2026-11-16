@@ -13,6 +13,7 @@ House rules for every item: the engine in `src/game/` is pure and deterministic 
 ## Shipped in v0.10
 
 - **Free order within a realm** (item 1 below) and **guarded troves** (item 2), both on Atlas charts begun from v0.10. See RULES.md, “Free order and guarded troves”.
+- **Omens** (item 3 below): a seeded almanac names an omen every three days from day 4. See RULES.md, “Omens”.
 
 ## Next
 
@@ -30,7 +31,7 @@ House rules for every item: the engine in `src/game/` is pure and deterministic 
 **Where.** `engine.ts`, `atlas.ts`, `Atlas.tsx`, `Strategy.tsx` (scout), tests.
 **Done when.** A trove can be scouted, fought and looted once; skipping all three still wins; validation rejects a side fight with no site.
 
-### 3. Omens · Build
+### 3. ✓ Omens · Build (shipped v0.10)
 
 **Why.** Heroes' “week of…” makes the calendar itself an event; days exist on the Atlas now.
 **What.** Every third dawn (days 4, 7, 10…) the almanac names a seeded omen that lasts three days, announced in the dawn message and shown in the day bar. Six omens, each one visible rule: _Moth-light_ (+1 starting focus), _Hoarfrost_ (enemies' first hit adds 1 frost), _Fair days_ (trader prices −20%), _Long shadows_ (lamp oil −15% at dawn), _Clear bells_ (perfect guards wear 25% more poise), _Kind weather_ (resting heals 12). Pure functions `omenAt(seed, day)` and hooks at the six places named.

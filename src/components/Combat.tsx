@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { describeTraits } from '../game/bestiary';
 import { KEEPERS, NODE_LABELS, type Intent } from '../game/data';
 import { VOICES } from '../game/lore';
+import { omenOf, OMENS } from '../game/omens';
 import {
   realmOf,
   effectiveHit,
@@ -322,6 +323,14 @@ export function Combat({
                   <Chip tone="good" text="Your next Strike deals 6 more" explain={setExplain}>
                     Sharpened
                   </Chip>
+                )}
+                {(['moth', 'hoarfrost', 'bells'] as const).map(
+                  (id) =>
+                    omenOf(run) === id && (
+                      <Chip key={id} tone="omen" text={OMENS[id].rule} explain={setExplain}>
+                        {OMENS[id].name}
+                      </Chip>
+                    ),
                 )}
               </div>
             </div>
