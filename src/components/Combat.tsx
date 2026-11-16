@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { describeTraits } from '../game/bestiary';
-import { KEEPERS, NODE_LABELS, type Intent } from '../game/data';
+import { KEEPERS, type Intent } from '../game/data';
 import { VOICES } from '../game/lore';
 import { omenOf, OMENS } from '../game/omens';
 import {
@@ -28,6 +28,8 @@ import {
 import { EnemyPortrait, KeeperPortrait, Landscape } from './Art';
 import { Icon, type IconName } from './Icon';
 import { play } from '../sound';
+import { en, type Dict } from '../i18n/en';
+import { useT } from '../i18n';
 
 type CombatAction = 'strike' | 'guard' | 'skill' | 'technique' | 'flask';
 /** Keys 1–5 in ruleset 3; the first two rulesets keep their original 1–4. */
@@ -38,14 +40,15 @@ export function combatKeys(run: Run): CombatAction[] {
 }
 
 /** Everything an intention does besides its damage, in the order the engine applies it. */
-export function intentEffects(intent: Intent): string[] {
+export function intentEffects(intent: Intent, t: Dict = en): string[] {
+  const c = t.combat;
   return [
-    ...(intent.guard ? [`+${intent.guard} guard`] : []),
-    ...(intent.heal ? [`restores ${intent.heal}`] : []),
-    ...(intent.fury ? [`+${intent.fury} fury`] : []),
-    ...(intent.drain ? [`drains ${intent.drain} focus`] : []),
-    ...(intent.weak ? [`weakens ${intent.weak}`] : []),
-    ...(intent.frost ? [`frost ${intent.frost}`] : []),
+    ...(intent.guard ? [c.effGuard(intent.guard)] : []),
+    ...(intent.heal ? [c.effHeal(intent.heal)] : []),
+    ...(intent.fury ? [c.effFury(intent.fury)] : []),
+    ...(intent.drain ? [c.effDrain(intent.drain)] : []),
+    ...(intent.weak ? [c.effWeak(intent.weak)] : []),
+    ...(intent.frost ? [c.effFrost(intent.frost)] : []),
   ];
 }
 export function intentIcon(intent: Intent): IconName {
@@ -92,19 +95,16 @@ function Chip({
 type Floater = { id: number; side: 'enemy' | 'hero'; text: string; tone: string };
 
 /** One sentence of guidance for a keeper's very first fights, chosen from the situation. */
-function coaching(run: Run): string {
+function coaching(run: Run, t: Dict): string {
+  const c = t.combat;
   const e = run.enemy!;
   const incoming = incomingDamage(run);
-  if (e.stagger === 2)
-    return 'It is staggered: its action is lost and your hits deal +50%. This is the moment for your strongest blow.';
-  if (e.stagger === 1) return 'Still reeling: your hits deal +50% until it acts again.';
-  if (incoming >= guardAmount(run))
-    return `A heavy blow is coming. Guard absorbs ${guardAmount(run)} of it — or break its poise first and the blow never lands.`;
-  if (incoming > 0 && incoming <= guardAmount(run) && e.poise! <= incoming)
-    return 'Guard this whole blow and the perfect guard will break its poise.';
-  if (!intentFor(run)!.damage)
-    return 'It is not attacking this turn. A free turn to strike, or to drink a flask safely.';
-  return `Read the line under each action: it is exactly what will happen. Poise ${e.poise}: wear it to zero to stagger.`;
+  if (e.stagger === 2) return c.coachStaggered;
+  if (e.stagger === 1) return c.coachReeling;
+  if (incoming >= guardAmount(run)) return c.coachHeavy(guardAmount(run));
+  if (incoming > 0 && incoming <= guardAmount(run) && e.poise! <= incoming) return c.coachPerfect;
+  if (!intentFor(run)!.damage) return c.coachFree;
+  return c.coachRead(e.poise);
 }
 
 export function Combat({
@@ -116,6 +116,8 @@ export function Combat({
   dispatch: (a: Action) => void;
   coach?: boolean;
 }) {
+  const t = useT();
+  const c = t.combat;
   const k = KEEPERS[run.keeper];
   const e = run.enemy!;
   const v3 = run.ruleset === 3;
@@ -149,14 +151,14 @@ export function Combat({
     if (dealt > 0) add('enemy', `−${dealt}`, 'damage');
     if (dealt < 0) add('enemy', `+${-dealt}`, 'heal');
     if ((run.stats?.staggers ?? 0) > (before.stats?.staggers ?? 0))
-      add('enemy', 'Staggered', 'call');
+      add('enemy', c.floatStaggered, 'call');
     if (e.phase === 2 && before.enemy.phase === 1) add('enemy', e.phase2?.name ?? '', 'call');
     if (taken > 0) add('hero', `−${taken}`, 'damage');
     if (taken < 0) add('hero', `+${-taken}`, 'heal');
     if ((run.stats?.parries ?? 0) > (before.stats?.parries ?? 0))
-      add('hero', 'Perfect guard', 'call');
+      add('hero', c.floatPerfect, 'call');
     else if (taken === 0 && before.turn !== run.turn && incomingDamage(before) > 0 && !v3)
-      add('hero', 'Guarded', 'call');
+      add('hero', c.floatGuarded, 'call');
     if ((run.stats?.staggers ?? 0) > (before.stats?.staggers ?? 0)) play('stagger');
     else if ((run.stats?.parries ?? 0) > (before.stats?.parries ?? 0)) play('perfect');
     else if (taken > 0) play('hurt');
@@ -168,7 +170,7 @@ export function Combat({
     setPulse((p) => ({ enemy: p.enemy + (dealt > 0 ? 1 : 0), hero: p.hero + (taken > 0 ? 1 : 0) }));
     const timer = setTimeout(() => setFloaters([]), 1300);
     return () => clearTimeout(timer);
-  }, [run, e, v3]);
+  }, [run, e, v3, c]);
 
   const buttons: {
     type: CombatAction;
@@ -182,35 +184,38 @@ export function Combat({
     {
       type: 'strike',
       icon: 'sword',
-      title: 'Strike',
-      detail: `Deal ${effectiveHit(run, strike.damage)}${strike.hits > 1 ? ' × 2' : ''} damage`,
-      sub: `+${strikeFocus(run)} focus${strikeHealing(run) ? ` · heal ${strikeHealing(run)}` : ''}${
-        v3 && e.traits?.thorns ? ` · thorns ${e.traits.thorns}` : ''
+      title: c.strike,
+      detail: c.strikeDetail(effectiveHit(run, strike.damage), strike.hits > 1),
+      sub: `${c.plusFocus(strikeFocus(run))}${strikeHealing(run) ? c.healN(strikeHealing(run)) : ''}${
+        v3 && e.traits?.thorns ? c.thornsN(e.traits.thorns) : ''
       }`,
     },
     {
       type: 'guard',
       icon: 'shield',
-      title: 'Guard',
-      detail: `Block ${guardAmount(run)} damage`,
-      sub: `+2 focus${run.relics.includes('briar') ? ' · deal 3' : ''}${
-        run.relics.includes('censer') ? ' · 2 poison' : ''
+      title: c.guard,
+      detail: c.guardDetail(guardAmount(run)),
+      sub: `${c.plusFocus(2)}${run.relics.includes('briar') ? c.guardBriar : ''}${
+        run.relics.includes('censer') ? c.guardCenser : ''
       }`,
     },
     {
       type: 'skill',
       icon: run.keeper === 'wayfarer' ? 'leaf' : 'sparkles',
       title: k.skill,
-      detail: `Deal ${effectiveHit(run, skillDamage(run), run.keeper === 'seer')}${run.keeper === 'seer' ? ' piercing' : ''} damage`,
-      sub: `${skillCost(run)} focus${
+      detail: c.skillDetail(
+        effectiveHit(run, skillDamage(run), run.keeper === 'seer'),
+        run.keeper === 'seer',
+      ),
+      sub: `${c.focusCost(skillCost(run))}${
         run.keeper === 'wayfarer'
-          ? ` · +${poisonAmount(run)} poison`
+          ? c.plusPoison(poisonAmount(run))
           : run.keeper === 'warden'
-            ? ' · +5 guard'
-            : ' · ignores guard'
+            ? c.plusGuard5
+            : c.ignoresGuard
       }`,
       special: true,
-      reason: run.focus < skillCost(run) ? 'Not enough focus' : undefined,
+      reason: run.focus < skillCost(run) ? c.notEnoughFocus : undefined,
     },
     ...(v3
       ? [
@@ -224,16 +229,16 @@ export function Combat({
             title: k.technique,
             detail:
               run.keeper === 'warden'
-                ? `Deal ${effectiveHit(run, guardAmount(run))} damage`
+                ? c.techniqueDamage(effectiveHit(run, guardAmount(run)))
                 : run.keeper === 'seer'
-                  ? `Block all ${incoming} damage`
-                  : `Deal ${e.poison * 2} poison damage`,
-            sub: `${k.techniqueCost} focus${
+                  ? c.techniqueBlock(incoming)
+                  : c.techniquePoison(e.poison * 2),
+            sub: `${c.focusCost(k.techniqueCost)}${
               run.keeper === 'warden'
-                ? ' · double poise damage'
+                ? c.doublePoise
                 : run.keeper === 'seer'
-                  ? ' · always perfect'
-                  : ' · poison stays'
+                  ? c.alwaysPerfect
+                  : c.poisonStays
             }`,
             special: true,
             reason: blocked ?? undefined,
@@ -243,10 +248,10 @@ export function Combat({
     {
       type: 'flask',
       icon: 'flask',
-      title: 'Drink flask',
-      detail: `Restore ${flaskHealing(run)} health`,
-      sub: `${run.flasks} left${v3 ? ' · lifts frost and weakness' : ' · ends turn'}`,
-      reason: !run.flasks ? 'No flasks left' : undefined,
+      title: c.flask,
+      detail: c.flaskDetail(flaskHealing(run)),
+      sub: `${c.flasksLeft(run.flasks)}${v3 ? c.liftsFrost : c.endsTurn}`,
+      reason: !run.flasks ? c.noFlasks : undefined,
     },
   ];
 
@@ -263,19 +268,19 @@ export function Combat({
   );
 
   return (
-    <section className="duel" aria-label="Turn-based combat">
+    <section className="duel" aria-label={c.region}>
       <div className="duel-arena">
         <Landscape chapter={chapter} />
         <div className="duel-shade" />
         <header className="duel-top">
           <div>
             <span className="eyebrow">
-              {run.side ? 'TROVE GUARDIAN' : NODE_LABELS[nodeOf(run).kind].toUpperCase()}
+              {run.side ? c.troveGuardian : t.node[nodeOf(run).kind].toUpperCase()}
             </span>
             <h2>{e.name}</h2>
           </div>
           <span className="duel-turn">
-            TURN <b>{String(run.turn + 1).padStart(2, '0')}</b>
+            {c.turn} <b>{String(run.turn + 1).padStart(2, '0')}</b>
           </span>
         </header>
         <div className="duel-sides">
@@ -297,31 +302,27 @@ export function Combat({
                 <i style={{ width: `${(run.health / run.maxHealth) * 100}%` }} />
               </div>
               <div className="chips">
-                <Chip text="Reduces every hit you take" explain={setExplain}>
-                  <Icon name="shield" size={12} /> {run.armor} armor
+                <Chip text={c.armorChipText} explain={setExplain}>
+                  <Icon name="shield" size={12} /> {c.armorN(run.armor)}
                 </Chip>
                 {run.guard > 0 && (
-                  <Chip tone="good" text="Absorbs damage this turn" explain={setExplain}>
-                    {run.guard} guard
+                  <Chip tone="good" text={c.guardChipText} explain={setExplain}>
+                    {c.guardN(run.guard)}
                   </Chip>
                 )}
                 {!!run.weak && (
-                  <Chip tone="bad" text="Your hits deal 25% less" explain={setExplain}>
-                    Weakened {run.weak}
+                  <Chip tone="bad" text={c.weakenedText} explain={setExplain}>
+                    {c.weakened(run.weak)}
                   </Chip>
                 )}
                 {!!run.frost && (
-                  <Chip
-                    tone="bad"
-                    text="Costs this much health each enemy turn, then melts by 1"
-                    explain={setExplain}
-                  >
-                    Frost {run.frost}
+                  <Chip tone="bad" text={c.frostText} explain={setExplain}>
+                    {c.frostN(run.frost)}
                   </Chip>
                 )}
                 {run.charge && (
-                  <Chip tone="good" text="Your next Strike deals 6 more" explain={setExplain}>
-                    Sharpened
+                  <Chip tone="good" text={c.sharpenedText} explain={setExplain}>
+                    {c.sharpened}
                   </Chip>
                 )}
                 {(['moth', 'hoarfrost', 'bells'] as const).map(
@@ -353,7 +354,7 @@ export function Combat({
               <div
                 className="health-bar enemy-health"
                 role="meter"
-                aria-label="Enemy health"
+                aria-label={c.enemyHealth}
                 aria-valuenow={e.health}
                 aria-valuemin={0}
                 aria-valuemax={e.maxHealth}
@@ -364,36 +365,32 @@ export function Combat({
                 <div
                   className="poise"
                   role="meter"
-                  aria-label="Enemy poise"
+                  aria-label={c.enemyPoise}
                   aria-valuenow={e.stagger ? 0 : e.poise}
                   aria-valuemin={0}
                   aria-valuemax={e.maxPoise}
                 >
-                  <span>{e.stagger ? 'STAGGERED' : 'POISE'}</span>
+                  <span>{e.stagger ? c.staggeredLabel : c.poiseLabel}</span>
                   <div className="poise-bar">
                     <i style={{ width: `${e.stagger ? 0 : (e.poise! / e.maxPoise) * 100}%` }} />
                   </div>
-                  <b>{e.stagger ? `hits ×${staggerBonus(run)}` : e.poise}</b>
+                  <b>{e.stagger ? c.hitsX(staggerBonus(run)) : e.poise}</b>
                 </div>
               )}
               <div className="chips">
                 {e.guard > 0 && (
-                  <Chip text="Absorbs hit damage until broken" explain={setExplain}>
-                    <Icon name="shield" size={12} /> {e.guard} guard
+                  <Chip text={c.enemyGuardText} explain={setExplain}>
+                    <Icon name="shield" size={12} /> {c.guardN(e.guard).toLowerCase()}
                   </Chip>
                 )}
                 {e.poison > 0 && (
-                  <Chip
-                    tone="good"
-                    text="Deals this much after your action, then fades by 1"
-                    explain={setExplain}
-                  >
-                    <Icon name="leaf" size={12} /> {e.poison} poison
+                  <Chip tone="good" text={c.poisonText} explain={setExplain}>
+                    <Icon name="leaf" size={12} /> {c.poisonN(e.poison)}
                   </Chip>
                 )}
                 {!!e.fury && (
-                  <Chip tone="bad" text="Added to every hit it lands" explain={setExplain}>
-                    <Icon name="flame" size={12} /> {e.fury} fury
+                  <Chip tone="bad" text={c.furyText} explain={setExplain}>
+                    <Icon name="flame" size={12} /> {c.furyN(e.fury)}
                   </Chip>
                 )}
                 {traits.map((t) => (
@@ -423,70 +420,72 @@ export function Combat({
             <Icon name={intentIcon(intent)} size={20} />
           </span>
           <div className="intent-name">
-            <span className="eyebrow">
-              {skipped ? 'STAGGERED · THIS ACTION IS LOST' : 'ENEMY INTENT'}
-            </span>
+            <span className="eyebrow">{skipped ? c.staggeredSkip : c.enemyIntent}</span>
             <strong>{intent.name}</strong>
             {v3 && (
               <span className="intent-next">
-                Then: {upcoming.name}
+                {c.then}
+                {upcoming.name}
                 {upcoming.damage
-                  ? ` · ${hitDamage(run, upcoming)}${(upcoming.hits ?? 1) > 1 ? ` × ${upcoming.hits}` : ''} damage`
+                  ? c.damageN(
+                      `${hitDamage(run, upcoming)}${(upcoming.hits ?? 1) > 1 ? ` × ${upcoming.hits}` : ''}`,
+                    )
                   : ''}
-                {intentEffects(upcoming).length ? ` · ${intentEffects(upcoming).join(' · ')}` : ''}
+                {intentEffects(upcoming, t).length
+                  ? ` · ${intentEffects(upcoming, t).join(' · ')}`
+                  : ''}
               </span>
             )}
           </div>
           <p className="intent-value">
             {skipped ? (
               <>
-                <b>0</b> incoming
+                <b>0</b> {c.incoming}
               </>
             ) : intent.damage ? (
               <>
-                <b>{incoming}</b> incoming{' '}
+                <b>{incoming}</b> {c.incoming}{' '}
                 <small>
                   (
                   {hits > 1
-                    ? `${hits} hits of ${intent.damage + (e.fury ?? 0)}`
-                    : `${intent.damage + (e.fury ?? 0)} raw`}
-                  {' − '}
-                  {run.armor} armor{hits > 1 ? ' each' : ''})
+                    ? c.hitsOf(hits, intent.damage + (e.fury ?? 0))
+                    : c.raw(intent.damage + (e.fury ?? 0))}
+                  {c.armorSub(run.armor, hits > 1)})
                 </small>
               </>
             ) : intent.guard ? (
               <>
-                <b>+{intent.guard}</b> enemy guard
+                <b>+{intent.guard}</b> {c.enemyGuardInc}
               </>
             ) : intent.heal ? (
               <>
-                <b>+{intent.heal}</b> enemy health
+                <b>+{intent.heal}</b> {c.enemyHealthInc}
               </>
             ) : (
               <>
-                <b>+{intent.fury}</b> fury
+                <b>+{intent.fury}</b> {c.furyInc}
               </>
             )}
             {!skipped &&
-              intentEffects(intent)
+              intentEffects(intent, t)
                 .filter((_, i) => intent.damage > 0 || i > 0)
-                .map((text) => <small key={text}>Also {text}</small>)}
+                .map((text) => <small key={text}>{c.also(text)}</small>)}
           </p>
         </div>
       </div>
       {coach && run.ruleset === 3 && (
         <p className="duel-coach" role="note">
           <Icon name="flame" size={15} />
-          <span>{coaching(run)}</span>
+          <span>{coaching(run, t)}</span>
         </p>
       )}
       <div className="duel-controls">
         <div className="duel-controls-top">
           <span>
-            YOUR MOVE <small>No rush. The dark can wait.</small>
+            {c.yourMove} <small>{c.noRush}</small>
           </span>
-          <div className="focus-meter" aria-label={`Focus: ${run.focus} of 5`}>
-            <span>FOCUS</span>
+          <div className="focus-meter" aria-label={c.focusLabel(run.focus)}>
+            <span>{c.focus}</span>
             {[0, 1, 2, 3, 4].map((i) => (
               <i key={i} className={i < run.focus ? 'filled' : ''} />
             ))}
@@ -513,23 +512,23 @@ export function Combat({
                 <small>{b.sub}</small>
                 <em className="action-result">
                   {!result ? (
-                    (b.reason ?? 'Nothing to restore')
+                    (b.reason ?? c.nothingToRestore)
                   ) : result.kills ? (
-                    <b className="tag-good">Finishing blow</b>
+                    <b className="tag-good">{c.finishing}</b>
                   ) : (
                     <>
-                      {result.dealt > 0 && <span>Enemy −{result.dealt}</span>}
-                      {result.breaks && <b className="tag-good">Breaks poise</b>}
-                      {result.perfect && <b className="tag-good">Perfect guard</b>}
+                      {result.dealt > 0 && <span>{c.enemyMinus(result.dealt)}</span>}
+                      {result.breaks && <b className="tag-good">{c.breaksPoise}</b>}
+                      {result.perfect && <b className="tag-good">{c.perfectGuard}</b>}
                       {result.fatal ? (
-                        <b className="tag-bad">You would fall</b>
+                        <b className="tag-bad">{c.youFall}</b>
                       ) : (
                         <span className={result.taken > 0 ? 'cost' : ''}>
                           {result.taken > 0
-                            ? `You −${result.taken}`
+                            ? c.youMinus(result.taken)
                             : result.taken < 0
-                              ? `You +${-result.taken}`
-                              : 'You take 0'}
+                              ? c.youPlus(-result.taken)
+                              : c.youTake0}
                         </span>
                       )}
                     </>
@@ -541,9 +540,7 @@ export function Combat({
         </div>
         <p className="duel-footnote">
           <Icon name="info" size={12} />
-          {v3
-            ? 'Every action ends your turn; the last line of each is exactly what will happen. Break poise to cancel the enemy’s action. Guard a whole blow to wear its poise down.'
-            : 'Every action ends your turn. Guard lasts one enemy action. Poison bypasses guard.'}
+          {v3 ? c.footnoteV3 : c.footnoteOld}
         </p>
       </div>
     </section>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { useT } from '../i18n';
 import { Icon } from './Icon';
 
 export function Modal({
@@ -10,6 +11,7 @@ export function Modal({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const t = useT();
   const ref = useRef<HTMLDialogElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -38,10 +40,14 @@ export function Modal({
       }}
     >
       <div className="modal-inner">
-        <button className="icon-button modal-close" aria-label="Close dialog" onClick={onClose}>
+        <button
+          className="icon-button modal-close"
+          aria-label={t.common.closeDialog}
+          onClick={onClose}
+        >
           <Icon name="close" />
         </button>
-        <span className="eyebrow">THE KEEPER’S COMPANION</span>
+        <span className="eyebrow">{t.common.companion}</span>
         <h2 id="dialog-title">{title}</h2>
         {children}
       </div>

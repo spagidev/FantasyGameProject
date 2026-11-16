@@ -44,6 +44,10 @@ Browser tests use `/usr/bin/chromium` when present. On other machines, run `npx 
 
 The list above describes the first two rulesets. In combat your action resolves first, then poison, then the enemy's visible intention. **Guard lasts one enemy action. Flasks also end your turn.** Open “How to play” for the complete introduction.
 
+## Slovenčina · v0.12
+
+- **Interface language.** A footer switch (EN · SK) shows the interface in English or Slovenčina and remembers the choice in your profile. Navigation, combat, the Atlas day bar and wagon, rewards, shops, the Chronicle and the score card are translated (`src/i18n/`). Story, lore, names and rules text stay English until a native speaker has reviewed a literary translation.
+
 ## Boons, a handier map, and play anywhere · v0.11
 
 - **Province boons.** Recover a province's legend and its relic joins every later road: eight new relics, from a coronation offcut to the last lit window.

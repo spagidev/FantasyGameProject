@@ -1455,3 +1455,24 @@
   font-weight: 600;
   color: #2f6b3c;
 }
+
+/* v0.12 · interface language switch in the footer. */
+.lang-switch {
+  display: flex;
+  align-items: center;
+}
+.lang-switch i {
+  margin: 0 1px;
+}
+.lang-switch button {
+  justify-content: center;
+  min-width: 34px;
+  padding: 7px 6px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+.lang-switch button[aria-pressed='true'] {
+  color: #7a4712;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}

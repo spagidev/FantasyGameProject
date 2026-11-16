@@ -34,6 +34,8 @@ export type Meta = {
   sound: boolean;
   /** The atlas passport: every real place charted, keyed by its chart. */
   cities: Record<string, CityStamp>;
+  /** Interface language. Absent means English. */
+  lang?: 'en' | 'sk';
 };
 export type CityStamp = {
   /** The fantasy title of the chart. */
@@ -67,17 +69,32 @@ export function emptyMeta(): Meta {
 }
 
 export type ScoreLine = { label: string; value: number };
+/** `id` and `n` let the interface write each line in its own language; `label` is English. */
+export type ScorePart = { id: string; n?: number };
 /** A transparent score: every line is shown to the player on the ending screen. */
-export function scoreOf(run: Run): { total: number; lines: ScoreLine[]; multiplier: number } {
+export function scoreOf(run: Run): {
+  total: number;
+  lines: ScoreLine[];
+  /** Same order as `lines`. */
+  parts: ScorePart[];
+  multiplier: number;
+} {
   const won = run.phase === 'won' || run.phase === 'ending';
   const crossed = encountersWon(run);
   const stats = run.stats;
-  const lines: ScoreLine[] = [
-    { label: `${crossed} ${crossed === 1 ? 'encounter' : 'encounters'} won`, value: crossed * 10 },
-    { label: `${run.bells} bells awakened`, value: run.bells * 150 },
+  const entries: (ScoreLine & ScorePart)[] = [
+    {
+      id: 'encounters',
+      n: crossed,
+      label: `${crossed} ${crossed === 1 ? 'encounter' : 'encounters'} won`,
+      value: crossed * 10,
+    },
+    { id: 'bells', n: run.bells, label: `${run.bells} bells awakened`, value: run.bells * 150 },
     ...(stats?.elites
       ? [
           {
+            id: 'elites',
+            n: stats.elites,
             label: `${stats.elites} ${stats.elites === 1 ? 'elite' : 'elites'} defeated`,
             value: stats.elites * 40,
           },
@@ -86,6 +103,8 @@ export function scoreOf(run: Run): { total: number; lines: ScoreLine[]; multipli
     ...(stats?.staggers
       ? [
           {
+            id: 'staggers',
+            n: stats.staggers,
             label: `${stats.staggers} ${stats.staggers === 1 ? 'stagger' : 'staggers'}`,
             value: stats.staggers * 5,
           },
@@ -94,25 +113,41 @@ export function scoreOf(run: Run): { total: number; lines: ScoreLine[]; multipli
     ...(stats?.parries
       ? [
           {
+            id: 'parries',
+            n: stats.parries,
             label: `${stats.parries} ${stats.parries === 1 ? 'perfect guard' : 'perfect guards'}`,
             value: stats.parries * 3,
           },
         ]
       : []),
-    ...(run.atlas?.recognized ? [{ label: 'The city named', value: 100 }] : []),
+    ...(run.atlas?.recognized ? [{ id: 'named', label: 'The city named', value: 100 }] : []),
     ...(won && run.atlas?.day !== undefined && run.atlas.day < 12
-      ? [{ label: `Arrived on day ${run.atlas.day}`, value: (12 - run.atlas.day) * 15 }]
+      ? [
+          {
+            id: 'arrived',
+            n: run.atlas.day,
+            label: `Arrived on day ${run.atlas.day}`,
+            value: (12 - run.atlas.day) * 15,
+          },
+        ]
       : []),
     ...(won
       ? [
-          { label: 'The road completed', value: 300 },
-          { label: `${run.health} health to spare`, value: run.health * 2 },
+          { id: 'completed', label: 'The road completed', value: 300 },
+          {
+            id: 'spare',
+            n: run.health,
+            label: `${run.health} health to spare`,
+            value: run.health * 2,
+          },
         ]
       : []),
   ];
+  const lines: ScoreLine[] = entries.map(({ label, value }) => ({ label, value }));
+  const parts: ScorePart[] = entries.map(({ id, n }) => (n === undefined ? { id } : { id, n }));
   const multiplier = 1 + (run.dusk ?? 0) * 0.2;
   const base = lines.reduce((n, l) => n + l.value, 0);
-  return { total: Math.round(base * multiplier), lines, multiplier };
+  return { total: Math.round(base * multiplier), lines, parts, multiplier };
 }
 
 export type Deed = {
@@ -399,6 +434,7 @@ export function sanitizeMeta(x: unknown): Meta {
   meta.streak = whole(x.streak, 1e6);
   meta.bestStreak = Math.max(meta.streak, whole(x.bestStreak, 1e6));
   meta.sound = x.sound === true;
+  if (x.lang === 'en' || x.lang === 'sk') meta.lang = x.lang;
   if (Array.isArray(x.history))
     meta.history = x.history
       .filter(

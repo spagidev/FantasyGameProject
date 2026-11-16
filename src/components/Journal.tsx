@@ -1,9 +1,11 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import { CHAPTERS, KEEPERS } from '../game/data';
 import { decodeSave, MAX_SAVE_BYTES, type Save } from '../game/storage';
+import { useT } from '../i18n';
 import { Icon } from './Icon';
 
 export function Journal({ save, onRestore }: { save: Save; onRestore: (save: Save) => void }) {
+  const t = useT();
   const [pending, setPending] = useState<Save | null>(null);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -18,7 +20,7 @@ export function Journal({ save, onRestore }: { save: Save; onRestore: (save: Sav
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 3000);
-    setStatus('Your journal export is ready. Keep the file somewhere you can find it again.');
+    setStatus(t.journal.exportReady);
   }
 
   async function selectFile(event: ChangeEvent<HTMLInputElement>) {
@@ -30,47 +32,41 @@ export function Journal({ save, onRestore }: { save: Save; onRestore: (save: Sav
     setError('');
     setStatus('');
     if (file.size > MAX_SAVE_BYTES) {
-      setError('This file is too large. Choose an Emberwake journal smaller than 2 MB.');
+      setError(t.journal.tooLarge);
       return;
     }
     try {
       const decoded = decodeSave(await file.text());
       if (id !== request.current) return;
       if (!decoded) {
-        setError(
-          'This is not a compatible Emberwake journal. Your current progress has not changed.',
-        );
+        setError(t.journal.incompatible);
         return;
       }
       setPending(decoded);
     } catch {
-      if (id === request.current)
-        setError('This file could not be read. Your current progress has not changed.');
+      if (id === request.current) setError(t.journal.unreadable);
     }
   }
 
   return (
     <div className="journal-content">
-      <p>
-        Your stories belong to you. Download a journal to keep a backup or carry your exact
-        expedition to another browser.
-      </p>
+      <p>{t.journal.intro}</p>
       <button className="primary-button" onClick={download}>
-        <Icon name="book" size={17} /> Download journal
+        <Icon name="book" size={17} /> {t.journal.download}
       </button>
       <div className="journal-divider">
-        <span>OR BRING A STORY BACK</span>
+        <span>{t.journal.orBring}</span>
       </div>
       <label className="journal-file">
         <span>
           <Icon name="thread" size={20} />
-          <strong>Choose a journal file</strong>
+          <strong>{t.journal.chooseFile}</strong>
         </span>
-        <small>Emberwake .json · up to 2 MB · stays on your device</small>
+        <small>{t.journal.fileHint}</small>
         <input
           type="file"
           accept=".json,application/json"
-          aria-label="Choose a journal file"
+          aria-label={t.journal.chooseFile}
           onChange={selectFile}
         />
       </label>
@@ -87,44 +83,37 @@ export function Journal({ save, onRestore }: { save: Save; onRestore: (save: Sav
       )}
       {pending && (
         <div className="journal-preview">
-          <span className="eyebrow">A STORY READY TO RETURN</span>
+          <span className="eyebrow">{t.journal.readyEyebrow}</span>
           <h3>
             {pending.run
-              ? `${KEEPERS[pending.run.keeper].name} · ${pending.run.depth < 0 ? 'The road ahead' : CHAPTERS[Math.floor(pending.run.depth / 4)].short}`
-              : 'A keeper’s chronicle'}
+              ? `${KEEPERS[pending.run.keeper].name} · ${pending.run.depth < 0 ? t.journal.roadAhead : CHAPTERS[Math.floor(pending.run.depth / 4)].short}`
+              : t.journal.chronicleTitle}
           </h3>
-          {pending.run?.ruleset === 1 && (
-            <p className="journal-classic">
-              Classic crossing · the original rules and exact turn are preserved.
-            </p>
-          )}
+          {pending.run?.ruleset === 1 && <p className="journal-classic">{t.journal.classic}</p>}
           <div className="journal-summary">
             <span>
-              <b>{pending.profile.lore.length}</b> memories
+              <b>{pending.profile.lore.length}</b> {t.journal.memories}
             </span>
             <span>
-              <b>{pending.profile.wins}</b> victories
+              <b>{pending.profile.wins}</b> {t.journal.victories}
             </span>
             {pending.run && (
               <span>
                 <b>
                   {pending.run.health}/{pending.run.maxHealth}
                 </b>{' '}
-                vitality
+                {t.journal.vitality}
               </span>
             )}
           </div>
-          <p>
-            Restoring replaces the expedition and chronicle on this device. Download your current
-            journal first if you want to keep both.
-          </p>
+          <p>{t.journal.restoreWarn}</p>
           <button className="secondary-button" onClick={() => onRestore(pending)}>
-            Restore this journal <Icon name="arrow" size={15} />
+            {t.journal.restore} <Icon name="arrow" size={15} />
           </button>
         </div>
       )}
       <p className="journal-privacy">
-        <Icon name="shield" size={13} /> Files are checked and opened here. Nothing is uploaded.
+        <Icon name="shield" size={13} /> {t.journal.privacy}
       </p>
     </div>
   );

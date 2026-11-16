@@ -1,5 +1,6 @@
 import { PROVINCE_ART } from '../artwork';
 import { useId } from 'react';
+import { useT } from '../i18n';
 import type { Meta } from '../game/meta';
 import {
   campaignMap,
@@ -36,7 +37,6 @@ function markerStates(p: ProvinceProgress): ('open' | 'walked' | 'done')[] {
     states.push(i < p.completed ? 'done' : i < p.walked ? 'walked' : 'open');
   return states;
 }
-const STATE_LABEL = { open: 'not yet walked', walked: 'walked', done: 'rekindled' } as const;
 
 export function CampaignMap({
   cities,
@@ -47,6 +47,12 @@ export function CampaignMap({
   selected?: ProvinceCode | null;
   onSelect?: (code: ProvinceCode | null) => void;
 }) {
+  const t = useT();
+  const STATE_LABEL = {
+    open: t.campaign.notWalked,
+    walked: t.campaign.walked,
+    done: t.campaign.rekindled,
+  } as const;
   const clipId = useId().replace(/:/g, '');
   const progress = campaignProgress(cities);
   const rekindled = progress.reduce((n, p) => n + p.completed, 0);
@@ -61,7 +67,7 @@ export function CampaignMap({
         className="campaign-svg"
         viewBox={`0 0 ${campaignMap.width} ${campaignMap.height}`}
         role="img"
-        aria-label={`Map of the provinces: ${rekindled} of ${totalCities} cities rekindled`}
+        aria-label={t.campaign.mapLabel(rekindled, totalCities)}
       >
         <defs>
           <clipPath id={clipId}>
@@ -167,9 +173,7 @@ export function CampaignMap({
                 style={{ ['--tint' as string]: p.province.tint }}
               >
                 <b>{p.province.name}</b>
-                <span>
-                  {p.province.kraj} · {p.completed}/{p.total} rekindled
-                </span>
+                <span>{t.campaign.buttonLine(p.province.kraj, p.completed, p.total)}</span>
               </button>
             </li>
           ))}
@@ -190,17 +194,19 @@ export function CampaignMap({
             <h3>{current.province.name}</h3>
             <span className="eyebrow">{current.province.kraj}</span>
             <p className="campaign-counts">
-              {current.total} hidden cities · {current.walked} walked · {current.completed}{' '}
-              rekindled · {current.named} named
+              {t.campaign.counts(current.total, current.walked, current.completed, current.named)}
             </p>
             {current.recovered ? (
               <p>{current.province.legend}</p>
             ) : (
-              <p>{current.province.rumor} Rekindle both of its cities to recover its legend.</p>
+              <p>
+                {current.province.rumor}
+                {t.campaign.rumorTail}
+              </p>
             )}
           </>
         ) : (
-          <p className="muted">Choose a province to read its rumor.</p>
+          <p className="muted">{t.campaign.choose}</p>
         )}
       </div>
     </div>

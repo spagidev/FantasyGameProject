@@ -39,10 +39,11 @@ import { Modal } from './Modal';
 import { SceneArt } from './Art';
 import { provinceOfKraj } from '../atlas/provinces';
 import { Icon, type IconName } from './Icon';
+import { useLang, useT, type Dict } from '../i18n';
 
 /** Distances the way a hiking map prints them. */
-export const metres = (m: number) =>
-  m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
+export const metres = (m: number, sep = '.') =>
+  m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1).replace('.', sep)} km`;
 /** Walking time at four kilometres an hour. */
 export const walkingTime = (m: number) => {
   const minutes = Math.max(1, Math.round(m / (4000 / 60)));
@@ -82,10 +83,11 @@ function WorkIcon({ id, size }: { id: WorkId; size: number }) {
 }
 
 function WagonSummary({ run }: { run: Run }) {
+  const t = useT().atlas;
   const built = worksOf(run.atlas);
   return (
-    <div className="wagon-summary" role="group" aria-label="Hearth-wagon works">
-      <strong>The hearth-wagon</strong>
+    <div className="wagon-summary" role="group" aria-label={t.wagonGroup}>
+      <strong>{t.wagonTitle}</strong>
       {built.length ? (
         <ul>
           {built.map((id) => (
@@ -96,24 +98,24 @@ function WagonSummary({ run }: { run: Run }) {
           ))}
         </ul>
       ) : (
-        <span>Nothing built yet — make camp to build</span>
+        <span>{t.wagonEmpty}</span>
       )}
     </div>
   );
 }
 
 /** What the next dawn brings if the keeper makes this choice tonight. */
-function dawnPreview(run: Run, work: WorkId | null) {
+function dawnPreview(run: Run, work: WorkId | null, t: Dict['atlas']) {
   const a = run.atlas!;
   const works = work ? [...worksOf(a), work] : worksOf(a);
   const count = (id: string) => run.waylights.filter((w) => w === id).length;
   const health = count('well') * 2 + (works.includes('stove') ? 4 : 0);
   const coins = count('kiln') * 4 + (works.includes('strongbox') ? 6 : 0);
   const flask = works.includes('still') && run.flasks < 2;
-  const parts = ['full lamp oil'];
-  if (coins) parts.push(`+${coins} coins`);
-  if (health) parts.push(`+${health} health`);
-  if (flask) parts.push('+1 flask');
+  const parts = [t.fullOil];
+  if (coins) parts.push(t.dawnCoins(coins));
+  if (health) parts.push(t.dawnHealth(health));
+  if (flask) parts.push(t.dawnFlask);
   return { day: a.day! + 1, parts, ward: works.includes('ward') };
 }
 
@@ -126,31 +128,24 @@ function EveningDialog({
   onClose: () => void;
   onChoose: (work: WorkId | null) => void;
 }) {
+  const t = useT().atlas;
   const [hover, setHover] = useState<WorkId | null>(null);
-  const preview = dawnPreview(run, hover);
+  const preview = dawnPreview(run, hover, t);
   const hint = (work: WorkId | null) => ({
     onMouseEnter: () => setHover(work),
     onFocus: () => setHover(work),
   });
   return (
-    <Modal title="Evening at the wagon" onClose={onClose}>
+    <Modal title={t.eveningTitle} onClose={onClose}>
       <div className="wagon-dialog">
         <SceneArt id="wagon" />
-        <p>
-          Each evening the keeper may build one work onto the hearth-wagon or rest by its fire,
-          never both.
-        </p>
+        <p>{t.eveningIntro}</p>
         <p className="wagon-purse">
-          <Icon name="coins" size={14} /> You carry {run.coins} coins
+          <Icon name="coins" size={14} /> {t.purse(run.coins)}
         </p>
         <div className="wagon-dawn" aria-live="polite">
-          <b>
-            Day {preview.day} dawns: {preview.parts.join(' · ')}
-          </b>
-          <span>
-            The dark gathers: enemies ahead gain 2% health{' '}
-            {preview.ward ? 'every second night' : 'each night'}
-          </span>
+          <b>{t.dawnLine(preview.day, preview.parts.join(' · '))}</b>
+          <span>{t.darkGathers(preview.ward)}</span>
         </div>
         <div className="wagon-options">
           <button
@@ -161,10 +156,8 @@ function EveningDialog({
           >
             <Icon name="heart" size={22} />
             <span className="wagon-copy">
-              <strong>Rest by the fire</strong>
-              <span>
-                Restore {REST_HEALING} health ({run.health}/{run.maxHealth} now)
-              </span>
+              <strong>{t.restFire}</strong>
+              <span>{t.restFireDesc(REST_HEALING, run.health, run.maxHealth)}</span>
             </span>
           </button>
           {(Object.keys(WORKS) as WorkId[]).map((id) => {
@@ -188,12 +181,12 @@ function EveningDialog({
                 <span className="wagon-cost">
                   {blocked === 'Already built' ? (
                     <>
-                      <Icon name="check" size={14} /> Built
+                      <Icon name="check" size={14} /> {t.built}
                     </>
                   ) : (
                     <>
                       <Icon name="coins" size={14} /> {work.cost}
-                      {blocked === 'Not enough coins' && <small>Not enough coins</small>}
+                      {blocked === 'Not enough coins' && <small>{t.notEnoughCoins}</small>}
                     </>
                   )}
                 </span>
@@ -215,6 +208,8 @@ export function AtlasMap({
   dispatch?: (a: Action) => void;
   onInspect?: (node: MapNode) => void;
 }) {
+  const t = useT().atlas;
+  const sep = useT().decimalSep;
   const state = run?.atlas ?? newAtlas();
   const pack = atlasGeography(state);
   const sites = atlasSites(state);
@@ -385,6 +380,7 @@ export function AtlasMap({
       keys[e.key]();
     }
   };
+  const compass = (b: string) => t.compass[b] ?? b;
   const [evening, setEvening] = useState(false);
   const [omenOpen, setOmenOpen] = useState(false);
   const uid = useId().replace(/:/g, '');
@@ -444,22 +440,18 @@ export function AtlasMap({
     <section className="atlas-board" aria-label="The Lost Atlas">
       <div className="atlas-heading">
         <div>
-          <span className="eyebrow">THE LOST ATLAS · CHART I</span>
+          <span className="eyebrow">{t.eyebrow}</span>
           <h2>
             {state.recognized
-              ? `${state.chart?.city ?? 'Monaco'}, beneath the veil`
+              ? t.beneathVeil(state.chart?.city ?? 'Monaco')
               : state.chart
                 ? province
-                  ? `A veiled city of ${province.name}`
+                  ? t.veiledCityOf(province.name)
                   : state.chart.title
-                : 'The Saltbound Coast'}
+                : t.saltbound}
           </h2>
-          {state.chart && <span className="atlas-area-hint">Hidden city · {state.chart.area}</span>}
-          <p>
-            {run
-              ? 'The world has forgotten its name. Its shape remembers.'
-              : 'Real geography. Forgotten names. A world to uncover.'}
-          </p>
+          {state.chart && <span className="atlas-area-hint">{t.hiddenCity(state.chart.area)}</span>}
+          <p>{run ? t.ledeRun : t.ledePreview}</p>
         </div>
         <span className="atlas-seal">
           <Icon name="compass" size={26} />
@@ -469,32 +461,27 @@ export function AtlasMap({
       {next && movable && (
         <p className="atlas-next">
           <Icon name="flag" size={15} />
-          {canEnter ? (
-            anyOrder ? (
-              `An open encounter is here. ${open.length - 1} more ${open.length === 2 ? 'waits' : 'wait'} in this realm, in any order.`
-            ) : (
-              'Your next encounter is here.'
-            )
-          ) : anyOrder ? (
-            <>
-              {open.length} encounters are open in this realm: take them in any order; the bell
-              guardian waits for all three. Nearest:{' '}
-              {charted(state, next.id) ? next.name : 'an echo in the mist'} ·{' '}
-              {bearing(state.position, next.id, state)}.
-            </>
-          ) : (
-            <>
-              Next: {charted(state, next.id) ? next.name : 'an echo in the mist'} ·{' '}
-              {bearing(state.position, next.id, state)}. Walk the connected roads to reach it.
-            </>
-          )}
+          {canEnter
+            ? anyOrder
+              ? t.openHere(open.length - 1)
+              : t.nextHere
+            : anyOrder
+              ? t.anyOrder(
+                  open.length,
+                  charted(state, next.id) ? next.name : t.echo,
+                  compass(bearing(state.position, next.id, state)),
+                )
+              : t.nextIs(
+                  charted(state, next.id) ? next.name : t.echo,
+                  compass(bearing(state.position, next.id, state)),
+                )}
         </p>
       )}
       {days && run && (
         <div
           className={`atlas-day ${stranded ? 'is-stranded' : ''} ${omenOf(run) ? 'has-omen' : ''}`}
         >
-          <strong>Day {state.day}</strong>
+          <strong>{t.day(state.day ?? 0)}</strong>
           {omenOf(run) && (
             <button
               type="button"
@@ -509,7 +496,7 @@ export function AtlasMap({
           <div
             className="oil-meter"
             role="meter"
-            aria-label="Lamp oil left today"
+            aria-label={t.oilMeter}
             aria-valuemin={0}
             aria-valuemax={state.range}
             aria-valuenow={Math.min(state.oil!, state.range!)}
@@ -517,17 +504,19 @@ export function AtlasMap({
             <i style={{ width: `${Math.min(100, (state.oil! / state.range!) * 100)}%` }} />
           </div>
           <span>
-            Lamp oil for <b>{metres(state.oil!)}</b> more today
-            {stranded && ' · not enough for any road from here'}
+            {t.oilPre}
+            <b>{metres(state.oil!, sep)}</b>
+            {t.oilPost}
+            {stranded && t.stranded}
           </span>
           <button
             className="secondary-button"
             data-action="camp"
             disabled={!movable}
             onClick={() => setEvening(true)}
-            title="Start a new day with full oil. Waylights pay at dawn; the dark gathers a little."
+            title={t.makeCampTitle}
           >
-            Make camp
+            {t.makeCamp}
           </button>
         </div>
       )}
@@ -553,7 +542,7 @@ export function AtlasMap({
         ref={canvasRef}
         tabIndex={0}
         role="group"
-        aria-label="Pannable chart. Drag or use the arrow keys to pan, plus and minus to zoom, 0 for the whole chart."
+        aria-label={t.canvasLabel}
         onKeyDown={onMapKey}
       >
         <svg
@@ -565,7 +554,7 @@ export function AtlasMap({
           onPointerCancel={onPointerEnd}
           viewBox={viewBox}
           role="img"
-          aria-label={`Fantasy chart of real terrain. ${seen.length} of ${ATLAS_SITES.length} landmarks charted. You are at ${current.name}.`}
+          aria-label={t.chartLabel(seen.length, ATLAS_SITES.length, current.name)}
         >
           <defs>
             <pattern id={`${uid}sea`} width="26" height="26" patternUnits="userSpaceOnUse">
@@ -740,7 +729,7 @@ export function AtlasMap({
             aria-hidden="true"
           >
             <text x="550" y="705">
-              {state.chart ? 'THE UNWRITTEN WORLD' : 'THE NAMELESS SEA'}
+              {state.chart ? t.unwrittenWorld : t.namelessSea}
             </text>
           </g>
           {seen.map((s) => {
@@ -805,7 +794,7 @@ export function AtlasMap({
             )}
           </g>
         </svg>
-        <span className="atlas-north" aria-label="North is up">
+        <span className="atlas-north" aria-label={t.northIsUp}>
           N<br />↑
         </span>
         <span
@@ -813,21 +802,21 @@ export function AtlasMap({
           style={{
             width: `${(500 / (state.chart?.metresPerPixel ?? 3.52) / vw) * 100}%`,
           }}
-          aria-label="Map scale: 500 metres"
+          aria-label={t.scaleLabel}
         >
           500 m
         </span>
         <div className="atlas-tools">
           <button
             onClick={() => zoomAt(view.scale * 1.5)}
-            aria-label="Zoom in"
+            aria-label={t.zoomIn}
             disabled={view.scale >= 4}
           >
             +
           </button>
           <button
             onClick={() => zoomAt(view.scale / 1.5)}
-            aria-label="Zoom out"
+            aria-label={t.zoomOut}
             disabled={view.scale <= 1}
           >
             −
@@ -837,41 +826,38 @@ export function AtlasMap({
               panned.current = false;
               centreOn(state.position);
             }}
-            aria-label="Centre on keeper"
+            aria-label={t.centreLabel}
           >
             <Icon name="compass" size={16} />
-            Keeper
+            {t.centreText}
           </button>
           <button
             onClick={() => {
               panned.current = true;
               setView({ cx: W / 2, cy: H / 2, scale: 1 });
             }}
-            aria-label="Show whole chart"
+            aria-label={t.wholeLabel}
           >
             <Icon name="eye" size={16} />
-            Whole chart
+            {t.wholeText}
           </button>
         </div>
         <span className="atlas-discovery">
-          {seen.length}/{ATLAS_SITES.length} landmarks charted
+          {t.landmarksCharted(seen.length, ATLAS_SITES.length)}
         </span>
       </div>
       <div className="atlas-attribution">
         <span>
-          Geography ©{' '}
+          {t.geography}{' '}
           <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">
-            OpenStreetMap contributors
+            {t.osmContributors}
           </a>{' '}
           ·{' '}
           <a href="/atlas/NOTICE.md" target="_blank" rel="noreferrer">
-            ODbL · data & source
+            {t.dataSource}
           </a>
           {state.chart?.source.provider === 'OpenStreetMap / Geofabrik' && (
-            <span className="atlas-source-note">
-              {' '}
-              · Bundled roads · historical snapshot (2022 or earlier)
-            </span>
+            <span className="atlas-source-note">{t.bundledNote}</span>
           )}
           {state.chart && (
             <button
@@ -889,26 +875,25 @@ export function AtlasMap({
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
               }}
             >
-              Download this map’s data
+              {t.downloadData}
             </button>
           )}
         </span>
-        <span>✦ Keeper &nbsp; ◇ Landmark &nbsp; ♜ Bell</span>
+        <span>
+          ✦ {t.legendKeeper} &nbsp; ◇ {t.legendLandmark} &nbsp; ♜ {t.legendBell}
+        </span>
       </div>
       {!run ? (
         <div className="atlas-preview-note">
           <Icon name="flame" />
-          <p>
-            Choose a keeper and begin. Follow real roads through the veil, ring three bells, and
-            discover which place the world has forgotten.
-          </p>
+          <p>{t.previewNote}</p>
         </div>
       ) : (
         <>
           <div className="atlas-location" aria-live="polite">
             <div>
               <span className="eyebrow">
-                {selected === state.position ? 'YOU ARE HERE' : 'CHARTED LANDMARK'}
+                {selected === state.position ? t.youAreHere : t.charted}
               </span>
               <h3>{site.name}</h3>
               <p>{site.subtitle}</p>
@@ -922,10 +907,10 @@ export function AtlasMap({
                   onClick={() => dispatch?.({ type: 'atlas-walk', to: selected })}
                 >
                   {affordable === route.edges.length
-                    ? 'Walk this route'
+                    ? t.walkRoute
                     : affordable === 0
-                      ? 'Out of oil for today'
-                      : 'Walk as far as the oil lasts'}{' '}
+                      ? t.outOfOil
+                      : t.walkAsFar}{' '}
                   <Icon name="arrow" size={15} />
                 </button>
               )}
@@ -934,7 +919,7 @@ export function AtlasMap({
                   className="primary-button"
                   onClick={() => dispatch?.({ type: 'travel', lane: current.lane! })}
                 >
-                  Enter encounter <Icon name="arrow" size={15} />
+                  {t.enterEncounter} <Icon name="arrow" size={15} />
                 </button>
               )}
               {site.depth !== undefined && onInspect && (
@@ -942,7 +927,7 @@ export function AtlasMap({
                   className="text-button"
                   onClick={() => onInspect(nodeOf(run, site.depth!, site.lane!))}
                 >
-                  Scout encounter
+                  {t.scoutEncounter}
                 </button>
               )}
               {selected === state.position && guard && (
@@ -953,18 +938,18 @@ export function AtlasMap({
                     disabled={!movable}
                     onClick={() => dispatch?.({ type: 'atlas-challenge' })}
                   >
-                    Challenge the guardian <Icon name="swords" size={15} />
+                    {t.challenge} <Icon name="swords" size={15} />
                   </button>
                   {onInspect && (
                     <button className="text-button" onClick={() => onInspect(guard)}>
-                      Scout the guardian
+                      {t.scoutGuardian}
                     </button>
                   )}
                 </>
               )}
               {selectedGuard && onInspect && (
                 <button className="text-button" onClick={() => onInspect(selectedGuard)}>
-                  Scout the guardian
+                  {t.scoutGuardian}
                 </button>
               )}
               {selected === state.position && canCollect && (
@@ -973,55 +958,50 @@ export function AtlasMap({
                   disabled={!movable || (current.kind === 'spring' && run.flasks >= 5)}
                   onClick={() => dispatch?.({ type: 'atlas-collect' })}
                 >
-                  {current.kind === 'spring' && run.flasks >= 5
-                    ? 'Flasks full · return later'
-                    : 'Gather this kindness'}
+                  {current.kind === 'spring' && run.flasks >= 5 ? t.flasksFull : t.gather}
                 </button>
               )}
               {selected === state.position && state.collected.includes(current.id) && (
-                <span className="atlas-status">This kindness is already gathered.</span>
+                <span className="atlas-status">{t.gathered}</span>
               )}
             </div>
             {route && (
               <p className="atlas-plan">
                 <Icon name="compass" size={15} />
                 <span>
-                  <b>{metres(route.metres)}</b> · about {walkingTime(route.metres)} on foot ·{' '}
-                  {route.edges.length} {route.edges.length === 1 ? 'road' : 'roads'}
-                  {days &&
-                    (affordable === route.edges.length
-                      ? ' · within today’s oil'
-                      : ' · farther than today’s oil: camp on the way')}
+                  <b>{metres(route.metres, sep)}</b> · {t.about(walkingTime(route.metres))} ·{' '}
+                  {t.roadCount(route.edges.length)}
+                  {days && (affordable === route.edges.length ? t.withinOil : t.beyondOil)}
                 </span>
               </p>
             )}
             {movable && selected !== state.position && !route && (
               <p className="atlas-plan">
                 <Icon name="compass" size={15} />
-                <span>No charted road leads there yet. Walk into the veil to find one.</span>
+                <span>{t.noRoad}</span>
               </p>
             )}
             {(guard || selectedGuard) && (
               <p className="atlas-plan">
                 <Icon name="swords" size={15} />
                 <span>
-                  Guarded by <b>{(guard ?? selectedGuard)!.name}</b>. Optional: win the fight to
-                  claim this trove and choose from three rare relics. The road does not advance, and
-                  a trove left for a later realm is guarded by something stronger.
+                  {t.guardedBy}
+                  <b>{(guard ?? selectedGuard)!.name}</b>
+                  {t.guardedNote}
                 </span>
               </p>
             )}
             {selected === state.position && encounterState(run, current) === 'sealed' && (
               <p className="atlas-ward">
                 {current.depth! % 4 === 3 && Math.floor(current.depth! / 4) === run.bells
-                  ? 'The bell guardian waits until the other three encounters of this realm are done.'
-                  : 'A bell ward seals this place. Ring this realm’s bell first.'}
+                  ? t.wardGuardian
+                  : t.wardBell}
               </p>
             )}
           </div>
           {movable && (
             <div className="atlas-roads">
-              <span className="eyebrow">ROADS FROM {current.name.toUpperCase()}</span>
+              <span className="eyebrow">{t.roadsFrom(current.name)}</span>
               <div>
                 {neighbours.map((n) => (
                   <button
@@ -1033,15 +1013,15 @@ export function AtlasMap({
                     <Icon name="compass" size={17} />
                     <span>
                       <strong>
-                        {charted(state, n.id) ? atlasSite(n.id, state).name : 'Beyond the veil'}
+                        {charted(state, n.id) ? atlasSite(n.id, state).name : t.beyondVeil}
                       </strong>
                       <small>
-                        {bearing(state.position, n.id, state)} · {metres(n.metres)} ·{' '}
+                        {compass(bearing(state.position, n.id, state))} · {metres(n.metres, sep)} ·{' '}
                         {walkingTime(n.metres)}
                         {roadCost(run!, n.metres) > reach
-                          ? ' · needs a new day'
+                          ? t.needsDay
                           : state.roads.includes(n.index)
-                            ? ' · walked'
+                            ? t.walked
                             : ''}
                       </small>
                     </span>
@@ -1053,13 +1033,11 @@ export function AtlasMap({
           )}
           {!movable && (
             <p className="atlas-ward">
-              {run.phase === 'won' || run.phase === 'lost'
-                ? 'This expedition has ended. Its chart remains in your journal.'
-                : 'Resolve the encounter to walk the roads again.'}
+              {run.phase === 'won' || run.phase === 'lost' ? t.ended : t.resolve}
             </p>
           )}
           <details className="atlas-index">
-            <summary>Charted landmarks · select to inspect</summary>
+            <summary>{t.indexSummary}</summary>
             <div>
               {seen.map((s) => (
                 <button
@@ -1080,6 +1058,8 @@ export function AtlasMap({
 }
 
 export function AtlasJournal({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) {
+  const t = useT().atlas;
+  const lang = useLang();
   const a = run.atlas!;
   const [name, setName] = useState('');
   const canGuess =
@@ -1088,25 +1068,22 @@ export function AtlasJournal({ run, dispatch }: { run: Run; dispatch: (a: Action
   const clues = a.visited.map((id) => atlasSite(id, a));
   return (
     <section className="atlas-journal">
-      <span className="eyebrow">A GEOGRAPHY OF MEMORY</span>
-      <h3>The field journal</h3>
+      <span className="eyebrow">{t.journalEyebrow}</span>
+      <h3>{t.journalTitle}</h3>
       <p>
-        {a.chart
-          ? 'The roads survived. Their names did not.'
-          : 'Roads and shorelines survived. Their names did not.'}{' '}
-        Explore, prepare, and ring the three bells.
+        {a.chart ? t.roadsSurvivedChart : t.roadsSurvivedCoast} {t.exploreRing}
       </p>
       <div className="atlas-journal-stats">
         <span>
-          <b>{a.steps}</b> roads walked
+          <b>{a.steps}</b> {t.roadsWalkedTail(a.steps)}
         </span>
         {a.day !== undefined && (
           <span>
-            <b>{a.day}</b> {a.day === 1 ? 'day' : 'days'}
+            <b>{a.day}</b> {t.daysTail(a.day)}
           </span>
         )}
         <span>
-          <b>{run.bells}/3</b> bells awake
+          <b>{run.bells}/3</b> {t.bellsAwakeTail}
         </span>
       </div>
       <p className="atlas-journal-latest" role="status">
@@ -1117,10 +1094,7 @@ export function AtlasJournal({ run, dispatch }: { run: Run; dispatch: (a: Action
         onClick={() => setExpanded((x) => !x)}
         aria-expanded={expanded}
       >
-        {expanded
-          ? 'Fold the clues'
-          : `Read ${clues.length} field ${clues.length === 1 ? 'note' : 'notes'}`}{' '}
-        <Icon name="book" size={14} />
+        {expanded ? t.foldClues : t.readNotes(clues.length)} <Icon name="book" size={14} />
       </button>
       {expanded && (
         <ol className="atlas-clues">
@@ -1135,11 +1109,8 @@ export function AtlasJournal({ run, dispatch }: { run: Run; dispatch: (a: Action
       {a.recognized ? (
         <div className="atlas-recognized">
           <Icon name="sparkles" size={23} />
-          <h4>{a.chart?.city ?? 'Monaco'} remembers.</h4>
-          <p>
-            Your blade gained 2 attack. The Rose Hearth is charted; walk there to gather its
-            kindness.
-          </p>
+          <h4>{t.remembers(a.chart?.city ?? 'Monaco')}</h4>
+          <p>{t.recognizedText}</p>
           <a
             href={
               a.chart
@@ -1149,18 +1120,18 @@ export function AtlasJournal({ run, dispatch }: { run: Run; dispatch: (a: Action
             target="_blank"
             rel="noreferrer"
           >
-            Compare with the waking world ↗
+            {t.compare}
           </a>
           <a
             href={
               a.chart
-                ? `https://mapy.com/en/turisticka?x=${a.chart.centre[0]}&y=${a.chart.centre[1]}&z=14`
-                : 'https://mapy.com/en/turisticka?x=7.425&y=43.737&z=14'
+                ? `https://mapy.com/${lang}/turisticka?x=${a.chart.centre[0]}&y=${a.chart.centre[1]}&z=14`
+                : `https://mapy.com/${lang}/turisticka?x=7.425&y=43.737&z=14`
             }
             target="_blank"
             rel="noreferrer"
           >
-            Open the hiking map on Mapy.com ↗
+            {t.openMapy}
           </a>
         </div>
       ) : (
@@ -1172,32 +1143,27 @@ export function AtlasJournal({ run, dispatch }: { run: Run; dispatch: (a: Action
             setName('');
           }}
         >
-          <label htmlFor="atlas-place">
-            {a.chart ? 'Which city lies beneath the veil?' : 'Does this coast feel familiar?'}
-          </label>
-          <p>
-            Name the city for +2 attack and the location of a hidden hearth. A country or region is
-            not the answer. Recognition is optional.
-          </p>
+          <label htmlFor="atlas-place">{a.chart ? t.guessChart : t.guessCoast}</label>
+          <p>{t.guessIntro}</p>
           <input
             id="atlas-place"
             value={name}
             maxLength={80}
             onChange={(e) => setName(e.target.value)}
-            placeholder="The place beneath the fantasy…"
+            placeholder={t.guessPlaceholder}
             disabled={!canGuess}
           />
           <button className="secondary-button" disabled={!canGuess || !name.trim()}>
-            Remember its name
+            {t.remember}
           </button>
           <small>
             {run.phase === 'won' || run.phase === 'lost'
-              ? 'This expedition has ended. Name the city on another journey.'
+              ? t.guessEnded
               : canGuess
-                ? 'One attempt per bell stage. No penalty for a wrong name.'
+                ? t.guessOne
                 : run.phase !== 'map'
-                  ? 'Finish this encounter before naming the land.'
-                  : 'Ring another bell for another attempt.'}
+                  ? t.guessFinish
+                  : t.guessRing}
           </small>
         </form>
       )}
