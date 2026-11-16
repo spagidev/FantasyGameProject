@@ -404,6 +404,37 @@ export function atlasRoute(state: AtlasState, to: string) {
 }
 export const atlasSite = (id: string, state?: AtlasState) =>
   atlasSites(state).find((s) => s.id === id)!;
+export const TROVES = ['cache', 'spring', 'haven'] as const;
+/** A side site still guarded on a free-order chart. */
+export const isTrove = (a: AtlasState | undefined, id: string) =>
+  !!a &&
+  a.done !== undefined &&
+  (TROVES as readonly string[]).includes(id) &&
+  !a.collected.includes(id);
+/**
+ * Give a side site's gift and mark it collected. Returns the message, or null when the gift
+ * would do nothing (a spring when every flask slot is full).
+ */
+export function grantGift(r: Run, id: string): string | null {
+  const a = r.atlas!;
+  const site = atlasSite(id, a);
+  let message: string;
+  if (site.kind === 'cache') {
+    r.coins += 18;
+    message = a.chart
+      ? 'The treasury gives back 18 forgotten coins.'
+      : 'The arena gives back 18 forgotten coins.';
+  } else if (site.kind === 'haven') {
+    r.health = Math.min(r.maxHealth, r.health + 12);
+    r.attack++;
+    message = 'The Rose Hearth restores up to 12 health. Your blade remembers: +1 attack.';
+  } else if (site.kind === 'spring' && (r.flasks < 5 || a.done !== undefined)) {
+    r.flasks = Math.min(5, r.flasks + 1);
+    message = 'You bottle a little warmth. Gained one flask.';
+  } else return null;
+  a.collected = [...a.collected, id];
+  return message;
+}
 /** Whether this chart lets the realm's encounters be taken in any order. */
 export const freeOrder = (a?: AtlasState): a is AtlasState & { done: string[] } =>
   a?.done !== undefined;
@@ -544,21 +575,11 @@ export function applyAtlasAction(run: Run, action: AtlasAction): Run {
     }. The dark has gathered a little.`;
   } else if (action.type === 'atlas-collect') {
     const site = atlasSite(a.position, a);
-    if (a.collected.includes(site.id)) return run;
-    if (site.kind === 'cache') {
-      r.coins += 18;
-      message = a.chart
-        ? 'The treasury gives back 18 forgotten coins.'
-        : 'The arena gives back 18 forgotten coins.';
-    } else if (site.kind === 'haven') {
-      r.health = Math.min(r.maxHealth, r.health + 12);
-      r.attack++;
-      message = 'The Rose Hearth restores up to 12 health. Your blade remembers: +1 attack.';
-    } else if (site.kind === 'spring' && r.flasks < 5) {
-      r.flasks++;
-      message = 'You bottle a little warmth. Gained one flask.';
-    } else return run;
-    a.collected.push(site.id);
+    // On free-order charts the troves are guarded: they are won in a fight, not picked up.
+    if (a.collected.includes(site.id) || isTrove(a, site.id)) return run;
+    const gift = grantGift(r, site.id);
+    if (!gift) return run;
+    message = gift;
   } else {
     const name = action.name.trim().slice(0, 80);
     if (!name || a.recognized || a.attempts.some((g) => g.bell === r.bells)) return run;

@@ -3,6 +3,7 @@ import { describeTraits } from '../game/bestiary';
 import { KEEPERS, NODE_LABELS, type Intent } from '../game/data';
 import { VOICES } from '../game/lore';
 import {
+  realmOf,
   effectiveHit,
   flaskHealing,
   guardAmount,
@@ -119,7 +120,7 @@ export function Combat({
   const v3 = run.ruleset === 3;
   const intent = intentFor(run)!;
   const upcoming = nextIntent(run)!;
-  const chapter = Math.floor(run.depth / 4);
+  const chapter = realmOf(run);
   const skipped = e.stagger === 2;
   const incoming = incomingDamage(run);
   const perHit = hitDamage(run, intent);
@@ -267,7 +268,9 @@ export function Combat({
         <div className="duel-shade" />
         <header className="duel-top">
           <div>
-            <span className="eyebrow">{NODE_LABELS[nodeOf(run).kind].toUpperCase()}</span>
+            <span className="eyebrow">
+              {run.side ? 'TROVE GUARDIAN' : NODE_LABELS[nodeOf(run).kind].toUpperCase()}
+            </span>
             <h2>{e.name}</h2>
           </div>
           <span className="duel-turn">

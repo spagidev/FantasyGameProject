@@ -255,6 +255,14 @@ export const DEEDS: Deed[] = [
     done: (r) => won(r) && !!r.atlas,
   },
   {
+    id: 'troves',
+    name: 'Nothing left unguarded',
+    text: 'Win all three guarded troves of a Lost Atlas chart in one expedition.',
+    done: (r) =>
+      !!r.atlas?.done &&
+      ['cache', 'spring', 'haven'].every((id) => r.atlas!.collected.includes(id)),
+  },
+  {
     id: 'recognize',
     name: 'It was here all along',
     text: 'Name the real city beneath a Lost Atlas chart.',

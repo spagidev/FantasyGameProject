@@ -26,6 +26,7 @@ import {
 import {
   nextNodes,
   nodeOf,
+  troveGuard,
   waylightFor,
   type Action,
   type Run,
@@ -229,8 +230,12 @@ export function AtlasMap({
   const seen = sites.filter((s) => charted(state, s.id));
   const fogPoints = state.visited.map((id) => pack.points[id]);
   if (state.recognized) fogPoints.push(pack.points.haven);
+  const guard = run ? troveGuard(run, current.id) : null;
   const canCollect =
-    ['cache', 'haven', 'spring'].includes(current.kind) && !state.collected.includes(current.id);
+    !guard &&
+    ['cache', 'haven', 'spring'].includes(current.kind) &&
+    !state.collected.includes(current.id);
+  const selectedGuard = run && selected !== state.position ? troveGuard(run, selected) : null;
   const days = travels(state);
   const province = state.chart ? provinceOfKraj(state.chart.area) : undefined;
   const route = movable && selected !== state.position ? atlasRoute(state, selected) : null;
@@ -703,6 +708,28 @@ export function AtlasMap({
                   Scout encounter
                 </button>
               )}
+              {selected === state.position && guard && (
+                <>
+                  <button
+                    className="primary-button"
+                    data-action="challenge"
+                    disabled={!movable}
+                    onClick={() => dispatch?.({ type: 'atlas-challenge' })}
+                  >
+                    Challenge the guardian <Icon name="swords" size={15} />
+                  </button>
+                  {onInspect && (
+                    <button className="text-button" onClick={() => onInspect(guard)}>
+                      Scout the guardian
+                    </button>
+                  )}
+                </>
+              )}
+              {selectedGuard && onInspect && (
+                <button className="text-button" onClick={() => onInspect(selectedGuard)}>
+                  Scout the guardian
+                </button>
+              )}
               {selected === state.position && canCollect && (
                 <button
                   className="secondary-button"
@@ -735,6 +762,16 @@ export function AtlasMap({
               <p className="atlas-plan">
                 <Icon name="compass" size={15} />
                 <span>No charted road leads there yet. Walk into the veil to find one.</span>
+              </p>
+            )}
+            {(guard || selectedGuard) && (
+              <p className="atlas-plan">
+                <Icon name="swords" size={15} />
+                <span>
+                  Guarded by <b>{(guard ?? selectedGuard)!.name}</b>. Optional: win the fight to
+                  claim this trove and choose from three rare relics. The road does not advance, and
+                  a trove left for a later realm is guarded by something stronger.
+                </span>
               </p>
             )}
             {selected === state.position && encounterState(run, current) === 'sealed' && (

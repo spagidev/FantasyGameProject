@@ -514,9 +514,10 @@ test('Lost Atlas recognition, keyboard roads, mobile layout and accessible contr
   await road.focus();
   await page.keyboard.press('Enter');
   expect((await readRun(page)).atlas?.position).toBe('cache');
-  await page.getByRole('button', { name: 'Gather this kindness' }).click();
-  expect((await readRun(page)).coins).toBe(53);
-  await expect(page.getByText('This kindness is already gathered.')).toBeVisible();
+  // From v0.10 the arena is a guarded trove: its guardian is offered, the gift is not free.
+  await expect(page.getByRole('button', { name: 'Gather this kindness' })).toHaveCount(0);
+  await expect(page.locator('[data-action="challenge"]')).toBeVisible();
+  await expect(page.locator('.atlas-plan')).toContainText('Guarded by');
   await page.screenshot({ path: 'test-results/atlas-mobile.png', fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();

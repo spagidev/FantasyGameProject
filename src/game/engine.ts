@@ -5,6 +5,9 @@ import {
   darkNights,
   encounterState,
   freeOrder,
+  grantGift,
+  isTrove,
+  TROVES,
   travels,
   newAtlas,
   cloneAtlasRun,
@@ -131,10 +134,13 @@ export type Run = {
   stats?: RunStats;
   /** Set for a date-seeded expedition, as YYYY-MM-DD. */
   daily?: string;
+  /** The guarded trove being fought for (v0.10): a side fight that does not advance the road. */
+  side?: string;
 };
 export type ShopItem = 'flask' | 'heal' | 'forge' | RelicId;
 export type Action =
   | AtlasAction
+  | { type: 'atlas-challenge' }
   | { type: 'travel'; lane: number }
   | { type: 'strike' | 'guard' | 'skill' | 'technique' | 'flask' }
   | { type: 'reward'; id: RelicId | 'heal' }
@@ -324,11 +330,36 @@ export function nodeAt(
 export const nodeOf = (r: Run, depth = r.depth, lane = r.lane): MapNode =>
   nodeAt(r.seed, depth, lane, layoutOf(r));
 
+/**
+ * The guardian of a trove, as a scoutable node. It is drawn from the roster of the realm the
+ * keeper has reached, so a trove left for later is guarded by something stronger.
+ */
+export function troveGuard(r: Run, id: string): MapNode | null {
+  if (!isTrove(r.atlas, id)) return null;
+  const chapter = Math.min(2, r.bells);
+  const foe = ORDINARY[chapter][hash(r.seed, 8000 + TROVES.indexOf(id as 'cache')) % 4];
+  return {
+    id: `trove-${id}`,
+    depth: chapter * 4 + 1,
+    lane: 0,
+    kind: 'battle',
+    name: foe.name,
+    eventIndex: 0,
+    foe: foe.id,
+  };
+}
+
+/** The realm (0–2) the keeper is in; a trove fight belongs to the realm reached so far. */
+export const realmOf = (r: Pick<Run, 'side' | 'bells' | 'phase' | 'depth'>) =>
+  r.side
+    ? Math.min(2, r.bells)
+    : Math.max(0, Math.floor(Math.min(11, r.phase === 'map' ? r.depth + 1 : r.depth) / 4));
+
 /** Encounters entered so far, including one in progress. */
 export const encountersEntered = (r: Pick<Run, 'path'>) => r.path.length;
-/** Encounters won: those entered, less one lost in. */
-export const encountersWon = (r: Pick<Run, 'path' | 'phase'>) =>
-  Math.max(0, r.path.length - (r.phase === 'lost' ? 1 : 0));
+/** Encounters won: those entered, less one lost in (a trove fight is not an encounter). */
+export const encountersWon = (r: Pick<Run, 'path' | 'phase' | 'side'>) =>
+  Math.max(0, r.path.length - (r.phase === 'lost' && !r.side ? 1 : 0));
 
 export function nextNodes(run: Run): MapNode[] {
   if (run.phase !== 'map' || run.depth >= 11) return [];
@@ -684,6 +715,19 @@ function clearBattle(r: Run) {
   }
 }
 function victory(r: Run) {
+  if (r.side) {
+    // A trove won: its gift and an elite's choice of relics. The road does not advance.
+    const id = r.side;
+    clearBattle(r);
+    if (r.relics.includes('thread')) heal(r, 5);
+    if (r.talents.includes('trail')) heal(r, 2);
+    if (r.enemy?.id) r.slain!.push(r.enemy.id);
+    note(r, `${r.enemy?.name} falls. The trove is yours.`);
+    note(r, grantGift(r, id) ?? '');
+    r.rewards = drawRelics(r, 'elite', 3, 9000 + TROVES.indexOf(id as 'cache') * 17);
+    r.phase = 'reward';
+    return;
+  }
   const node = nodeOf(r);
   const kind = node.kind;
   const coins = victoryCoins(r);
@@ -983,6 +1027,18 @@ export function transition(run: Run, action: Action): Run {
     return applyAtlasAction(run, action);
   const r = cloneAtlasRun(run);
   const v3 = r.ruleset === 3;
+  if (action.type === 'atlas-challenge') {
+    const guard = r.phase === 'map' && r.atlas ? troveGuard(r, r.atlas.position) : null;
+    if (!guard) return run;
+    r.side = r.atlas!.position;
+    r.enemy = makeEnemy(guard, 3, r.dusk ?? 0, nightsOf(r));
+    r.turn = 0;
+    clearBattle(r);
+    r.focus = startingFocus(r);
+    r.phase = 'combat';
+    r.log = [`${guard.name} guards ${atlasSite(r.side, r.atlas).name}.`];
+    return r;
+  }
   if (action.type === 'travel') {
     const target = nextNodes(r).find((n) => n.lane === action.lane);
     if (!target) return run;
@@ -1042,7 +1098,8 @@ export function transition(run: Run, action: Action): Run {
       note(r, `You carry the ${RELICS[action.id].name}. ${RELICS[action.id].flavor}`);
     } else return run;
     r.rewards = [];
-    r.phase = r.ruleset >= 2 && r.depth % 4 === 3 ? 'talent' : 'map';
+    r.phase = !r.side && r.ruleset >= 2 && r.depth % 4 === 3 ? 'talent' : 'map';
+    delete r.side;
     return r;
   }
   if (action.type === 'talent' && r.phase === 'talent') {

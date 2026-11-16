@@ -44,6 +44,11 @@ Browser tests use `/usr/bin/chromium` when present. On other machines, run `npx 
 
 The list above describes the first two rulesets. In combat your action resolves first, then poison, then the enemy's visible intention. **Guard lasts one enemy action. Flasks also end your turn.** Open “How to play” for the complete introduction.
 
+## Free roads and guarded troves · v0.10
+
+- **Any order within a realm.** On the Lost Atlas the three encounters of a realm can be taken in any order; the bell guardian waits for all three. With lamp oil and the wagon, the order is a route to plan.
+- **Guarded troves.** The arena, the spring and the hidden hearth are now guarded. Scout the guardian, then decide: an optional fight for the old gift and a choice of three rare relics. Leave it for later and something stronger stands guard.
+
 ## The Hearth-wagon and the Provinces · v0.9
 
 - **A camp that is a town.** On the Lost Atlas your camp is a hearth-wagon. Each evening build one of six works onto it (a stove, a dew-still, a whetwheel, a lamp-rack, a toll-box, a ward-lantern) or rest by its fire — never both. Works pay at dawn; nights still cost.

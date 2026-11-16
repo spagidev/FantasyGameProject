@@ -10,16 +10,20 @@ House rules for every item: the engine in `src/game/` is pure and deterministic 
 - **The provinces of Veyr.** A real map of Slovakia with eight fantasy provinces mirroring the eight kraje; choose where to go on the map; a province campaign reaches both of its cities; rekindle both to recover its legend. (`src/atlas/provinces.ts`, `src/components/CampaignMap.tsx`.)
 - **Voices.** Guardians and elites speak when a fight begins, turns and ends; each keeper writes their own page after each bell and has their own epilogue for each ending — fifteen new chronicle pages, three tellings of one story. (`src/game/lore.ts`.)
 
+## Shipped in v0.10
+
+- **Free order within a realm** (item 1 below) and **guarded troves** (item 2), both on Atlas charts begun from v0.10. See RULES.md, “Free order and guarded troves”.
+
 ## Next
 
-### 1. Free order within a realm · Lead
+### 1. ✓ Free order within a realm · Lead (shipped v0.10)
 
 **Why.** Heroes III lets you decide which guarded thing to take first; on the Atlas the bell wards force one order, so the map is a corridor with detours.
 **What.** Inside a realm, the three encounters before the guardian may be entered in any order; the guardian opens when all three are done. `run.depth` stays the count of encounters won; add `atlas.done: string[]` (site ids) and derive the node for a site from its own fixed depth/lane. `nextNodes` on the Atlas returns the node of the site the keeper stands on if it belongs to the current realm and is not done. Waylight, lesson and reward rules are unchanged. Old Atlas journals (no `done`) keep the strict order.
 **Where.** `engine.ts` (`nextNodes`, `travel`, `victory`), `atlas.ts`, `storage.ts`, objective banner in `Atlas.tsx`, `tests/player.ts`.
 **Done when.** A test wins a realm's three encounters in each of the six orders; saves round-trip; the balance matrix still wins at Dusk 0.
 
-### 2. Guarded troves · Lead
+### 2. ✓ Guarded troves · Lead (shipped v0.10)
 
 **Why.** “Is that treasure worth that fight?” is the adventure-map question, and Emberwake has no optional fights.
 **What.** The cache, spring and haven sites each gain a seeded guardian from the realm's ordinary roster (visible when scouted, toughened like any enemy by nights). Entering is optional; winning grants the site's gift plus a relic choice drawn as for an elite. A side fight does not advance `depth`: add `run.side?: string` (site id) set on entry and cleared on victory, with `victory()` returning to the map. Fleeing is not offered; scouting is.

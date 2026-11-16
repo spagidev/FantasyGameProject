@@ -1,4 +1,4 @@
-import { atlasSites, encounterState, validAtlas } from './atlas';
+import { TROVES, atlasSites, encounterState, validAtlas } from './atlas';
 import { FOES } from './bestiary';
 import { KEEPERS, LORE, NEW_TALENTS, RELICS, TALENTS, WAYLIGHTS, type KeeperId } from './data';
 import { DUSK_MAX, nodeOf, type Run } from './engine';
@@ -210,7 +210,7 @@ export function validRun(x: unknown): x is Run {
   if (x.phase === 'combat' && (!record(x.enemy) || x.enemy.health === 0 || x.health === 0))
     return false;
   if (x.phase === 'lost' ? x.health !== 0 : x.health === 0) return false;
-  if (x.phase !== 'map' && x.depth < 0) return false;
+  if (x.phase !== 'map' && x.depth < 0 && x.side === undefined) return false;
   if (x.phase === 'map' && x.depth === 11) return false;
   if ((x.phase === 'won' || x.phase === 'ending') && (x.depth !== 11 || x.bells !== 3))
     return false;
@@ -218,7 +218,18 @@ export function validRun(x: unknown): x is Run {
   if (v3) {
     const kind = x.depth >= 0 ? nodeOf(x as unknown as Run).kind : null;
     if (['event', 'camp', 'shop'].includes(String(x.phase)) && kind !== x.phase) return false;
-    if (x.phase === 'combat' && !['battle', 'elite', 'boss'].includes(String(kind))) return false;
+    if (x.side !== undefined) {
+      if (
+        typeof x.side !== 'string' ||
+        !(TROVES as readonly string[]).includes(x.side) ||
+        !record(x.atlas) ||
+        x.atlas.done === undefined ||
+        !['combat', 'reward', 'lost'].includes(String(x.phase)) ||
+        (x.phase === 'reward') !== (x.atlas.collected as string[]).includes(x.side)
+      )
+        return false;
+    } else if (x.phase === 'combat' && !['battle', 'elite', 'boss'].includes(String(kind)))
+      return false;
   } else {
     if (x.phase === 'event' && x.depth % 4 !== 1) return false;
     if (['camp', 'shop'].includes(String(x.phase)) && x.depth % 4 !== 2) return false;

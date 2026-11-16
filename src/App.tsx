@@ -17,6 +17,7 @@ import {
 } from './game/data';
 import {
   attackOf,
+  realmOf,
   encountersEntered,
   encountersWon,
   canBuy,
@@ -115,9 +116,7 @@ export default function App() {
   const bestBefore = useRef(run ? (meta.best[run.keeper] ?? 0) : 0);
   if (run && !terminal(run)) bestBefore.current = meta.best[run.keeper] ?? 0;
   const today = dailyRoad(new Date());
-  const chapter = run
-    ? Math.floor(Math.min(11, run.phase === 'map' ? run.depth + 1 : run.depth) / 4)
-    : 0;
+  const chapter = run ? realmOf(run) : 0;
   const dispatch = useCallback(
     (action: Action) =>
       setSave((s) => {
@@ -1025,11 +1024,12 @@ function RelicInventory({ ids }: { ids: RelicId[] }) {
 }
 
 function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) {
-  const boss = run.depth % 4 === 3;
-  const site = run.ruleset >= 2 ? waylightFor(nodeOf(run)) : null;
+  const trove = run.side;
+  const boss = !trove && run.depth % 4 === 3;
+  const site = !trove && run.ruleset >= 2 ? waylightFor(nodeOf(run)) : null;
   return (
     <section className="scene-board reward-board">
-      <Landscape chapter={Math.floor(run.depth / 4)} />
+      <Landscape chapter={realmOf(run)} />
       <div className="scene-content">
         <span className="scene-sigil">
           <Icon name={boss ? 'bell' : 'gem'} size={34} />
@@ -1041,7 +1041,11 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
           </p>
         )}
         <span className="eyebrow">
-          {boss ? 'A BELL REMEMBERS ITS SONG' : 'THE DARK YIELDS A LITTLE'}
+          {trove
+            ? 'THE TROVE IS YOURS'
+            : boss
+              ? 'A BELL REMEMBERS ITS SONG'
+              : 'THE DARK YIELDS A LITTLE'}
         </span>
         <h2>{boss ? 'A memory awakens.' : 'Something worth carrying.'}</h2>
         {boss && run.enemy?.id && VOICES[run.enemy.id]?.fall && (
@@ -1049,7 +1053,7 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
         )}
         <p className="scene-lead">
           {boss
-            ? CHAPTERS[Math.floor(run.depth / 4)].memory
+            ? CHAPTERS[realmOf(run)].memory
             : 'Among the ashes, a small thing catches the light.\nChoose one gift for the road ahead.'}
         </p>
         {boss && pageFor(`${run.keeper}-bell-${run.bells}`) && run.ruleset === 3 && (
@@ -1060,7 +1064,15 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
           </blockquote>
         )}
         <div className="reward-coins">
-          <Icon name="coins" size={16} /> +{victoryCoins(run)} coins collected
+          {trove ? (
+            <>
+              <Icon name="gem" size={16} /> {run.log.at(-1)}
+            </>
+          ) : (
+            <>
+              <Icon name="coins" size={16} /> +{victoryCoins(run)} coins collected
+            </>
+          )}
           {run.relics.includes('thread') && <span> · +5 health</span>}
         </div>
         {site && (
@@ -1114,7 +1126,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
   const shop = run.phase === 'shop';
   return (
     <section className="scene-board encounter-board">
-      <Landscape chapter={Math.floor(run.depth / 4)} />
+      <Landscape chapter={realmOf(run)} />
       <div className="scene-content">
         {run.phase === 'event' && <SceneArt id={event.options[0].lore} />}
         <span className="scene-sigil">
@@ -1308,7 +1320,7 @@ function Ending({
   const choosing = run.phase === 'ending';
   return (
     <section className="scene-board ending-board">
-      <Landscape chapter={lost ? Math.floor(run.depth / 4) : 2} />
+      <Landscape chapter={lost ? realmOf(run) : 2} />
       <div className="scene-content">
         {!choosing && <SceneArt id={lost ? 'fallen' : (run.ending ?? 'dawn')} />}
         <span className="scene-sigil">
@@ -1340,7 +1352,7 @@ function Ending({
         </h2>
         <p className="scene-lead">
           {lost
-            ? `You fall in ${CHAPTERS[Math.floor(run.depth / 4)].name}. The ember goes quiet, but the memories you found will outlive the dark. Another keeper will take the road.`
+            ? `You fall in ${CHAPTERS[realmOf(run)].name}. The ember goes quiet, but the memories you found will outlive the dark. Another keeper will take the road.`
             : choosing
               ? '“Eira,” the king whispers. The heart of the sun opens in his hands. You could wake it, if the world will share its burden. Or you could carry him home, and teach Cinderfall another way to keep warm.'
               : LORE.find((l) => l.id === run.ending)?.text}

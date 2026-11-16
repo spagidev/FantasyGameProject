@@ -83,6 +83,12 @@ Each evening, **Make camp** opens one choice, never both: build one of six works
 
 At dawn the lamp oil is refilled (to the rack's longer day, if built), then waylights and works pay: each Dawnwell restores 2 health, the stove 4, each Cinder Kiln pays 4 coins, the toll-box 6, and the dew-still fills a flask if fewer than two are carried. A work built tonight pays at the very next dawn. With the ward-lantern only every second night (rounded up) counts toward the 2% health gained by enemies not yet fought.
 
+### Free order and guarded troves (v0.10)
+
+On Atlas charts begun from v0.10 the three encounters of a realm may be entered in any order; the realm's bell guardian opens only when all three are done, and later realms stay sealed until it falls. `atlas.done` records the sites entered in order, and a journal is accepted only if that list replays as a legal sequence (each site open when entered; path, position and bells agreeing). Charts begun earlier keep the strict order.
+
+On those charts the three side sites are **guarded troves**. A trove cannot be gathered; from its site the keeper may _challenge_ its guardian, an ordinary enemy of the realm reached so far (scoutable; toughened by nights like any enemy). Winning grants the site's old gift (18 coins; a flask; 12 health and +1 attack) and a choice of three relics drawn with elite weights, or 12 health. A trove fight does not advance the road, pays no battle coins, frees no waylight and never offers a lesson. Losing it ends the expedition like any fight.
+
 ### Records
 
 `src/game/meta.ts`. Score = 10 per crossing + 150 per bell + 40 per elite + 5 per stagger + 3 per perfect guard + 100 for naming an Atlas city + (on completion) 300 and 2 per remaining health, all multiplied by `1 + 0.2 × dusk`. Deeds are judged on every saved step; twelve of them add one relic each to the pool of future expeditions. Records never change a keeper’s starting statistics. Unreadable records in a journal are dropped without rejecting the journal.

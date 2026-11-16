@@ -10,6 +10,7 @@ import {
 import { describeTraits, FOES } from '../game/bestiary';
 import { encounterState, siteAt } from '../game/atlas';
 import {
+  realmOf,
   availableTalents,
   makeEnemy,
   nextNodes,
@@ -212,23 +213,25 @@ export function Scout({
         <p className="scout-unreachable">
           {!run
             ? 'Choose a keeper and begin an expedition to take this road.'
-            : run.atlas
-              ? {
-                  done: 'This encounter is behind you.',
-                  open: 'Walk to this place on the chart to enter it.',
-                  sealed:
-                    node.kind === 'boss'
-                      ? 'The guardian waits until the rest of its realm is done.'
-                      : 'A later realm. Ring this realm’s bell first.',
-                }[
-                  encounterState(run, siteAt(node.depth, node.lane, run.atlas) ?? { id: '' }) ??
-                    'sealed'
-                ]
-              : node.depth <= run.depth
-                ? 'This crossing is behind you. The road leads forward.'
-                : node.depth === run.depth + 1
-                  ? 'This lane is beyond reach from your current path. A neighboring lane stays open.'
-                  : 'A future crossing. Plan your route, then advance one path at a time.'}
+            : node.id.startsWith('trove-')
+              ? 'An optional fight. Challenge it from the chart; winning claims the trove and a choice of three rare relics.'
+              : run.atlas
+                ? {
+                    done: 'This encounter is behind you.',
+                    open: 'Walk to this place on the chart to enter it.',
+                    sealed:
+                      node.kind === 'boss'
+                        ? 'The guardian waits until the rest of its realm is done.'
+                        : 'A later realm. Ring this realm’s bell first.',
+                  }[
+                    encounterState(run, siteAt(node.depth, node.lane, run.atlas) ?? { id: '' }) ??
+                      'sealed'
+                  ]
+                : node.depth <= run.depth
+                  ? 'This crossing is behind you. The road leads forward.'
+                  : node.depth === run.depth + 1
+                    ? 'This lane is beyond reach from your current path. A neighboring lane stays open.'
+                    : 'A future crossing. Plan your route, then advance one path at a time.'}
         </p>
       )}
       <p className="scout-free">
@@ -309,7 +312,7 @@ export function WaylightsPanel({ run }: { run: Run }) {
 export function TalentChoice({ run, dispatch }: { run: Run; dispatch: (action: Action) => void }) {
   return (
     <section className="scene-board talent-board">
-      <Landscape chapter={Math.floor(run.depth / 4)} />
+      <Landscape chapter={realmOf(run)} />
       <div className="scene-content">
         <span className="scene-sigil">
           <Icon name="sparkles" size={34} />
