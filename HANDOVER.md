@@ -1,4 +1,18 @@
-# Emberwake · The Long Night checkpoint (v0.7.0)
+# Emberwake · The Living Map checkpoint (v0.8.0)
+
+## Round two (v0.8)
+
+Plan: `docs/ROUND2_PLAN.md`. Inspiration only from Heroes III (days, movement, things on the map, dawn income) and OpenStreetMap/Mapy.com (planner, blazes, real units).
+
+- `src/game/atlas.ts`: `day`/`oil`/`range`/`finds` on `AtlasState` (absent on older charts), `dayRange`, `atlasFinds`, `atlasRoute`, actions `atlas-walk` and `atlas-camp`. `makeEnemy(node, ruleset, dusk, nights)`; `nightsOf(run)`.
+- `src/components/Atlas.tsx`: day and oil meter, planner, blazes, finds, pictogram pins. `Chronicle.tsx`: Atlas passport tab (`meta.cities`).
+- `src/artwork.ts` globs `src/art/{foes,relics,sites,scenes}/*.webp`; components `EnemyPortrait`, `RelicIcon`, `SiteIcon`, `SceneArt` fall back when a file is absent. **No illustrations are committed yet**: `docs/ART_BRIEF.md` is the complete brief for an image-producing agent. After they land, check the combat board, reward cards, route map and scene screens at desktop and phone width, and extend `scripts/build-worker.mjs` checks if desired.
+- Combat: chips are buttons that explain themselves; `effectiveHit` feeds action titles; victory beat on the reward screen.
+- Validation: 96 unit tests and 22 Chromium tests pass; strict build and Worker packaging pass. Direct Atlas runs take 4–6 days on the charts sampled.
+
+---
+
+# Earlier checkpoint · The Long Night (v0.7.0)
 
 ## Latest user request
 

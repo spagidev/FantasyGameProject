@@ -216,7 +216,9 @@
   min-height: 22px;
   margin-top: 8px;
 }
-.chips > span {
+.chips > .chip {
+  font-family: inherit;
+  cursor: help;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -229,15 +231,15 @@
   color: #e3e6cf;
   white-space: nowrap;
 }
-.chips > .good {
+.chips > .chip.good {
   border-color: #b5cf8f80;
   color: #d5e6b0;
 }
-.chips > .bad {
+.chips > .chip.bad {
   border-color: #e0a07a99;
   color: #f4c7a3;
 }
-.chips > .trait {
+.chips > .chip.trait {
   border-style: dashed;
   color: #ead9ae;
 }
@@ -1193,4 +1195,148 @@
 }
 .sound-toggle[aria-pressed='true'] {
   color: #7a4712;
+}
+
+/* v0.8 · tap-to-explain, supplied artwork, the victory beat. */
+.duel-explain {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0;
+  padding: 7px 12px;
+  border-left: 2px solid #e2c58a;
+  background: #0d2423cc;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #e9edd8;
+}
+.duel-explain svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #e2c58a;
+}
+.enemy-portrait.enemy-portrait-own {
+  background-size: cover;
+  background-position: 50% 20%;
+}
+.relic-art,
+.site-art {
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+.scene-art {
+  display: block;
+  width: min(100%, 560px);
+  aspect-ratio: 16 / 9;
+  margin: 0 auto 18px;
+  border: 1px solid #c7b27366;
+  border-radius: 5px;
+  object-fit: cover;
+  box-shadow: 0 10px 30px #06161699;
+}
+.victory-beat {
+  margin: 0 0 14px;
+  font-family: var(--serif);
+  font-size: 21px;
+  color: #f3dba6;
+  animation: victory-beat 0.7s ease-out;
+}
+@keyframes victory-beat {
+  from {
+    opacity: 0;
+    letter-spacing: 6px;
+  }
+}
+
+/* v0.8 · the Atlas as a day's walk. */
+.atlas-day {
+  display: grid;
+  grid-template-columns: auto minmax(80px, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 20px;
+  border-bottom: 1px solid #c9cabb;
+  background: #f1ecdc;
+  font-size: 12px;
+  color: #4a5d45;
+}
+.atlas-day strong {
+  font-family: var(--serif);
+  font-size: 21px;
+  font-weight: 600;
+  color: #2f4a33;
+}
+.atlas-day b {
+  color: #2f4a33;
+}
+.oil-meter {
+  height: 8px;
+  border: 1px solid #b9a56f;
+  border-radius: 999px;
+  background: #e2dcc6;
+  overflow: hidden;
+}
+.oil-meter > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #c98a3c, #f0cf8d);
+  transition: width 0.3s;
+}
+.atlas-day .secondary-button {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 12px;
+}
+.atlas-day.is-stranded {
+  background: #f3e2c2;
+}
+.atlas-day.is-stranded .secondary-button {
+  background: #234634;
+  border-color: #234634;
+  color: #f3e7cb;
+}
+.atlas-plan {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #47583f;
+}
+.atlas-plan svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #86683c;
+}
+.atlas-plan b {
+  color: #2f4a33;
+}
+.atlas-roads button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.atlas-recognized a {
+  display: block;
+}
+@media (max-width: 740px) {
+  .atlas-day {
+    grid-template-columns: auto 1fr auto;
+    gap: 8px 12px;
+    padding: 10px 14px;
+  }
+  .atlas-day > span {
+    grid-column: 1 / 3;
+    grid-row: 2;
+  }
+  .atlas-day .secondary-button {
+    grid-row: 1 / 3;
+    grid-column: 3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .victory-beat {
+    animation: none;
+  }
 }

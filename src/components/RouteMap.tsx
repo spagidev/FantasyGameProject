@@ -1,6 +1,6 @@
 import { CHAPTERS, NODE_LABELS, WAYLIGHTS } from '../game/data';
 import { layoutOf, nextNodes, nodeAt, waylightFor, type MapNode, type Run } from '../game/engine';
-import { Landscape } from './Art';
+import { Landscape, SiteIcon } from './Art';
 import { Icon } from './Icon';
 
 export function RouteMap({
@@ -75,10 +75,16 @@ export function RouteMap({
                   onClick={() => onInspect(node)}
                   title={`Scout ${node.name}`}
                 >
-                  <Icon
-                    name={visited ? 'check' : node.kind}
-                    size={node.kind === 'boss' ? 24 : 20}
-                  />
+                  {visited ? (
+                    <Icon name="check" size={20} />
+                  ) : (
+                    <SiteIcon
+                      kind={site ?? node.kind}
+                      fallback={node.kind}
+                      size={node.kind === 'boss' ? 40 : 34}
+                      iconSize={node.kind === 'boss' ? 24 : 20}
+                    />
+                  )}
                 </button>
                 <span>
                   {node.kind === 'boss'

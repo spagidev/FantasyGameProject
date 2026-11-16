@@ -58,6 +58,16 @@ After the first and second bell choose one of three lessons (each keeper has fou
 
 A chosen level 0–8 applies all rules up to that level: (1) enemies +10% health; (2) elites and guardians hit 2 harder; (3) one starting flask; (4) poise +25%; (5) every enemy hits 1 harder; (6) rest restores 6 less; (7) trader prices +20%; (8) enemies a further +15% health and guardians begin with 2 fury. Completing an expedition at a keeper’s deepest open level opens the next.
 
+### The Atlas as a day's walk (v0.8)
+
+Ruleset-3 Atlas expeditions count days. One day's lamp oil is a distance in real metres: a seventh of the shortest road through all twelve encounters, never less than the chart's longest single road, rounded up to 100 m. Walking a road spends its length; a road longer than the remaining oil cannot be started. Entering an encounter, gathering a gift and naming the city cost no oil.
+
+**Make camp** starts the next day with full oil. At dawn each Dawnwell restores 2 health and each Cinder Kiln pays 4 coins; on these charts waylights do not also pay when an encounter is entered. Each night adds 2% health to every enemy not yet fought, to a maximum of 30%; scouting shows the current figure. Completing the expedition before day 12 scores 15 per day to spare.
+
+Five **wayside finds** lie on five different roads chosen by the seed: two purses (+14 coins), two bundles of herbs (restore 8 health) and one oil flask (a third of a day's oil, today only). A find is gathered the first time its road is walked, in either direction.
+
+The **route planner** (`atlasRoute`) returns the shortest route over roads the keeper knows — roads already walked and roads whose both ends are charted. `atlas-walk` follows it one road at a time and stops where the oil runs out. Atlas journals begun before v0.8 have no day counter and keep free walking.
+
 ### Records
 
 `src/game/meta.ts`. Score = 10 per crossing + 150 per bell + 40 per elite + 5 per stagger + 3 per perfect guard + 100 for naming an Atlas city + (on completion) 300 and 2 per remaining health, all multiplied by `1 + 0.2 × dusk`. Deeds are judged on every saved step; twelve of them add one relic each to the pool of future expeditions. Records never change a keeper’s starting statistics. Unreadable records in a journal are dropped without rejecting the journal.

@@ -84,7 +84,14 @@ export function campaignAction(r: Run): Action {
       while (queue.length) {
         const path = queue.shift()!,
           last = path.at(-1)!;
-        if (last === target) return { type: 'atlas-move', to: path[1] };
+        if (last === target) {
+          const road = atlasGeography(r.atlas).edges.find(
+            (e) => (e.a === path[0] && e.b === path[1]) || (e.b === path[0] && e.a === path[1]),
+          )!;
+          return r.atlas.oil !== undefined && r.atlas.oil < road.metres
+            ? { type: 'atlas-camp' }
+            : { type: 'atlas-move', to: path[1] };
+        }
         for (const edge of atlasGeography(r.atlas).edges) {
           const next = edge.a === last ? edge.b : edge.b === last ? edge.a : null;
           if (next && !seen.has(next)) {

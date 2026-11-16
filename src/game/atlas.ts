@@ -205,13 +205,24 @@ export type AtlasState = {
   collected: string[];
   recognized: boolean;
   attempts: { bell: number; name: string }[];
+  // Travel rules (v0.8). Absent on charts begun earlier, which keep free walking.
+  /** The current day, starting at 1. */
+  day?: number;
+  /** Metres of road the keeper can still walk today. */
+  oil?: number;
+  /** Metres of road one day's lamp oil lasts on this chart. */
+  range?: number;
+  /** Road indices whose wayside find has been gathered. */
+  finds?: number[];
 };
 export type AtlasAction =
   | { type: 'atlas-move'; to: string }
+  | { type: 'atlas-walk'; to: string }
+  | { type: 'atlas-camp' }
   | { type: 'atlas-collect' }
   | { type: 'atlas-name'; name: string };
-export function newAtlas(chart?: RegionalChart): AtlasState {
-  return {
+export function newAtlas(chart?: RegionalChart, travel = true): AtlasState {
+  const state: AtlasState = {
     version: 1,
     region: chart ? 'regional' : 'saltbound',
     ...(chart ? { chart } : {}),
@@ -223,6 +234,105 @@ export function newAtlas(chart?: RegionalChart): AtlasState {
     recognized: false,
     attempts: [],
   };
+  if (!travel) return state;
+  const range = dayRange(state);
+  return { ...state, day: 1, oil: range, range, finds: [] };
+}
+
+/** Shortest road distances from one site to every other, over the whole chart. */
+function distances(state: AtlasState, from: string, allowed?: (index: number) => boolean) {
+  const pack = atlasGeography(state);
+  const best: Record<string, { metres: number; via: number; previous: string } | undefined> = {};
+  const done = new Set<string>();
+  const cost: Record<string, number> = { [from]: 0 };
+  for (;;) {
+    let here: string | null = null;
+    for (const id of Object.keys(cost))
+      if (!done.has(id) && (here === null || cost[id] < cost[here])) here = id;
+    if (here === null) break;
+    done.add(here);
+    pack.edges.forEach((e, index) => {
+      if ((e.a !== here && e.b !== here) || (allowed && !allowed(index))) return;
+      const next = e.a === here ? e.b : e.a;
+      const total = cost[here!] + e.metres;
+      if (cost[next] === undefined || total < cost[next]) {
+        cost[next] = total;
+        best[next] = { metres: total, via: index, previous: here! };
+      }
+    });
+  }
+  return { cost, best };
+}
+/**
+ * One day's lamp oil: a seventh of the shortest road through all twelve encounters, and never
+ * less than the longest single road, so a fresh day can always walk any one stretch.
+ */
+export function dayRange(state: AtlasState): number {
+  const pack = atlasGeography(state);
+  const stops = [
+    'origin',
+    ...ATLAS_SITES.filter((s) => s.depth !== undefined)
+      .sort((a, b) => a.depth! - b.depth!)
+      .map((s) => s.id),
+  ];
+  let road = 0;
+  for (let i = 1; i < stops.length; i++) road += distances(state, stops[i - 1]).cost[stops[i]] ?? 0;
+  const longest = Math.max(...pack.edges.map((e) => e.metres));
+  return Math.ceil(Math.max(longest, road / 7) / 100) * 100;
+}
+/** Whether this chart uses days and lamp oil. */
+export const travels = (
+  a?: AtlasState,
+): a is AtlasState & { day: number; oil: number; range: number; finds: number[] } =>
+  a?.day !== undefined;
+
+export type FindKind = 'purse' | 'herbs' | 'oil';
+export const FINDS: Record<FindKind, { name: string; text: string }> = {
+  purse: { name: 'A dropped purse', text: '+14 coins' },
+  herbs: { name: 'Roadside herbs', text: 'restore 8 health' },
+  oil: { name: 'A cached oil flask', text: 'walk a third of a day farther today' },
+};
+/** Five seeded wayside finds, each lying on a different road. Gathered by walking that road. */
+export function atlasFinds(
+  seed: number,
+  state: AtlasState,
+): { edge: number; kind: FindKind; point: Point }[] {
+  const pack = atlasGeography(state);
+  const mix = (i: number) => {
+    let n = (seed ^ Math.imul(i + 9001, 0x9e3779b9)) >>> 0;
+    n = Math.imul(n ^ (n >>> 16), 0x21f0aaad);
+    n = Math.imul(n ^ (n >>> 15), 0x735a2d97);
+    return (n ^ (n >>> 15)) >>> 0;
+  };
+  const kinds: FindKind[] = ['purse', 'herbs', 'oil', 'purse', 'herbs'];
+  return pack.edges
+    .map((_, index) => index)
+    .sort((a, b) => mix(a) - mix(b) || a - b)
+    .slice(0, kinds.length)
+    .map((edge, i) => {
+      const points = pack.edges[edge].points;
+      return { edge, kind: kinds[i], point: points[Math.floor(points.length / 2)] };
+    });
+}
+/**
+ * The shortest route to a site along roads the keeper knows: roads already walked, and
+ * roads whose both ends are charted.
+ */
+export function atlasRoute(state: AtlasState, to: string) {
+  const pack = atlasGeography(state);
+  if (to === state.position || !pack.points[to]) return null;
+  const known = (index: number) =>
+    state.roads.includes(index) ||
+    (charted(state, pack.edges[index].a) && charted(state, pack.edges[index].b));
+  const { best } = distances(state, state.position, known);
+  if (!best[to]) return null;
+  const sites: string[] = [];
+  const edges: number[] = [];
+  for (let at = to; at !== state.position; at = best[at]!.previous) {
+    sites.unshift(at);
+    edges.unshift(best[at]!.via);
+  }
+  return { sites, edges, metres: best[to]!.metres };
 }
 export const atlasSite = (id: string, state?: AtlasState) =>
   atlasSites(state).find((s) => s.id === id)!;
@@ -261,14 +371,49 @@ export function applyAtlasAction(run: Run, action: AtlasAction): Run {
   const r = cloneAtlasRun(run),
     a = r.atlas!;
   let message = '';
-  if (action.type === 'atlas-move') {
-    const edge = atlasNeighbours(a).find((e) => e.id === action.to);
-    if (!edge) return run;
-    a.position = action.to;
+  const step = (to: string): boolean => {
+    const edge = atlasNeighbours(a).find((e) => e.id === to);
+    if (!edge || (travels(a) && a.oil < edge.metres)) return false;
+    if (travels(a)) a.oil -= edge.metres;
+    a.position = to;
     a.steps++;
-    if (!a.visited.includes(action.to)) a.visited.push(action.to);
+    if (!a.visited.includes(to)) a.visited.push(to);
     if (!a.roads.includes(edge.index)) a.roads.push(edge.index);
-    message = `You reach ${atlasSite(action.to, a).name}. A little more of the world returns.`;
+    message = `You reach ${atlasSite(to, a).name}. A little more of the world returns.`;
+    const find = travels(a) ? atlasFinds(r.seed, a).find((f) => f.edge === edge.index) : null;
+    if (find && travels(a) && !a.finds.includes(edge.index)) {
+      a.finds.push(edge.index);
+      if (find.kind === 'purse') r.coins += 14;
+      else if (find.kind === 'herbs') r.health = Math.min(r.maxHealth, r.health + 8);
+      else a.oil += Math.round(a.range / 3);
+      message += ` On the way: ${FINDS[find.kind].name.toLowerCase()} (${FINDS[find.kind].text}).`;
+    }
+    return true;
+  };
+  if (action.type === 'atlas-move') {
+    if (!step(action.to)) return run;
+  } else if (action.type === 'atlas-walk') {
+    const route = atlasRoute(a, action.to);
+    if (!route) return run;
+    let walked = 0;
+    for (const site of route.sites) {
+      if (!step(site)) break;
+      walked++;
+    }
+    if (!walked) return run;
+  } else if (action.type === 'atlas-camp') {
+    if (!travels(a)) return run;
+    a.day++;
+    a.oil = a.range;
+    const wells = r.waylights.filter((id) => id === 'well').length * 2;
+    const kilns = r.waylights.filter((id) => id === 'kiln').length * 4;
+    r.health = Math.min(r.maxHealth, r.health + wells);
+    r.coins += kilns;
+    message = `Day ${a.day}. You make camp and trim the lamp.${
+      wells || kilns
+        ? ` Your waylights send${kilns ? ` ${kilns} coins` : ''}${kilns && wells ? ' and' : ''}${wells ? ` ${wells} health` : ''} at dawn.`
+        : ''
+    } The dark has gathered a little.`;
   } else if (action.type === 'atlas-collect') {
     const site = atlasSite(a.position, a);
     if (a.collected.includes(site.id)) return run;
@@ -338,6 +483,23 @@ export function validAtlas(x: unknown): x is AtlasState {
     Number.isInteger(a.steps) &&
     a.steps >= 0 &&
     a.steps <= 100000 &&
+    (a.day === undefined
+      ? a.oil === undefined && a.range === undefined && a.finds === undefined
+      : Number.isInteger(a.day) &&
+        a.day >= 1 &&
+        a.day <= 10000 &&
+        Number.isInteger(a.range) &&
+        a.range! >= 100 &&
+        a.range! <= 1000000 &&
+        Number.isInteger(a.oil) &&
+        a.oil! >= 0 &&
+        a.oil! <= a.range! * 3 &&
+        Array.isArray(a.finds) &&
+        a.finds.length <= 5 &&
+        new Set(a.finds).size === a.finds.length &&
+        a.finds.every(
+          (n) => Number.isInteger(n) && n >= 0 && n < atlasGeography(a).edges.length,
+        )) &&
     typeof a.recognized === 'boolean' &&
     Array.isArray(a.attempts) &&
     a.attempts.length <= 4 &&

@@ -31,7 +31,22 @@ export type Meta = {
   /** Best score on each date-seeded road, by YYYY-MM-DD. */
   daily: Record<string, number>;
   sound: boolean;
+  /** The atlas passport: every real place charted, keyed by its chart. */
+  cities: Record<string, CityStamp>;
 };
+export type CityStamp = {
+  /** The fantasy title of the chart. */
+  title: string;
+  /** The public clue: the country or region chosen. */
+  area: string;
+  /** The real name, kept only once the player has named it. */
+  name?: string;
+  completed: boolean;
+};
+/** Sixteen bundled Slovak charts and the original coast. Live charts add to the passport too. */
+export const KNOWN_CHARTS = 17;
+export const cityKey = (run: Run) =>
+  run.atlas ? (run.atlas.chart ? `c${run.atlas.chart.cityId}` : 'saltbound') : null;
 export const HISTORY_LENGTH = 12;
 export const DAILY_LENGTH = 60;
 export function emptyMeta(): Meta {
@@ -46,6 +61,7 @@ export function emptyMeta(): Meta {
     bestStreak: 0,
     daily: {},
     sound: false,
+    cities: {},
   };
 }
 
@@ -68,6 +84,9 @@ export function scoreOf(run: Run): { total: number; lines: ScoreLine[]; multipli
       ? [{ label: `${stats.parries} perfect guards`, value: stats.parries * 3 }]
       : []),
     ...(run.atlas?.recognized ? [{ label: 'The city named', value: 100 }] : []),
+    ...(won && run.atlas?.day !== undefined && run.atlas.day < 12
+      ? [{ label: `Arrived on day ${run.atlas.day}`, value: (12 - run.atlas.day) * 15 }]
+      : []),
     ...(won
       ? [
           { label: 'The road completed', value: 300 },
@@ -278,6 +297,21 @@ export function advanceMeta(
     relics: [...new Set([...meta.relics, ...run.relics])],
     foes: [...new Set([...meta.foes, ...(run.slain ?? [])])],
   };
+  const key = cityKey(run);
+  if (key) {
+    const chart = run.atlas!.chart;
+    const before = meta.cities[key];
+    const name = run.atlas!.recognized ? (chart?.city ?? 'Monaco') : before?.name;
+    next.cities = {
+      ...meta.cities,
+      [key]: {
+        title: chart?.title ?? 'The Saltbound Coast',
+        area: chart?.area ?? 'A small southern coast',
+        ...(name ? { name } : {}),
+        completed: !!before?.completed || run.phase === 'won',
+      },
+    };
+  }
   if (finished) {
     const victory = run.phase === 'won';
     const { total } = scoreOf(run);
@@ -363,5 +397,16 @@ export function sanitizeMeta(x: unknown): Meta {
         .sort()
         .slice(-DAILY_LENGTH),
     ) as Record<string, number>;
+  if (isRecord(x.cities))
+    for (const [key, v] of Object.entries(x.cities).slice(0, 300)) {
+      const text = (t: unknown) => (typeof t === 'string' ? t.slice(0, 120) : '');
+      if (!/^(saltbound|c\d{1,12})$/.test(key) || !isRecord(v) || !text(v.title)) continue;
+      meta.cities[key] = {
+        title: text(v.title),
+        area: text(v.area),
+        ...(text(v.name) ? { name: text(v.name) } : {}),
+        completed: v.completed === true,
+      };
+    }
   return meta;
 }
