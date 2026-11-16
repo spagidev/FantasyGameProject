@@ -155,3 +155,8 @@
   float: right;
   margin: 0 0 6px 12px;
 }
+
+/* Province crests on the realm map's province buttons. */
+.province-crest {
+  border-radius: 50%;
+}

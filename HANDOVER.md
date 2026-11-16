@@ -7,7 +7,7 @@ Working method this round: the lead model did design, lore and engine; two mid-t
 - **Hearth-wagon:** `WORKS`, `worksOf`, `workBlocked`, `darkNights`, `REST_HEALING` in `src/game/atlas.ts`; action `{ type: 'atlas-camp', work? }`. Evening dialog and wagon row in `src/components/Atlas.tsx`, styles in `src/wagon.css`.
 - **Provinces:** `src/atlas/provinces.ts` (legends, `campaignProgress`), data `src/atlas/slovakia-map.json` built by `scripts/build-campaign-map.mjs` from the Natural Earth outline (public domain) and the bundled chart centres. `bundledChart(area, seed, rekindled)` passes over completed charts. Interface: `src/components/CampaignMap.tsx`, `src/campaign.css`, used in `AtlasSetup.tsx` and the Chronicle's Atlas tab.
 - **Lore:** `src/game/lore.ts` (`VOICES`, `KEEPER_PAGES`, `EPILOGUES`); pages are appended to `LORE`, pushed to `run.lore` by ruleset-3 boss victories and endings.
-- **Art hooks waiting for files:** `src/art/works/`, `src/art/provinces/`, scenes `wagon`, `journal-<keeper>` — see `docs/ART_BRIEF_2.md`.
+- **Art:** the 18 illustrations of `docs/ART_BRIEF_2.md` (works, province crests, wagon and journal paintings) were delivered and checked on every screen that shows them.
 - Validation: see the PR description for the counts of the final run.
 
 ---
