@@ -1,4 +1,33 @@
-# Emberwake · Boons and offline checkpoint (v0.11.0)
+# Emberwake · Handover for the next session (v0.13, in progress)
+
+## Start here
+
+1. Branch `claude/game-improvement-plan-quwmax`, last commit `6ebad78`. `main` ends at PR #11 (v0.12). Everything listed under v0.13 below is on the branch only.
+2. **Verify first.** Run `npx tsc -b`, `npx vitest run` (~144 tests) and `npx playwright test --trace off --reporter=line` (~43 tests, about two minutes). The last full browser run of the guide card and terrain together was interrupted, so nobody has seen it green yet. Fix anything red, then open a PR to `main` and merge it once CI passes (the owner has been asking for "open and merge").
+3. Then continue with **keeper level-ups** (below).
+
+## v0.13 on the branch (not yet in main)
+
+- **One front door:** the lobby defaults to the Lost Atlas as "the campaign"; the First Crossing is the "quick road". The last choice is kept in `localStorage['emberwake.lobby.mode']`. Browser specs that assume classic set that key to `'quick'` in a `beforeEach`.
+- **Balance pass:** ruleset-3 Seer 38/6/1 and Wayfarer 44/6/1 via `startingStats` (`data.ts`). A naive scripted player now wins 64 / 58 / 54 % at Dusk 0. `tests/player.ts` has `beginnerAction`; `npm run balance` records beginner and Atlas groups and asserts keepers within 20 points.
+- **Keeper's guide:** `src/game/tips.ts` (`tipFor(run, meta)`, eleven notes), `meta.tips` / `meta.tipsOff`. Card: `src/components/GuideNote.tsx` above the board, on/off switch in Help, Slovak text in `src/i18n`.
+- **Ground of an encounter:** `src/game/terrain.ts`. Narrow streets, open ground, winding hill road or crossroads, from absolute road metres within 300 m (3,500 / 1,800, winding 1.4, degree 4). Active only on charts with `atlas.ground` (v0.13+). `nodeOf` adds `terrain`; `makeEnemy`, travel focus and `victoryCoins` apply it. Shown on the chart, scout card and combat board. Rules in RULES.md.
+
+## Next: keeper level-ups (Lead, design-heavy)
+
+Heroes III's "ding". Experience from every fight, a level every two encounters (troves count half), and a choice of three: +2 attack, +6 max health, a lesson, or an upgrade to the keeper's second technique. Rebalance enemy health so `npm run balance` keeps the beginner between about 50 and 70 % per keeper and the search player winning every Dusk 0 run. Keep it out of rulesets 1–2 and older journals (gate it with a run field such as `levels`). Then: "Feel" (motion, ambient sound; Build), from the Round four list in `docs/BACKLOG.md`.
+
+## Working method that worked
+
+The lead model designs rules, lore and engine and reviews. Mid-tier subagents build UI from tight written briefs with explicit file lists, and never commit. Check every subagent's screenshots and tests before committing. Codex makes art from `docs/ART_BRIEF*.md`. It pushes an `art/*` branch without merging, so pull it in yourself and validate names, sizes and alpha.
+
+## Open owner questions
+
+Slovak wording a native speaker should check (listed in the PR #11 description and in this session's notes: "Krbový voz", "cestné svetlo", "zachvený", "Rozumiem", "Lampášový trh"…). Lore translation is pending. A second country needs network access for a Geofabrik extract.
+
+---
+
+# Earlier checkpoint · Boons and offline (v0.11.0)
 
 ## v0.11
 
