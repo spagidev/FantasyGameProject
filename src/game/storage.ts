@@ -2,17 +2,26 @@ import { validAtlas } from './atlas';
 import { FOES } from './bestiary';
 import { KEEPERS, LORE, NEW_TALENTS, RELICS, TALENTS, WAYLIGHTS, type KeeperId } from './data';
 import { DUSK_MAX, nodeOf, type Run } from './engine';
+import { advanceMeta, emptyMeta, sanitizeMeta, type Meta } from './meta';
 
 export const SAVE_KEY = 'emberwake.save.v2';
 export const LEGACY_SAVE_KEY = 'emberwake.save.v1';
 export const MAX_SAVE_BYTES = 2 * 1024 * 1024;
-export type Profile = { runs: number; wins: number; lore: string[]; lastKeeper: KeeperId };
+export type Profile = {
+  runs: number;
+  wins: number;
+  lore: string[];
+  lastKeeper: KeeperId;
+  /** Records, deeds and unlocks. Journals written before v0.7 do not carry it. */
+  meta?: Meta;
+};
+export const metaOf = (profile: Profile): Meta => profile.meta ?? emptyMeta();
 export type Save = { version: 2; run: Run | null; profile: Profile };
 export function emptySave(): Save {
   return {
     version: 2,
     run: null,
-    profile: { runs: 0, wins: 0, lore: ['beginning'], lastKeeper: 'warden' },
+    profile: { runs: 0, wins: 0, lore: ['beginning'], lastKeeper: 'warden', meta: emptyMeta() },
   };
 }
 
@@ -248,7 +257,7 @@ export function decodeSave(raw: string): Save | null {
       !Object.hasOwn(KEEPERS, p.lastKeeper)
     )
       return null;
-    return x as Save;
+    return { ...x, profile: { ...p, meta: sanitizeMeta(p.meta) } } as Save;
   } catch {
     return null;
   }
@@ -257,14 +266,19 @@ export function decodeSave(raw: string): Save | null {
 export function advanceSave(save: Save, run: Run): Save {
   const terminal = run.phase === 'won' || run.phase === 'lost';
   const alreadyTerminal = save.run?.phase === 'won' || save.run?.phase === 'lost';
+  const finished = terminal && !alreadyTerminal;
+  const lore = [...new Set([...save.profile.lore, ...run.lore])];
+  // Only the same expedition's previous step counts as "before".
+  const before = save.run && save.run.seed === run.seed ? save.run : null;
   return {
     version: 2,
     run,
     profile: {
-      runs: save.profile.runs + (terminal && !alreadyTerminal ? 1 : 0),
-      wins: save.profile.wins + (run.phase === 'won' && !alreadyTerminal ? 1 : 0),
+      runs: save.profile.runs + (finished ? 1 : 0),
+      wins: save.profile.wins + (finished && run.phase === 'won' ? 1 : 0),
       lastKeeper: run.keeper,
-      lore: [...new Set([...save.profile.lore, ...run.lore])],
+      lore,
+      meta: advanceMeta(metaOf(save.profile), run, lore, before, finished),
     },
   };
 }

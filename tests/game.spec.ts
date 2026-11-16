@@ -4,6 +4,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { EVENTS, KEEPERS, RELICS, TALENTS, type KeeperId, type RelicId } from '../src/game/data';
 import { makeEnemy, nextNodes, nodeOf, type Action, type Run } from '../src/game/engine';
 import { SAVE_KEY, LEGACY_SAVE_KEY, MAX_SAVE_BYTES } from '../src/game/storage';
+import { dailyRoad, scoreOf } from '../src/game/meta';
 import legacyJournal from './fixtures/v1-journal.json' with { type: 'json' };
 import { campaignAction } from './player';
 
@@ -130,17 +131,72 @@ for (const keeper of ['warden', 'seer', 'wayfarer'] as KeeperId[]) {
     expect(run.path).toHaveLength(12);
     expect(run.talents).toHaveLength(2);
     expect(run.waylights).toHaveLength(3);
-    await expect(page.getByRole('button', { name: /Walk another road/ })).toBeVisible();
+    await expect(page.locator('.score-total strong')).toHaveText(
+      scoreOf(run).total.toLocaleString('en'),
+    );
+    await expect(page.locator('.score-news')).toContainText('Dusk 1 is open');
+    await expect(page.locator('.score-news')).toContainText('Somebody made it');
     await page.reload();
     expect((await readRun(page)).phase).toBe('won');
     await page.getByRole('button', { name: /Chronicle/ }).click();
     await expect(page.locator('.chronicle-counts')).toContainText('1 crossings completed');
+    await page.getByRole('tab', { name: /Records/ }).click();
+    await expect(page.locator('.history tbody tr')).toHaveCount(1);
+    await expect(page.locator('.history')).toContainText('Completed');
+    await page.getByRole('tab', { name: /Bestiary/ }).click();
+    await expect(page.locator('.foe-card.is-done').first()).toBeVisible();
     await page.getByRole('button', { name: /Return to the expedition/ }).click();
-    await page.getByRole('button', { name: /Walk another road/ }).click();
-    await expect(page.getByRole('button', { name: /Begin expedition/ })).toBeVisible();
+    if (keeper === 'warden') {
+      // One click starts the next, harder night with the same keeper.
+      await page.getByRole('button', { name: /Walk again as Asha/ }).click();
+      const again = await readRun(page);
+      expect(again).toMatchObject({ keeper: 'warden', dusk: 1, phase: 'map', depth: -1 });
+      expect(again.seed).not.toBe(run.seed);
+      expect(again.pool).toEqual(expect.arrayContaining(['buckle', 'lodestar', 'mirror']));
+    } else {
+      await page.getByRole('button', { name: /Choose another road/ }).click();
+      await expect(page.getByRole('button', { name: /Begin expedition/ })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Dusk 1', exact: true })).toBeEnabled();
+      await expect(page.getByRole('button', { name: 'Dusk 2, locked' })).toBeDisabled();
+    }
     expect(errors).toEqual([]);
   });
 }
+
+test('today’s road, the codex and combat previews', async ({ page }) => {
+  await page.goto('/');
+  const road = await page.evaluate(() => {
+    const d = new Date();
+    return [d.getFullYear(), d.getMonth(), d.getDate()];
+  });
+  const today = dailyRoad(new Date(road[0], road[1], road[2]));
+  await page.getByRole('button', { name: /Today’s road/ }).click();
+  let run = await readRun(page);
+  expect(run).toMatchObject({ seed: today.seed, keeper: today.keeper, daily: today.id, dusk: 0 });
+  await page.locator('.route-choice').first().click();
+  run = await readRun(page);
+  // Every enabled action states its exact result; the engine agrees after the click.
+  const strike = page.locator('.duel-action[data-action="strike"]');
+  await expect(strike.locator('.action-result')).toContainText(/Enemy −\d+/);
+  const promised = Number(
+    (await strike.locator('.action-result').innerText()).match(/Enemy −(\d+)/)![1],
+  );
+  await expect(page.getByRole('meter', { name: 'Enemy poise' })).toBeVisible();
+  await expect(page.locator('.intent-next')).toContainText('Then:');
+  await page.keyboard.press('1');
+  const after = await readRun(page);
+  expect(run.enemy!.health - after.enemy!.health).toBe(promised);
+  await expect(page.locator('.duel-action')).toHaveCount(5);
+  await page.getByRole('button', { name: /Chronicle/ }).click();
+  for (const tab of ['Deeds', 'Relics', 'Bestiary', 'Records', 'Memories']) {
+    await page.getByRole('tab', { name: new RegExp(tab) }).click();
+    await expect(page.getByRole('tabpanel')).toBeVisible();
+  }
+  await page.getByRole('tab', { name: /Relics/ }).click();
+  await expect(page.getByRole('tabpanel')).toContainText('16 of 28 relics');
+  const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(accessibility.violations).toEqual([]);
+});
 
 test('mobile layout stays within the viewport and supports combat', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
