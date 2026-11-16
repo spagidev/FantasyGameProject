@@ -83,6 +83,27 @@ Each evening, **Make camp** opens one choice, never both: build one of six works
 
 At dawn the lamp oil is refilled (to the rack's longer day, if built), then waylights and works pay: each Dawnwell restores 2 health, the stove 4, each Cinder Kiln pays 4 coins, the toll-box 6, and the dew-still fills a flask if fewer than two are carried. A work built tonight pays at the very next dawn. With the ward-lantern only every second night (rounded up) counts toward the 2% health gained by enemies not yet fought.
 
+### Free order and guarded troves (v0.10)
+
+On Atlas charts begun from v0.10 the three encounters of a realm may be entered in any order; the realm's bell guardian opens only when all three are done, and later realms stay sealed until it falls. `atlas.done` records the sites entered in order, and a journal is accepted only if that list replays as a legal sequence (each site open when entered; path, position and bells agreeing). Charts begun earlier keep the strict order.
+
+On those charts the three side sites are **guarded troves**. A trove cannot be gathered; from its site the keeper may _challenge_ its guardian, an ordinary enemy of the realm reached so far (scoutable; toughened by nights like any enemy). Winning grants the site's old gift (18 coins; a flask; 12 health and +1 attack) and a choice of three relics drawn with elite weights, or 12 health. A trove fight does not advance the road, pays no battle coins, frees no waylight and never offers a lesson. Losing it ends the expedition like any fight.
+
+### Omens (v0.10)
+
+On Atlas charts that count days, the almanac names an omen. It is a pure function of the run's seed and the day: days 1–3 have none; from day 4 the omen changes every three days (days 4–6, 7–9, 10–12, …). Each period's omen is drawn with `hash(seed, 6100 + period)` over the six omens and never repeats the previous period's (if the draw matches, the next omen in the list is taken). The dawn message announces a new omen on the first day of its period. Effects use the current day; the dawn effect uses the new day, and resting uses the evening's day. Charts without days and earlier rulesets are unaffected, and no save data changes.
+
+- **Moth-light:** battles start with 1 extra focus (still capped at 5).
+- **Hoarfrost:** when a battle begins, the keeper has 1 frost (the Sprig of Thaw still prevents it).
+- **Fair days:** trader prices are 20% lower (rounded up, after every other modifier).
+- **Long shadows:** walking a road costs 15% more lamp oil, rounded up, but never more than a full day's oil, so a fresh day can always walk any single road.
+- **Clear bells:** perfect guards wear 25% more poise (rounded up).
+- **Kind weather:** resting by the wagon fire restores 12 instead of 8.
+
+### Relic sets (v0.10)
+
+Four sets of three existing relics. Carrying all three of a set adds one rule (ruleset 3 only): **The bell-ringer’s kit** (Bell Clapper, Executioner’s Chime, Echo Bell) — every stagger also gives 1 focus. **The long watch** (Oathkeeper’s Buckle, Iron Psalm, Shard of the March) — every perfect guard restores 2 health. **The night garden** (Nightshade Censer, Gravebloom, Briar Charm) — poison fades only on odd turns. **The pilgrim’s purse** (Ferryman’s Coin, Trader’s Scale, Pilgrim’s Thread) — entering a trader gives one flask (up to five). Relic cards show each relic's set and how many of it are carried.
+
 ### Records
 
 `src/game/meta.ts`. Score = 10 per crossing + 150 per bell + 40 per elite + 5 per stagger + 3 per perfect guard + 100 for naming an Atlas city + (on completion) 300 and 2 per remaining health, all multiplied by `1 + 0.2 × dusk`. Deeds are judged on every saved step; twelve of them add one relic each to the pool of future expeditions. Records never change a keeper’s starting statistics. Unreadable records in a journal are dropped without rejecting the journal.

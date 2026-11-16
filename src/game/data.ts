@@ -431,6 +431,43 @@ export const RELICS: Record<
     rarity: 'rare',
   },
 };
+/**
+ * Relic sets (v0.10): carrying all three relics of a set adds one more rule. Ruleset 3 only.
+ */
+export type SetId = 'kit' | 'watch' | 'garden' | 'purse';
+export const RELIC_SETS: Record<
+  SetId,
+  { name: string; relics: [RelicId, RelicId, RelicId]; bonus: string; flavor: string }
+> = {
+  kit: {
+    name: 'The bell-ringer’s kit',
+    relics: ['clapper', 'chime', 'echo'],
+    bonus: 'Whenever you stagger an enemy, gain 1 focus.',
+    flavor: 'Three ways of asking the same bell the same question.',
+  },
+  watch: {
+    name: 'The long watch',
+    relics: ['buckle', 'psalm', 'mirror'],
+    bonus: 'Every perfect guard restores 2 health.',
+    flavor: 'Somebody has to stand here. It may as well be someone who can sing.',
+  },
+  garden: {
+    name: 'The night garden',
+    relics: ['censer', 'gravebloom', 'briar'],
+    bonus: 'Poison fades only every second turn.',
+    flavor: 'Plant it at dusk. Do not water it. Do not look back.',
+  },
+  purse: {
+    name: 'The pilgrim’s purse',
+    relics: ['ferrycoin', 'scale', 'thread'],
+    bonus: 'Every trader you visit gives you a flask.',
+    flavor: 'The coin, the weight and the way home: everything a pilgrim needs to bargain.',
+  },
+};
+/** The set a relic belongs to, if any. */
+export const setOf = (id: RelicId): SetId | undefined =>
+  (Object.keys(RELIC_SETS) as SetId[]).find((s) => RELIC_SETS[s].relics.includes(id));
+
 /** The six relics of the first two rulesets, in their original order. */
 export const LEGACY_RELICS: RelicId[] = [
   'briar',

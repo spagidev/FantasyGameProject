@@ -4,11 +4,15 @@ import {
   FINDS,
   atlasFinds,
   atlasRoute,
+  roadCost,
   travels,
   atlasGeography,
   atlasSites,
   atlasSite,
   atlasObjective,
+  atlasObjectives,
+  encounterState,
+  freeOrder,
   atlasNeighbours,
   bearing,
   charted,
@@ -20,8 +24,17 @@ import {
   type WorkId,
   type Point,
 } from '../game/atlas';
-import { nodeOf, waylightFor, type Action, type Run, type MapNode } from '../game/engine';
+import {
+  nextNodes,
+  nodeOf,
+  troveGuard,
+  waylightFor,
+  type Action,
+  type Run,
+  type MapNode,
+} from '../game/engine';
 import { SITE_ART, WORK_ART } from '../artwork';
+import { omenOf, OMENS } from '../game/omens';
 import { Modal } from './Modal';
 import { SceneArt } from './Art';
 import { provinceOfKraj } from '../atlas/provinces';
@@ -206,6 +219,7 @@ export function AtlasMap({
   const [selected, setSelected] = useState(state.position);
   const [zoom, setZoom] = useState(true);
   const [evening, setEvening] = useState(false);
+  const [omenOpen, setOmenOpen] = useState(false);
   const uid = useId().replace(/:/g, '');
   useEffect(() => setSelected(state.position), [state.position]);
   const site = atlasSite(selected, state);
@@ -213,12 +227,18 @@ export function AtlasMap({
   const neighbours = atlasNeighbours(state);
   const movable = !!run && run.phase === 'map';
   const next = run ? atlasObjective(run) : ATLAS_SITES[1];
-  const canEnter = movable && current.depth === run!.depth + 1;
+  const canEnter = movable && nextNodes(run!).length > 0;
+  const open = run ? atlasObjectives(run) : [];
+  const anyOrder = run && freeOrder(state) && open.length > 1;
   const seen = sites.filter((s) => charted(state, s.id));
   const fogPoints = state.visited.map((id) => pack.points[id]);
   if (state.recognized) fogPoints.push(pack.points.haven);
+  const guard = run ? troveGuard(run, current.id) : null;
   const canCollect =
-    ['cache', 'haven', 'spring'].includes(current.kind) && !state.collected.includes(current.id);
+    !guard &&
+    ['cache', 'haven', 'spring'].includes(current.kind) &&
+    !state.collected.includes(current.id);
+  const selectedGuard = run && selected !== state.position ? troveGuard(run, selected) : null;
   const days = travels(state);
   const province = state.chart ? provinceOfKraj(state.chart.area) : undefined;
   const route = movable && selected !== state.position ? atlasRoute(state, selected) : null;
@@ -228,12 +248,13 @@ export function AtlasMap({
   if (route) {
     let left = reach;
     for (const i of route.edges) {
-      if (pack.edges[i].metres > left) break;
-      left -= pack.edges[i].metres;
+      const cost = roadCost(run!, pack.edges[i].metres);
+      if (cost > left) break;
+      left -= cost;
       affordable++;
     }
   }
-  const stranded = days && movable && neighbours.every((n) => n.metres > reach);
+  const stranded = days && movable && neighbours.every((n) => roadCost(run!, n.metres) > reach);
   const finds = run && days ? atlasFinds(run.seed, state) : [];
   const pinArt = (s: (typeof sites)[number]) => {
     if (s.depth === undefined) return SITE_ART[s.kind === 'cache' ? 'chest' : s.kind];
@@ -274,7 +295,18 @@ export function AtlasMap({
         <p className="atlas-next">
           <Icon name="flag" size={15} />
           {canEnter ? (
-            'Your next encounter is here.'
+            anyOrder ? (
+              `An open encounter is here. ${open.length - 1} more ${open.length === 2 ? 'waits' : 'wait'} in this realm, in any order.`
+            ) : (
+              'Your next encounter is here.'
+            )
+          ) : anyOrder ? (
+            <>
+              {open.length} encounters are open in this realm: take them in any order; the bell
+              guardian waits for all three. Nearest:{' '}
+              {charted(state, next.id) ? next.name : 'an echo in the mist'} ·{' '}
+              {bearing(state.position, next.id, state)}.
+            </>
           ) : (
             <>
               Next: {charted(state, next.id) ? next.name : 'an echo in the mist'} ·{' '}
@@ -284,8 +316,21 @@ export function AtlasMap({
         </p>
       )}
       {days && run && (
-        <div className={`atlas-day ${stranded ? 'is-stranded' : ''}`}>
+        <div
+          className={`atlas-day ${stranded ? 'is-stranded' : ''} ${omenOf(run) ? 'has-omen' : ''}`}
+        >
           <strong>Day {state.day}</strong>
+          {omenOf(run) && (
+            <button
+              type="button"
+              className="omen-chip"
+              title={OMENS[omenOf(run)!].rule}
+              aria-expanded={omenOpen}
+              onClick={() => setOmenOpen((o) => !o)}
+            >
+              {OMENS[omenOf(run)!].name}
+            </button>
+          )}
           <div
             className="oil-meter"
             role="meter"
@@ -310,6 +355,12 @@ export function AtlasMap({
             Make camp
           </button>
         </div>
+      )}
+      {days && run && omenOf(run) && omenOpen && (
+        <p className="omen-line" role="status">
+          <b>{OMENS[omenOf(run)!].name}.</b> {OMENS[omenOf(run)!].rule}{' '}
+          <i>{OMENS[omenOf(run)!].flavor}</i>
+        </p>
       )}
       {days && run && <WagonSummary run={run} />}
       {evening && run && dispatch && (
@@ -507,7 +558,7 @@ export function AtlasMap({
           {seen.map((s) => {
             const q = pack.points[s.id],
               active = selected === s.id,
-              done = s.depth !== undefined && run && s.depth <= run.depth;
+              done = !!run && encounterState(run, s) === 'done';
             return (
               <g
                 key={s.id}
@@ -516,6 +567,18 @@ export function AtlasMap({
                 onClick={() => setSelected(s.id)}
               >
                 {active && <circle cx={q[0]} cy={q[1]} r="31" fill={`url(#${uid}halo)`} />}
+                {run && run.phase === 'map' && encounterState(run, s) === 'open' && (
+                  <circle
+                    className="atlas-open-ring"
+                    cx={q[0]}
+                    cy={q[1]}
+                    r={s.id.startsWith('bell') ? 23 : 19}
+                    fill="none"
+                    stroke="#ffd27a"
+                    strokeWidth="2.5"
+                    strokeDasharray="5 4"
+                  />
+                )}
                 <circle
                   cx={q[0]}
                   cy={q[1]}
@@ -668,6 +731,28 @@ export function AtlasMap({
                   Scout encounter
                 </button>
               )}
+              {selected === state.position && guard && (
+                <>
+                  <button
+                    className="primary-button"
+                    data-action="challenge"
+                    disabled={!movable}
+                    onClick={() => dispatch?.({ type: 'atlas-challenge' })}
+                  >
+                    Challenge the guardian <Icon name="swords" size={15} />
+                  </button>
+                  {onInspect && (
+                    <button className="text-button" onClick={() => onInspect(guard)}>
+                      Scout the guardian
+                    </button>
+                  )}
+                </>
+              )}
+              {selectedGuard && onInspect && (
+                <button className="text-button" onClick={() => onInspect(selectedGuard)}>
+                  Scout the guardian
+                </button>
+              )}
               {selected === state.position && canCollect && (
                 <button
                   className="secondary-button"
@@ -702,13 +787,23 @@ export function AtlasMap({
                 <span>No charted road leads there yet. Walk into the veil to find one.</span>
               </p>
             )}
-            {selected === state.position &&
-              current.depth !== undefined &&
-              current.depth > run.depth + 1 && (
-                <p className="atlas-ward">
-                  A bell ward seals this place. Resolve the next encounter first.
-                </p>
-              )}
+            {(guard || selectedGuard) && (
+              <p className="atlas-plan">
+                <Icon name="swords" size={15} />
+                <span>
+                  Guarded by <b>{(guard ?? selectedGuard)!.name}</b>. Optional: win the fight to
+                  claim this trove and choose from three rare relics. The road does not advance, and
+                  a trove left for a later realm is guarded by something stronger.
+                </span>
+              </p>
+            )}
+            {selected === state.position && encounterState(run, current) === 'sealed' && (
+              <p className="atlas-ward">
+                {current.depth! % 4 === 3 && Math.floor(current.depth! / 4) === run.bells
+                  ? 'The bell guardian waits until the other three encounters of this realm are done.'
+                  : 'A bell ward seals this place. Ring this realm’s bell first.'}
+              </p>
+            )}
           </div>
           {movable && (
             <div className="atlas-roads">
@@ -718,7 +813,7 @@ export function AtlasMap({
                   <button
                     data-destination={n.id}
                     key={n.id}
-                    disabled={n.metres > reach}
+                    disabled={roadCost(run!, n.metres) > reach}
                     onClick={() => dispatch?.({ type: 'atlas-move', to: n.id })}
                   >
                     <Icon name="compass" size={17} />
@@ -729,7 +824,7 @@ export function AtlasMap({
                       <small>
                         {bearing(state.position, n.id, state)} · {metres(n.metres)} ·{' '}
                         {walkingTime(n.metres)}
-                        {n.metres > reach
+                        {roadCost(run!, n.metres) > reach
                           ? ' · needs a new day'
                           : state.roads.includes(n.index)
                             ? ' · walked'

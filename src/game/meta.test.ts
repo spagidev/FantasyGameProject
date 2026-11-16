@@ -41,6 +41,7 @@ describe('score', () => {
       ...newRun('warden', 1, false, { dusk: 2 }),
       phase: 'won',
       depth: 11,
+      path: Array.from({ length: 12 }, (_, i) => `${i}-1`),
       bells: 3,
       health: 20,
       ending: 'dawn',
@@ -50,7 +51,15 @@ describe('score', () => {
     expect(score.lines.reduce((n, l) => n + l.value, 0)).toBe(120 + 450 + 80 + 50 + 12 + 300 + 40);
     expect(score.multiplier).toBeCloseTo(1.4);
     expect(score.total).toBe(Math.round(1052 * 1.4));
-    const fallen = scoreOf({ ...run, phase: 'lost', depth: 5, bells: 1, health: 0, dusk: 0 });
+    const fallen = scoreOf({
+      ...run,
+      phase: 'lost',
+      depth: 5,
+      path: run.path.slice(0, 6),
+      bells: 1,
+      health: 0,
+      dusk: 0,
+    });
     expect(fallen.total).toBe(50 + 150 + 80 + 50 + 12);
   });
 });

@@ -2,6 +2,7 @@ import { normalizePlace } from '../atlas/regions';
 import { validRegionalChart, type Geography, type RegionalChart } from '../atlas/types';
 import geography from './atlas-geography.json' with { type: 'json' };
 import type { Run } from './engine';
+import { OMENS, omenAt, omenBegins } from './omens';
 
 export type Point = [number, number];
 export type AtlasSite = {
@@ -216,6 +217,12 @@ export type AtlasState = {
   finds?: number[];
   /** Works built onto the hearth-wagon (v0.9). Absent means none. */
   works?: WorkId[];
+  /**
+   * Encounter sites entered, in order (v0.10). Present only on charts with free order: inside
+   * a realm the three encounters may be taken in any order; its bell guardian opens when all
+   * three are done. Charts begun earlier keep the strict order.
+   */
+  done?: string[];
 };
 /**
  * The hearth-wagon: the keeper's camp is a small town that travels with her. Each evening
@@ -262,6 +269,8 @@ export const WORKS: Record<WorkId, { name: string; cost: number; effect: string;
     },
   };
 export const REST_HEALING = 8;
+/** Resting under the Kind weather omen. */
+export const KIND_HEALING = 12;
 export const worksOf = (a?: AtlasState): WorkId[] => a?.works ?? [];
 /** Nights that count toward the gathering dark. */
 export const darkNights = (a?: AtlasState) => {
@@ -298,7 +307,7 @@ export function newAtlas(chart?: RegionalChart, travel = true): AtlasState {
   };
   if (!travel) return state;
   const range = dayRange(state);
-  return { ...state, day: 1, oil: range, range, finds: [], works: [] };
+  return { ...state, day: 1, oil: range, range, finds: [], works: [], done: [] };
 }
 
 /** Shortest road distances from one site to every other, over the whole chart. */
@@ -330,7 +339,6 @@ function distances(state: AtlasState, from: string, allowed?: (index: number) =>
  * less than the longest single road, so a fresh day can always walk any one stretch.
  */
 export function dayRange(state: AtlasState): number {
-  const pack = atlasGeography(state);
   const stops = [
     'origin',
     ...ATLAS_SITES.filter((s) => s.depth !== undefined)
@@ -339,8 +347,20 @@ export function dayRange(state: AtlasState): number {
   ];
   let road = 0;
   for (let i = 1; i < stops.length; i++) road += distances(state, stops[i - 1]).cost[stops[i]] ?? 0;
-  const longest = Math.max(...pack.edges.map((e) => e.metres));
-  return Math.ceil(Math.max(longest, road / 7) / 100) * 100;
+  return Math.ceil(Math.max(longestRoad(state), road / 7) / 100) * 100;
+}
+/** The longest single road on the chart, in metres. */
+function longestRoad(state: AtlasState): number {
+  return Math.max(...atlasGeography(state).edges.map((e) => e.metres));
+}
+/**
+ * Lamp oil a road of this length costs today: its length, or 15% more under Long shadows,
+ * but never more than a full day, so a fresh day can always walk any single road.
+ */
+export function roadCost(run: Pick<Run, 'seed' | 'atlas'>, metres: number): number {
+  const a = run.atlas;
+  if (!a || a.day === undefined || omenAt(run.seed, a.day) !== 'shadows') return metres;
+  return Math.min(a.range!, Math.ceil(metres * 1.15));
 }
 /** Whether this chart uses days and lamp oil. */
 export const travels = (
@@ -398,8 +418,76 @@ export function atlasRoute(state: AtlasState, to: string) {
 }
 export const atlasSite = (id: string, state?: AtlasState) =>
   atlasSites(state).find((s) => s.id === id)!;
-export const atlasObjective = (run: Run) =>
-  atlasSites(run.atlas).find((s) => s.depth === run.depth + 1);
+export const TROVES = ['cache', 'spring', 'haven'] as const;
+/** A side site still guarded on a free-order chart. */
+export const isTrove = (a: AtlasState | undefined, id: string) =>
+  !!a &&
+  a.done !== undefined &&
+  (TROVES as readonly string[]).includes(id) &&
+  !a.collected.includes(id);
+/**
+ * Give a side site's gift and mark it collected. Returns the message, or null when the gift
+ * would do nothing (a spring when every flask slot is full).
+ */
+export function grantGift(r: Run, id: string): string | null {
+  const a = r.atlas!;
+  const site = atlasSite(id, a);
+  let message: string;
+  if (site.kind === 'cache') {
+    r.coins += 18;
+    message = a.chart
+      ? 'The treasury gives back 18 forgotten coins.'
+      : 'The arena gives back 18 forgotten coins.';
+  } else if (site.kind === 'haven') {
+    r.health = Math.min(r.maxHealth, r.health + 12);
+    r.attack++;
+    message = 'The Rose Hearth restores up to 12 health. Your blade remembers: +1 attack.';
+  } else if (site.kind === 'spring' && (r.flasks < 5 || a.done !== undefined)) {
+    r.flasks = Math.min(5, r.flasks + 1);
+    message = 'You bottle a little warmth. Gained one flask.';
+  } else return null;
+  a.collected = [...a.collected, id];
+  return message;
+}
+/** Whether this chart lets the realm's encounters be taken in any order. */
+export const freeOrder = (a?: AtlasState): a is AtlasState & { done: string[] } =>
+  a?.done !== undefined;
+export type EncounterState = 'done' | 'open' | 'sealed';
+/**
+ * Where an encounter site stands in the expedition. Free order: everything in earlier realms
+ * is done; in the current realm (one per bell rung) the three encounters are open until
+ * entered, and the guardian opens once they are all done; later realms are sealed.
+ */
+export function encounterState(
+  run: Pick<Run, 'atlas' | 'depth' | 'bells'>,
+  site: { id: string; depth?: number },
+): EncounterState | null {
+  if (site.depth === undefined) return null;
+  const a = run.atlas;
+  if (!freeOrder(a))
+    return site.depth <= run.depth ? 'done' : site.depth === run.depth + 1 ? 'open' : 'sealed';
+  if (a.done.includes(site.id)) return 'done';
+  const chapter = Math.floor(site.depth / 4);
+  if (chapter !== run.bells) return chapter < run.bells ? 'done' : 'sealed';
+  if (site.depth % 4 !== 3) return 'open';
+  const rest = ATLAS_SITES.filter(
+    (s) => s.depth !== undefined && Math.floor(s.depth / 4) === chapter && s.depth % 4 !== 3,
+  );
+  return rest.every((s) => a.done.includes(s.id)) ? 'open' : 'sealed';
+}
+/** Every encounter the keeper may walk to and enter now. */
+export const atlasObjectives = (run: Run) =>
+  atlasSites(run.atlas).filter((s) => encounterState(run, s) === 'open');
+/** The open encounter nearest by road (the only one, on a strict-order chart). */
+export function atlasObjective(run: Run): AtlasSite | undefined {
+  const open = atlasObjectives(run);
+  if (open.length < 2 || !run.atlas) return open[0];
+  const { cost } = distances(run.atlas, run.atlas.position);
+  return [...open].sort((x, y) => (cost[x.id] ?? Infinity) - (cost[y.id] ?? Infinity))[0];
+}
+/** The site that holds the encounter at this depth and lane. */
+export const siteAt = (depth: number, lane: number, state?: AtlasState) =>
+  atlasSites(state).find((s) => s.depth === depth && s.lane === lane);
 export function atlasNeighbours(state: AtlasState) {
   return atlasGeography(state).edges.flatMap((e, index) =>
     e.a === state.position
@@ -435,8 +523,9 @@ export function applyAtlasAction(run: Run, action: AtlasAction): Run {
   let message = '';
   const step = (to: string): boolean => {
     const edge = atlasNeighbours(a).find((e) => e.id === to);
-    if (!edge || (travels(a) && a.oil < edge.metres)) return false;
-    if (travels(a)) a.oil -= edge.metres;
+    const cost = edge ? roadCost(r, edge.metres) : 0;
+    if (!edge || (travels(a) && a.oil < cost)) return false;
+    if (travels(a)) a.oil -= cost;
     a.position = to;
     a.steps++;
     if (!a.visited.includes(to)) a.visited.push(to);
@@ -476,7 +565,8 @@ export function applyAtlasAction(run: Run, action: AtlasAction): Run {
       if (action.work === 'rack') a.range = Math.round((a.range * 1.25) / 100) * 100;
       evening = `You build ${work.name.toLowerCase()} onto the wagon.`;
     } else {
-      r.health = Math.min(r.maxHealth, r.health + REST_HEALING);
+      const kind = omenAt(r.seed, a.day) === 'kind';
+      r.health = Math.min(r.maxHealth, r.health + (kind ? KIND_HEALING : REST_HEALING));
       evening = 'You rest by the wagon’s fire.';
     }
     // Dawn.
@@ -499,23 +589,18 @@ export function applyAtlasAction(run: Run, action: AtlasAction): Run {
     message = `${evening} Day ${a.day} dawns${
       gifts.length ? ` with ${gifts.join(', ')}` : ''
     }. The dark has gathered a little.`;
+    const omen = omenAt(r.seed, a.day);
+    if (omen && omenBegins(a.day))
+      message += ` The almanac turns: ${OMENS[omen].name} — ${OMENS[omen].rule
+        .charAt(0)
+        .toLowerCase()}${OMENS[omen].rule.slice(1)}`;
   } else if (action.type === 'atlas-collect') {
     const site = atlasSite(a.position, a);
-    if (a.collected.includes(site.id)) return run;
-    if (site.kind === 'cache') {
-      r.coins += 18;
-      message = a.chart
-        ? 'The treasury gives back 18 forgotten coins.'
-        : 'The arena gives back 18 forgotten coins.';
-    } else if (site.kind === 'haven') {
-      r.health = Math.min(r.maxHealth, r.health + 12);
-      r.attack++;
-      message = 'The Rose Hearth restores up to 12 health. Your blade remembers: +1 attack.';
-    } else if (site.kind === 'spring' && r.flasks < 5) {
-      r.flasks++;
-      message = 'You bottle a little warmth. Gained one flask.';
-    } else return run;
-    a.collected.push(site.id);
+    // On free-order charts the troves are guarded: they are won in a fight, not picked up.
+    if (a.collected.includes(site.id) || isTrove(a, site.id)) return run;
+    const gift = grantGift(r, site.id);
+    if (!gift) return run;
+    message = gift;
   } else {
     const name = action.name.trim().slice(0, 80);
     if (!name || a.recognized || a.attempts.some((g) => g.bell === r.bells)) return run;
@@ -572,7 +657,8 @@ export function validAtlas(x: unknown): x is AtlasState {
       ? a.oil === undefined &&
         a.range === undefined &&
         a.finds === undefined &&
-        a.works === undefined
+        a.works === undefined &&
+        a.done === undefined
       : Number.isInteger(a.day) &&
         a.day >= 1 &&
         a.day <= 10000 &&
@@ -586,6 +672,11 @@ export function validAtlas(x: unknown): x is AtlasState {
         a.finds.length <= 5 &&
         new Set(a.finds).size === a.finds.length &&
         a.finds.every((n) => Number.isInteger(n) && n >= 0 && n < atlasGeography(a).edges.length) &&
+        (a.done === undefined ||
+          (Array.isArray(a.done) &&
+            a.done.length <= 12 &&
+            new Set(a.done).size === a.done.length &&
+            a.done.every((id) => ATLAS_SITES.some((s) => s.id === id && s.depth !== undefined)))) &&
         (a.works === undefined ||
           (Array.isArray(a.works) &&
             a.works.length <= Object.keys(WORKS).length &&

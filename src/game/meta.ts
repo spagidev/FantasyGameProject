@@ -1,6 +1,6 @@
 import { FOES } from './bestiary';
 import { KEEPERS, LORE, RELICS, STARTING_RELICS, type KeeperId, type RelicId } from './data';
-import { DUSK_MAX, type Run } from './engine';
+import { DUSK_MAX, encountersWon, type Run } from './engine';
 
 /**
  * Everything a chronicle remembers between expeditions. None of it makes a keeper stronger:
@@ -69,7 +69,7 @@ export type ScoreLine = { label: string; value: number };
 /** A transparent score: every line is shown to the player on the ending screen. */
 export function scoreOf(run: Run): { total: number; lines: ScoreLine[]; multiplier: number } {
   const won = run.phase === 'won' || run.phase === 'ending';
-  const crossed = Math.max(0, run.phase === 'lost' ? run.depth : run.depth + 1);
+  const crossed = encountersWon(run);
   const stats = run.stats;
   const lines: ScoreLine[] = [
     { label: `${crossed} ${crossed === 1 ? 'encounter' : 'encounters'} won`, value: crossed * 10 },
@@ -255,6 +255,14 @@ export const DEEDS: Deed[] = [
     done: (r) => won(r) && !!r.atlas,
   },
   {
+    id: 'troves',
+    name: 'Nothing left unguarded',
+    text: 'Win all three guarded troves of a Lost Atlas chart in one expedition.',
+    done: (r) =>
+      !!r.atlas?.done &&
+      ['cache', 'spring', 'haven'].every((id) => r.atlas!.collected.includes(id)),
+  },
+  {
     id: 'recognize',
     name: 'It was here all along',
     text: 'Name the real city beneath a Lost Atlas chart.',
@@ -336,7 +344,7 @@ export function advanceMeta(
       score: total,
       won: victory,
       bells: run.bells,
-      crossed: Math.max(0, victory ? run.depth + 1 : run.depth),
+      crossed: encountersWon(run),
       turns: run.stats?.turns ?? 0,
       atlas: !!run.atlas,
       seed: run.seed,

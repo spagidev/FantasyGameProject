@@ -10,30 +10,36 @@ House rules for every item: the engine in `src/game/` is pure and deterministic 
 - **The provinces of Veyr.** A real map of Slovakia with eight fantasy provinces mirroring the eight kraje; choose where to go on the map; a province campaign reaches both of its cities; rekindle both to recover its legend. (`src/atlas/provinces.ts`, `src/components/CampaignMap.tsx`.)
 - **Voices.** Guardians and elites speak when a fight begins, turns and ends; each keeper writes their own page after each bell and has their own epilogue for each ending — fifteen new chronicle pages, three tellings of one story. (`src/game/lore.ts`.)
 
+## Shipped in v0.10
+
+- **Relic sets** (item 4): four sets with one bonus each.
+- **Free order within a realm** (item 1 below) and **guarded troves** (item 2), both on Atlas charts begun from v0.10. See RULES.md, “Free order and guarded troves”.
+- **Omens** (item 3 below): a seeded almanac names an omen every three days from day 4. See RULES.md, “Omens”.
+
 ## Next
 
-### 1. Free order within a realm · Lead
+### 1. ✓ Free order within a realm · Lead (shipped v0.10)
 
 **Why.** Heroes III lets you decide which guarded thing to take first; on the Atlas the bell wards force one order, so the map is a corridor with detours.
 **What.** Inside a realm, the three encounters before the guardian may be entered in any order; the guardian opens when all three are done. `run.depth` stays the count of encounters won; add `atlas.done: string[]` (site ids) and derive the node for a site from its own fixed depth/lane. `nextNodes` on the Atlas returns the node of the site the keeper stands on if it belongs to the current realm and is not done. Waylight, lesson and reward rules are unchanged. Old Atlas journals (no `done`) keep the strict order.
 **Where.** `engine.ts` (`nextNodes`, `travel`, `victory`), `atlas.ts`, `storage.ts`, objective banner in `Atlas.tsx`, `tests/player.ts`.
 **Done when.** A test wins a realm's three encounters in each of the six orders; saves round-trip; the balance matrix still wins at Dusk 0.
 
-### 2. Guarded troves · Lead
+### 2. ✓ Guarded troves · Lead (shipped v0.10)
 
 **Why.** “Is that treasure worth that fight?” is the adventure-map question, and Emberwake has no optional fights.
 **What.** The cache, spring and haven sites each gain a seeded guardian from the realm's ordinary roster (visible when scouted, toughened like any enemy by nights). Entering is optional; winning grants the site's gift plus a relic choice drawn as for an elite. A side fight does not advance `depth`: add `run.side?: string` (site id) set on entry and cleared on victory, with `victory()` returning to the map. Fleeing is not offered; scouting is.
 **Where.** `engine.ts`, `atlas.ts`, `Atlas.tsx`, `Strategy.tsx` (scout), tests.
 **Done when.** A trove can be scouted, fought and looted once; skipping all three still wins; validation rejects a side fight with no site.
 
-### 3. Omens · Build
+### 3. ✓ Omens · Build (shipped v0.10)
 
 **Why.** Heroes' “week of…” makes the calendar itself an event; days exist on the Atlas now.
 **What.** Every third dawn (days 4, 7, 10…) the almanac names a seeded omen that lasts three days, announced in the dawn message and shown in the day bar. Six omens, each one visible rule: _Moth-light_ (+1 starting focus), _Hoarfrost_ (enemies' first hit adds 1 frost), _Fair days_ (trader prices −20%), _Long shadows_ (lamp oil −15% at dawn), _Clear bells_ (perfect guards wear 25% more poise), _Kind weather_ (resting heals 12). Pure functions `omenAt(seed, day)` and hooks at the six places named.
 **Where.** new `src/game/omens.ts`, hooks in `engine.ts`/`atlas.ts`, day bar in `Atlas.tsx`, scout and combat chips.
 **Done when.** Each omen has a unit test proving its one effect and its absence a day later; the same seed gives the same almanac.
 
-### 4. Relic sets · Build, then Lead for balance
+### 4. ✓ Relic sets · Build, then Lead for balance (shipped v0.10)
 
 **Why.** Combination artifacts turn single finds into a hunt.
 **What.** Four sets of three existing relics; carrying all three adds one bonus line, shown on each member's card (“2 of 3 · The Bell-ringer's kit”). Proposed: _Bell-ringer's kit_ (clapper, chime, echo): breaking poise restores 1 focus. _The long watch_ (buckle, psalm, mirror): perfect guards heal 2. _Night garden_ (censer, gravebloom, briar): poison fades every second turn. _Pilgrim's purse_ (ferrycoin, scale, thread): +1 flask at every trader visit. Re-run `npm run balance` and the scripted-player sim; adjust numbers if Dusk 0 novice win rates move more than five points.

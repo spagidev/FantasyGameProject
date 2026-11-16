@@ -1,4 +1,4 @@
-import { atlasObjective, atlasGeography } from '../src/game/atlas';
+import { atlasObjective, atlasGeography, roadCost } from '../src/game/atlas';
 import { EVENTS, RELICS, type EventOption, type RelicId } from '../src/game/data';
 import {
   canBuy,
@@ -88,7 +88,7 @@ export function campaignAction(r: Run): Action {
           const road = atlasGeography(r.atlas).edges.find(
             (e) => (e.a === path[0] && e.b === path[1]) || (e.b === path[0] && e.a === path[1]),
           )!;
-          return r.atlas.oil !== undefined && r.atlas.oil < road.metres
+          return r.atlas.oil !== undefined && r.atlas.oil < roadCost(r, road.metres)
             ? { type: 'atlas-camp' }
             : { type: 'atlas-move', to: path[1] };
         }

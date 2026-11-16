@@ -11,12 +11,17 @@ import {
   LORE,
   NODE_LABELS,
   RELICS,
+  RELIC_SETS,
+  setOf,
   WAYLIGHTS,
   type KeeperId,
   type RelicId,
 } from './game/data';
 import {
   attackOf,
+  realmOf,
+  encountersEntered,
+  encountersWon,
   canBuy,
   canEvent,
   incomingDamage,
@@ -113,9 +118,7 @@ export default function App() {
   const bestBefore = useRef(run ? (meta.best[run.keeper] ?? 0) : 0);
   if (run && !terminal(run)) bestBefore.current = meta.best[run.keeper] ?? 0;
   const today = dailyRoad(new Date());
-  const chapter = run
-    ? Math.floor(Math.min(11, run.phase === 'map' ? run.depth + 1 : run.depth) / 4)
-    : 0;
+  const chapter = run ? realmOf(run) : 0;
   const dispatch = useCallback(
     (action: Action) =>
       setSave((s) => {
@@ -447,9 +450,7 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <span className="encounter-count">
-                  {Math.max(0, run.depth + 1)} / 12 encounters
-                </span>
+                <span className="encounter-count">{encountersEntered(run)} / 12 encounters</span>
               </div>
             )}
 
@@ -993,6 +994,19 @@ function KeeperPanel({ run }: { run: Run }) {
   );
 }
 
+/** A relic's set, how many of it are carried, and the bonus once all three are. */
+function SetLine({ id, carried }: { id: RelicId; carried: RelicId[] }) {
+  const set = setOf(id);
+  if (!set) return null;
+  const { name, relics, bonus } = RELIC_SETS[set];
+  const have = relics.filter((r) => carried.includes(r)).length;
+  return (
+    <span className={`relic-set ${have === 3 ? 'is-complete' : ''}`}>
+      {name} · {have}/3{have === 3 ? ` · ${bonus}` : ` · all three: ${bonus}`}
+    </span>
+  );
+}
+
 function RelicInventory({ ids }: { ids: RelicId[] }) {
   return (
     <section className="relic-inventory">
@@ -1009,6 +1023,7 @@ function RelicInventory({ ids }: { ids: RelicId[] }) {
               <span>
                 <strong>{RELICS[id].name}</strong>
                 <small>{RELICS[id].description}</small>
+                <SetLine id={id} carried={ids} />
               </span>
             </div>
           ))}
@@ -1025,11 +1040,12 @@ function RelicInventory({ ids }: { ids: RelicId[] }) {
 }
 
 function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) {
-  const boss = run.depth % 4 === 3;
-  const site = run.ruleset >= 2 ? waylightFor(nodeOf(run)) : null;
+  const trove = run.side;
+  const boss = !trove && run.depth % 4 === 3;
+  const site = !trove && run.ruleset >= 2 ? waylightFor(nodeOf(run)) : null;
   return (
     <section className="scene-board reward-board">
-      <Landscape chapter={Math.floor(run.depth / 4)} />
+      <Landscape chapter={realmOf(run)} />
       <div className="scene-content">
         <span className="scene-sigil">
           <Icon name={boss ? 'bell' : 'gem'} size={34} />
@@ -1041,7 +1057,11 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
           </p>
         )}
         <span className="eyebrow">
-          {boss ? 'A BELL REMEMBERS ITS SONG' : 'THE DARK YIELDS A LITTLE'}
+          {trove
+            ? 'THE TROVE IS YOURS'
+            : boss
+              ? 'A BELL REMEMBERS ITS SONG'
+              : 'THE DARK YIELDS A LITTLE'}
         </span>
         <h2>{boss ? 'A memory awakens.' : 'Something worth carrying.'}</h2>
         {boss && run.enemy?.id && VOICES[run.enemy.id]?.fall && (
@@ -1049,7 +1069,7 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
         )}
         <p className="scene-lead">
           {boss
-            ? CHAPTERS[Math.floor(run.depth / 4)].memory
+            ? CHAPTERS[realmOf(run)].memory
             : 'Among the ashes, a small thing catches the light.\nChoose one gift for the road ahead.'}
         </p>
         {boss && pageFor(`${run.keeper}-bell-${run.bells}`) && run.ruleset === 3 && (
@@ -1060,7 +1080,15 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
           </blockquote>
         )}
         <div className="reward-coins">
-          <Icon name="coins" size={16} /> +{victoryCoins(run)} coins collected
+          {trove ? (
+            <>
+              <Icon name="gem" size={16} /> {run.log.at(-1)}
+            </>
+          ) : (
+            <>
+              <Icon name="coins" size={16} /> +{victoryCoins(run)} coins collected
+            </>
+          )}
           {run.relics.includes('thread') && <span> · +5 health</span>}
         </div>
         {site && (
@@ -1087,6 +1115,7 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
               </span>
               <h3>{RELICS[id].name}</h3>
               <p>{RELICS[id].description}</p>
+              <SetLine id={id} carried={run.relics} />
               <em>{RELICS[id].flavor}</em>
               <span className="take-relic">
                 Carry this relic <Icon name="arrow" size={14} />
@@ -1114,7 +1143,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
   const shop = run.phase === 'shop';
   return (
     <section className="scene-board encounter-board">
-      <Landscape chapter={Math.floor(run.depth / 4)} />
+      <Landscape chapter={realmOf(run)} />
       <div className="scene-content">
         {run.phase === 'event' && <SceneArt id={event.options[0].lore} />}
         <span className="scene-sigil">
@@ -1166,6 +1195,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
                     <small>
                       {RELICS[id].rarity[0].toUpperCase() + RELICS[id].rarity.slice(1)} relic ·{' '}
                       {RELICS[id].description}
+                      <SetLine id={id} carried={run.relics} />
                     </small>
                   </span>
                   <span className="price">
@@ -1308,7 +1338,7 @@ function Ending({
   const choosing = run.phase === 'ending';
   return (
     <section className="scene-board ending-board">
-      <Landscape chapter={lost ? Math.floor(run.depth / 4) : 2} />
+      <Landscape chapter={lost ? realmOf(run) : 2} />
       <div className="scene-content">
         {!choosing && <SceneArt id={lost ? 'fallen' : (run.ending ?? 'dawn')} />}
         <span className="scene-sigil">
@@ -1340,7 +1370,7 @@ function Ending({
         </h2>
         <p className="scene-lead">
           {lost
-            ? `You fall in ${CHAPTERS[Math.floor(run.depth / 4)].name}. The ember goes quiet, but the memories you found will outlive the dark. Another keeper will take the road.`
+            ? `You fall in ${CHAPTERS[realmOf(run)].name}. The ember goes quiet, but the memories you found will outlive the dark. Another keeper will take the road.`
             : choosing
               ? '“Eira,” the king whispers. The heart of the sun opens in his hands. You could wake it, if the world will share its burden. Or you could carry him home, and teach Cinderfall another way to keep warm.'
               : LORE.find((l) => l.id === run.ending)?.text}
@@ -1387,7 +1417,7 @@ function Ending({
                 <span>Relics carried</span>
               </div>
               <div>
-                <strong>{Math.max(0, lost ? run.depth : run.depth + 1)}/12</strong>
+                <strong>{encountersWon(run)}/12</strong>
                 <span>Encounters won</span>
               </div>
             </div>
@@ -1554,16 +1584,17 @@ function Help() {
         <div>
           <h3>The Lost Atlas</h3>
           <p>
-            A second kind of expedition, drawn over real OpenStreetMap roads. Each day your lamp oil
-            carries you a fixed distance; then you make camp. Your camp is a hearth-wagon, a small
-            town that travels with you: each evening either build one work onto it (a stove, a
-            still, a toll-box…) or rest by its fire for 8 health — never both. Works and waylights
-            pay at dawn, and every night the enemies ahead grow a little tougher. Choose a province
-            on the map of the realm to decide where the veil falls; rekindle both of its hidden
-            cities to recover its legend. Select a landmark to plan a route: the map shows its
-            distance and walking time, and one button walks it. Small finds lie on some roads. If
-            you recognize the real city, name it in the field journal for +2 attack. One guess per
-            bell.
+            A second kind of expedition, drawn over real OpenStreetMap roads. Inside each realm the
+            three encounters may be taken in any order; its bell guardian waits for all three, so
+            plan a route that spends your lamp oil well. Each day your lamp oil carries you a fixed
+            distance; then you make camp. Your camp is a hearth-wagon, a small town that travels
+            with you: each evening either build one work onto it (a stove, a still, a toll-box…) or
+            rest by its fire for 8 health — never both. Works and waylights pay at dawn, and every
+            night the enemies ahead grow a little tougher. Choose a province on the map of the realm
+            to decide where the veil falls; rekindle both of its hidden cities to recover its
+            legend. Select a landmark to plan a route: the map shows its distance and walking time,
+            and one button walks it. Small finds lie on some roads. If you recognize the real city,
+            name it in the field journal for +2 attack. One guess per bell.
           </p>
         </div>
       </div>

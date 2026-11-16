@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-16T00:37:51.893Z",
+  "generatedAt": "2026-11-16T15:03:15.300Z",
   "seeds": [42, 2026, 8128, 16384, 65537],
   "policy": "Bounded 12-action search, beam width 18. Three fixed route plans; legal transitions only. Evidence of automated reachability, not novice difficulty or fun.",
   "groups": [

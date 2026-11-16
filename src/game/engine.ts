@@ -3,6 +3,11 @@ import {
   applyAtlasAction,
   atlasSite,
   darkNights,
+  encounterState,
+  freeOrder,
+  grantGift,
+  isTrove,
+  TROVES,
   travels,
   newAtlas,
   cloneAtlasRun,
@@ -11,6 +16,7 @@ import {
 } from './atlas';
 import { BOSSES, ELITES, FOES, ORDINARY, type Foe, type Traits } from './bestiary';
 import { VOICES } from './lore';
+import { omenOf } from './omens';
 import {
   CHAPTERS,
   EVENTS,
@@ -19,6 +25,7 @@ import {
   LEGACY_RELICS,
   NEW_TALENTS,
   RELICS,
+  RELIC_SETS,
   STARTING_RELICS,
   TALENTS,
   WAYLIGHTS,
@@ -28,6 +35,7 @@ import {
   type KeeperId,
   type NodeKind,
   type RelicId,
+  type SetId,
   type TalentId,
   type WaylightId,
 } from './data';
@@ -129,10 +137,13 @@ export type Run = {
   stats?: RunStats;
   /** Set for a date-seeded expedition, as YYYY-MM-DD. */
   daily?: string;
+  /** The guarded trove being fought for (v0.10): a side fight that does not advance the road. */
+  side?: string;
 };
 export type ShopItem = 'flask' | 'heal' | 'forge' | RelicId;
 export type Action =
   | AtlasAction
+  | { type: 'atlas-challenge' }
   | { type: 'travel'; lane: number }
   | { type: 'strike' | 'guard' | 'skill' | 'technique' | 'flask' }
   | { type: 'reward'; id: RelicId | 'heal' }
@@ -322,12 +333,43 @@ export function nodeAt(
 export const nodeOf = (r: Run, depth = r.depth, lane = r.lane): MapNode =>
   nodeAt(r.seed, depth, lane, layoutOf(r));
 
+/**
+ * The guardian of a trove, as a scoutable node. It is drawn from the roster of the realm the
+ * keeper has reached, so a trove left for later is guarded by something stronger.
+ */
+export function troveGuard(r: Run, id: string): MapNode | null {
+  if (!isTrove(r.atlas, id)) return null;
+  const chapter = Math.min(2, r.bells);
+  const foe = ORDINARY[chapter][hash(r.seed, 8000 + TROVES.indexOf(id as 'cache')) % 4];
+  return {
+    id: `trove-${id}`,
+    depth: chapter * 4 + 1,
+    lane: 0,
+    kind: 'battle',
+    name: foe.name,
+    eventIndex: 0,
+    foe: foe.id,
+  };
+}
+
+/** The realm (0–2) the keeper is in; a trove fight belongs to the realm reached so far. */
+export const realmOf = (r: Pick<Run, 'side' | 'bells' | 'phase' | 'depth'>) =>
+  r.side
+    ? Math.min(2, r.bells)
+    : Math.max(0, Math.floor(Math.min(11, r.phase === 'map' ? r.depth + 1 : r.depth) / 4));
+
+/** Encounters entered so far, including one in progress. */
+export const encountersEntered = (r: Pick<Run, 'path'>) => r.path.length;
+/** Encounters won: those entered, less one lost in (a trove fight is not an encounter). */
+export const encountersWon = (r: Pick<Run, 'path' | 'phase' | 'side'>) =>
+  Math.max(0, r.path.length - (r.phase === 'lost' && !r.side ? 1 : 0));
+
 export function nextNodes(run: Run): MapNode[] {
   if (run.phase !== 'map' || run.depth >= 11) return [];
   const d = run.depth + 1;
   if (run.atlas) {
     const site = atlasSite(run.atlas.position, run.atlas);
-    return site.depth === d ? [nodeOf(run, d, site.lane!)] : [];
+    return encounterState(run, site) === 'open' ? [nodeOf(run, site.depth!, site.lane!)] : [];
   }
   return (d % 4 === 3 ? [1] : [0, 1, 2])
     .filter((l) => d % 4 === 0 || Math.abs(l - run.lane) <= 1)
@@ -446,7 +488,8 @@ export function startingFocus(r: Run) {
       roadBenefits(r).focus +
       (r.ruleset === 3 && r.keeper === 'seer' ? 1 : 0) +
       (r.talents.includes('astral') ? 1 : 0) +
-      (r.relics.includes('vigil') ? 1 : 0),
+      (r.relics.includes('vigil') ? 1 : 0) +
+      (omenOf(r) === 'moth' ? 1 : 0),
   );
 }
 /** Attack as it stands right now, including conditional relics. */
@@ -557,9 +600,10 @@ export function priceOf(run: Run, item: ShopItem): number {
       ? BASE_PRICES[item]
       : RELIC_PRICES[RELICS[item].rarity];
   if (run.ruleset < 3) return base;
-  return Math.ceil(
+  const price = Math.ceil(
     base * ((run.dusk ?? 0) >= 7 ? 1.2 : 1) * (run.relics.includes('scale') ? 0.75 : 1),
   );
+  return omenOf(run) === 'fair' ? Math.ceil(price * 0.8) : price;
 }
 export function canBuy(run: Run, item: ShopItem): boolean {
   if (run.phase !== 'shop' || run.purchased.includes(item) || run.coins < priceOf(run, item))
@@ -586,6 +630,9 @@ function hitEnemy(r: Run, amount: number, piercing = false) {
   r.enemy.health = Math.max(0, r.enemy.health - (amount - blocked));
   note(r, `${amount - blocked} damage dealt${blocked ? ` · ${blocked} blocked` : ''}.`);
 }
+/** Whether the keeper carries every relic of a set. */
+export const hasSet = (r: Pick<Run, 'relics' | 'ruleset'>, id: SetId) =>
+  r.ruleset === 3 && RELIC_SETS[id].relics.every((relic) => r.relics.includes(relic));
 /** Ruleset 3: wear poise down; at zero the enemy is staggered and its poise hardens. */
 function wear(r: Run, amount: number) {
   const e = r.enemy!;
@@ -598,6 +645,7 @@ function wear(r: Run, amount: number) {
   r.stats!.staggers++;
   note(r, `${e.name} is staggered: it loses its next action and takes more damage.`);
   if (r.talents.includes('breaker')) gainFocus(r, 2);
+  if (hasSet(r, 'kit')) gainFocus(r, 1);
 }
 /**
  * What a hit of this base damage becomes against the current enemy, before its guard:
@@ -666,6 +714,10 @@ export function drawRelics(
   }
   return picked;
 }
+/** Hoarfrost: the keeper begins the battle with 1 frost, unless a sprig already forbids it. */
+function omenFrost(r: Run) {
+  if (r.ruleset === 3 && omenOf(r) === 'hoarfrost' && !r.relics.includes('sprig')) r.frost = 1;
+}
 function clearBattle(r: Run) {
   r.guard = 0;
   if (r.ruleset === 3) {
@@ -676,6 +728,19 @@ function clearBattle(r: Run) {
   }
 }
 function victory(r: Run) {
+  if (r.side) {
+    // A trove won: its gift and an elite's choice of relics. The road does not advance.
+    const id = r.side;
+    clearBattle(r);
+    if (r.relics.includes('thread')) heal(r, 5);
+    if (r.talents.includes('trail')) heal(r, 2);
+    if (r.enemy?.id) r.slain!.push(r.enemy.id);
+    note(r, `${r.enemy?.name} falls. The trove is yours.`);
+    note(r, grantGift(r, id) ?? '');
+    r.rewards = drawRelics(r, 'elite', 3, 9000 + TROVES.indexOf(id as 'cache') * 17);
+    r.phase = 'reward';
+    return;
+  }
   const node = nodeOf(r);
   const kind = node.kind;
   const coins = victoryCoins(r);
@@ -880,7 +945,8 @@ function combat3(
   if (e.poison > 0) {
     note(r, `Poison deals ${e.poison} damage.`);
     e.health = Math.max(0, e.health - e.poison);
-    e.poison -= 1;
+    // The night garden: poison fades only on odd turns.
+    if (!hasSet(r, 'garden') || r.turn % 2 === 1) e.poison -= 1;
     if (e.health <= 0) {
       victory(r);
       return r;
@@ -912,8 +978,9 @@ function combat3(
         note(r, 'A perfect guard.');
         if (r.relics.includes('whetstone')) r.charge = true;
         if (r.talents.includes('longsight')) gainFocus(r, 1);
+        if (hasSet(r, 'watch')) heal(r, 2);
         if (r.relics.includes('mirror')) e.health = Math.max(0, e.health - Math.floor(blocked / 2));
-        wear(r, blocked);
+        wear(r, omenOf(r) === 'bells' ? Math.ceil(blocked * 1.25) : blocked);
       }
       if (taken > 0 && r.relics.includes('thornmail')) e.health = Math.max(0, e.health - 4);
     }
@@ -975,16 +1042,34 @@ export function transition(run: Run, action: Action): Run {
     return applyAtlasAction(run, action);
   const r = cloneAtlasRun(run);
   const v3 = r.ruleset === 3;
+  if (action.type === 'atlas-challenge') {
+    const guard = r.phase === 'map' && r.atlas ? troveGuard(r, r.atlas.position) : null;
+    if (!guard) return run;
+    r.side = r.atlas!.position;
+    r.enemy = makeEnemy(guard, 3, r.dusk ?? 0, nightsOf(r));
+    r.turn = 0;
+    clearBattle(r);
+    omenFrost(r);
+    r.focus = startingFocus(r);
+    r.phase = 'combat';
+    r.log = [`${guard.name} guards ${atlasSite(r.side, r.atlas).name}.`];
+    return r;
+  }
   if (action.type === 'travel') {
-    if (!nextNodes(r).some((n) => n.lane === action.lane)) return run;
+    const target = nextNodes(r).find((n) => n.lane === action.lane);
+    if (!target) return run;
     // On a chart with days, waylights pay at dawn instead of at each crossing.
     const benefits = travels(r.atlas) ? { health: 0, coins: 0 } : roadBenefits(r);
     heal(r, benefits.health);
     r.coins += benefits.coins;
-    r.depth += 1;
+    // On a free-order chart the encounter belongs to its site, so depth can step back within
+    // a realm; elsewhere the target is always the next depth.
+    r.depth = target.depth;
     r.lane = action.lane;
     const node = nodeOf(r);
     r.path.push(node.id);
+    if (freeOrder(r.atlas))
+      r.atlas.done = [...r.atlas.done, atlasSite(r.atlas.position, r.atlas).id];
     r.purchased = [];
     r.enemy = null;
     if (v3) r.shop = [];
@@ -992,6 +1077,7 @@ export function transition(run: Run, action: Action): Run {
       r.enemy = makeEnemy(node, r.ruleset, r.dusk ?? 0, nightsOf(r));
       r.turn = 0;
       clearBattle(r);
+      omenFrost(r);
       r.focus = startingFocus(r);
       r.phase = 'combat';
       r.log = [
@@ -1004,7 +1090,13 @@ export function transition(run: Run, action: Action): Run {
       }
     } else {
       r.phase = node.kind as 'event' | 'camp' | 'shop';
-      if (v3 && node.kind === 'shop') r.shop = drawRelics(r, 'shop', 3, 6000 + r.depth * 17);
+      if (v3 && node.kind === 'shop') {
+        r.shop = drawRelics(r, 'shop', 3, 6000 + r.depth * 17);
+        if (hasSet(r, 'purse') && r.flasks < 5) {
+          r.flasks++;
+          note(r, 'The pilgrim’s purse: the trader presses a flask into your hand.');
+        }
+      }
     }
     return r;
   }
@@ -1029,7 +1121,8 @@ export function transition(run: Run, action: Action): Run {
       note(r, `You carry the ${RELICS[action.id].name}. ${RELICS[action.id].flavor}`);
     } else return run;
     r.rewards = [];
-    r.phase = r.ruleset >= 2 && r.depth % 4 === 3 ? 'talent' : 'map';
+    r.phase = !r.side && r.ruleset >= 2 && r.depth % 4 === 3 ? 'talent' : 'map';
+    delete r.side;
     return r;
   }
   if (action.type === 'talent' && r.phase === 'talent') {

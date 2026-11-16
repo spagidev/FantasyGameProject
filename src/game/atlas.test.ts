@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   ATLAS_SITES,
+  atlasObjectives,
+  atlasSite,
+  encounterState,
   REST_HEALING,
   WORKS,
   workBlocked,
@@ -12,7 +15,8 @@ import {
   charted,
   dayRange,
 } from './atlas';
-import { makeEnemy, nightsOf, nodeOf } from './engine';
+import { encountersWon, makeEnemy, nextNodes, nightsOf, nodeOf, troveGuard } from './engine';
+import { ORDINARY } from './bestiary';
 import { scoreOf } from './meta';
 import { newRun, transition, type Run } from './engine';
 import { advanceSave, decodeSave, emptySave, validRun } from './storage';
@@ -79,7 +83,14 @@ describe('Lost Atlas expedition', () => {
     expect(transition(r, { type: 'atlas-move', to: 'origin' })).toBe(r);
     expect(transition(r, { type: 'atlas-name', name: 'Monaco' })).toBe(r);
     expect(transition(r, { type: 'atlas-collect' })).toBe(r);
-    const start = rested({ ...r, phase: 'map', waylights: ['well', 'kiln'], health: 1 });
+    // Unguarded gifts belong to strict-order charts; free-order troves are tested below.
+    const start = rested({
+      ...r,
+      phase: 'map',
+      waylights: ['well', 'kiln'],
+      health: 1,
+      atlas: { ...r.atlas!, done: undefined },
+    });
     start.atlas!.finds = atlasFinds(start.seed, start.atlas!).map((f) => f.edge); // nothing left to find
     const free = walk(start, 'cache');
     expect(free.atlas!.day).toBe(1);
@@ -90,7 +101,9 @@ describe('Lost Atlas expedition', () => {
     expect(transition(gift, { type: 'atlas-collect' })).toBe(gift);
   });
   it('keeps fog and recognition across journals; wrong guesses wait for the next bell', () => {
+    // This test skips ahead by setting bells by hand, which only a strict-order chart allows.
     let r = newRun('seer', 123, true);
+    r = { ...r, atlas: { ...r.atlas!, done: undefined } };
     expect(charted(r.atlas!, 'bell3')).toBe(false);
     r = transition(r, { type: 'atlas-name', name: 'Venice' });
     expect(r.attack).toBe(6);
@@ -260,6 +273,127 @@ describe('Lost Atlas expedition', () => {
       atlas: { ...r.atlas!, day: 8 },
     };
     expect(scoreOf(done).lines).toContainEqual({ label: 'Arrived on day 8', value: 60 });
+  });
+  it('a realm’s three encounters can be taken in any of the six orders; the guardian waits', () => {
+    const realm = ATLAS_SITES.filter((x) => x.depth !== undefined && x.depth < 3).map((x) => x.id);
+    const orders = [
+      [0, 1, 2],
+      [0, 2, 1],
+      [1, 0, 2],
+      [1, 2, 0],
+      [2, 0, 1],
+      [2, 1, 0],
+    ].map((o) => o.map((i) => realm[i]));
+    for (const order of orders) {
+      let r = rested({ ...newRun('warden', 123, true), health: 999, maxHealth: 999 });
+      expect(
+        atlasObjectives(r)
+          .map((x) => x.id)
+          .sort(),
+      ).toEqual([...realm].sort());
+      for (const [n, id] of order.entries()) {
+        r = rested(walk(r, id));
+        expect(encounterState(r, atlasSite('bell1', r.atlas))).toBe('sealed');
+        const before = r;
+        r = transition(r, { type: 'travel', lane: atlasSite(id, r.atlas).lane! });
+        expect(r).not.toBe(before);
+        expect(r.depth).toBe(atlasSite(id, r.atlas).depth);
+        expect(r.atlas!.done).toEqual(order.slice(0, n + 1));
+        expect(validRun(r)).toBe(true);
+        let steps = 0;
+        while (r.phase !== 'map' && steps++ < 200) r = transition(r, campaignAction(r));
+        expect(r.phase).toBe('map');
+        expect(encounterState(r, atlasSite(id, r.atlas))).toBe('done');
+        // A finished encounter cannot be entered again.
+        expect(nextNodes(r)).toEqual([]);
+        expect(decodeSave(JSON.stringify(advanceSave(emptySave(), r)))?.run).toEqual(r);
+      }
+      expect(r.path).toHaveLength(3);
+      expect(r.waylights).toHaveLength(1);
+      expect(encounterState(r, atlasSite('bell1', r.atlas))).toBe('open');
+      expect(atlasObjective(r)!.id).toBe('bell1');
+      // The next realm stays sealed until the bell rings.
+      expect(encounterState(r, atlasSite('kiln', r.atlas))).toBe('sealed');
+    }
+  });
+  it('troves are guarded: challenge, win the gift and an elite’s relic choice, never twice', () => {
+    let r = rested({ ...newRun('warden', 123, true), health: 999, maxHealth: 999, coins: 0 });
+    r = walk(r, 'cache');
+    expect(transition(r, { type: 'atlas-collect' })).toBe(r); // no free gift
+    const guard = troveGuard(r, 'cache')!;
+    expect(guard).toMatchObject({ id: 'trove-cache', kind: 'battle' });
+    expect(ORDINARY[0].some((f) => f.id === guard.foe)).toBe(true);
+    // The guard of a trove left for later comes from the realm reached by then.
+    expect(ORDINARY[2].some((f) => f.id === troveGuard({ ...r, bells: 2 }, 'cache')!.foe)).toBe(
+      true,
+    );
+    const depth = r.depth;
+    r = transition(r, { type: 'atlas-challenge' });
+    expect(r).toMatchObject({ phase: 'combat', side: 'cache', depth });
+    expect(r.enemy!.id).toBe(guard.foe);
+    expect(validRun(r)).toBe(true);
+    expect(decodeSave(JSON.stringify(advanceSave(emptySave(), r)))?.run).toEqual(r);
+    expect(transition(r, { type: 'atlas-challenge' })).toBe(r);
+    let steps = 0;
+    while (r.phase === 'combat' && steps++ < 200) r = transition(r, campaignAction(r));
+    expect(r.phase).toBe('reward');
+    expect(r.coins).toBe(18); // the gift; a trove pays no battle coins
+    expect(r.atlas!.collected).toEqual(['cache']);
+    expect(r.rewards).toHaveLength(3);
+    expect(r.path).toEqual([]); // the road did not advance
+    expect(validRun(r)).toBe(true);
+    r = transition(r, { type: 'reward', id: r.rewards[0] });
+    expect(r.phase).toBe('map');
+    expect(r.side).toBeUndefined();
+    expect(r.relics).toHaveLength(1);
+    expect(troveGuard(r, 'cache')).toBeNull();
+    expect(transition(r, { type: 'atlas-challenge' })).toBe(r);
+    expect(transition(r, { type: 'atlas-collect' })).toBe(r);
+    // Falling to a trove guardian loses the expedition but none of the encounters won.
+    const fallen = { ...r, phase: 'lost' as const, health: 0, side: 'spring', path: ['0-0'] };
+    expect(encountersWon(fallen)).toBe(1);
+    expect(encountersWon({ ...fallen, side: undefined })).toBe(0);
+    // Bad journals: a side fight that is not a trove, or claims a gift it has not won.
+    expect(validRun({ ...r, phase: 'combat', side: 'watch' } as Run)).toBe(false);
+    expect(validRun({ ...r, phase: 'reward', side: 'spring' } as Run)).toBe(false);
+    // Strict-order charts have no guarded troves.
+    const old = newRun('warden', 123, true, { ruleset: 2 });
+    expect(troveGuard({ ...old, atlas: { ...old.atlas!, position: 'cache' } }, 'cache')).toBeNull();
+  });
+  it('a trove won after a bell does not offer a second lesson', () => {
+    let r = rested({ ...newRun('seer', 123, true), health: 999, maxHealth: 999 });
+    for (const id of ['watch', 'letters', 'hearth', 'bell1']) {
+      r = walk(r, id);
+      r = transition(r, { type: 'travel', lane: atlasSite(id, r.atlas).lane! });
+      let steps = 0;
+      while (r.phase !== 'map' && steps++ < 300) r = transition(rested(r), campaignAction(r));
+    }
+    expect(r).toMatchObject({ depth: 3, bells: 1, phase: 'map' });
+    expect(r.talents).toHaveLength(1);
+    r = transition(walk(rested(r), 'spring'), { type: 'atlas-challenge' });
+    let steps = 0;
+    while (r.phase === 'combat' && steps++ < 300) r = transition(r, campaignAction(r));
+    r = transition(r, { type: 'reward', id: 'heal' });
+    expect(r.phase).toBe('map');
+    expect(r.talents).toHaveLength(1);
+    expect(validRun(r)).toBe(true);
+  });
+  it('rejects free-order journals that could not have happened', () => {
+    let r = rested({ ...newRun('warden', 123, true), health: 999, maxHealth: 999 });
+    r = walk(r, 'hearth');
+    r = transition(r, { type: 'travel', lane: atlasSite('hearth', r.atlas).lane! });
+    expect(validRun(r)).toBe(true);
+    const a = r.atlas!;
+    for (const bad of [
+      { ...r, atlas: { ...a, done: ['bell1'] }, path: ['3-1'], depth: 3, lane: 1 }, // guardian first
+      { ...r, atlas: { ...a, done: ['kiln'] }, path: ['4-1'], depth: 4, lane: 1 }, // next realm
+      { ...r, atlas: { ...a, done: ['hearth', 'hearth'] } }, // twice
+      { ...r, atlas: { ...a, done: [] } }, // path without a site
+      { ...r, path: ['0-0'] }, // path that disagrees with the site
+      { ...r, depth: 0 }, // position that disagrees with the site
+      { ...r, bells: 1 }, // a bell nobody rang
+    ])
+      expect(validRun(bad as Run), JSON.stringify(bad.atlas?.done)).toBe(false);
   });
   it.each(['warden', 'seer', 'wayfarer'] as const)(
     '%s can finish all twelve encounters without recognizing the geography',

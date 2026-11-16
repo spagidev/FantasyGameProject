@@ -1441,3 +1441,17 @@
   margin: 0 0 14px;
   box-shadow: none;
 }
+
+/* v0.10 · relic sets. */
+.relic-set {
+  display: block;
+  margin-top: 5px;
+  font-size: 10.5px;
+  font-style: normal;
+  line-height: 1.4;
+  color: #5c4a26;
+}
+.relic-set.is-complete {
+  font-weight: 600;
+  color: #2f6b3c;
+}
