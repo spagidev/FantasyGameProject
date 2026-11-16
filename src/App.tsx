@@ -51,6 +51,7 @@ import { Icon, type IconName } from './components/Icon';
 import { Modal } from './components/Modal';
 import { RouteMap } from './components/RouteMap';
 import { Combat, combatKeys } from './components/Combat';
+import { play, setSound } from './sound';
 import { Journal } from './components/Journal';
 import { Scout, TalentChoice, WaylightsPanel } from './components/Strategy';
 import { AtlasMap, AtlasJournal } from './components/Atlas';
@@ -141,9 +142,18 @@ export default function App() {
     if (!fresh.length) return;
     setEarned((e) => [...e, ...fresh]);
     setToast(fresh);
+    play('deed');
     const timer = setTimeout(() => setToast([]), 6500);
     return () => clearTimeout(timer);
   }, [meta.deeds]);
+
+  useEffect(() => setSound(meta.sound), [meta.sound]);
+  const bells = run?.bells ?? 0;
+  const rung = useRef(bells);
+  useEffect(() => {
+    if (bells > rung.current) play('bell');
+    rung.current = bells;
+  }, [bells]);
 
   useEffect(() => {
     if (run && view === 'journey' && window.matchMedia('(max-width: 740px)').matches) {
@@ -473,7 +483,11 @@ export default function App() {
                     <RouteMap run={run} onInspect={setScouted} />
                   )
                 ) : run.phase === 'combat' ? (
-                  <Combat run={run} dispatch={dispatch} />
+                  <Combat
+                    run={run}
+                    dispatch={dispatch}
+                    coach={save.profile.wins === 0 && run.depth < 4}
+                  />
                 ) : run.phase === 'reward' ? (
                   <Rewards run={run} dispatch={dispatch} />
                 ) : run.phase === 'talent' ? (
@@ -812,6 +826,21 @@ export default function App() {
           <i className={saved ? 'saved-dot' : ''} />
           {saved ? 'Saved on this device' : 'Playing in this tab'} · Journal{' '}
           <Icon name="book" size={12} />
+        </button>
+        <button
+          className="sound-toggle"
+          aria-label={meta.sound ? 'Turn sound off' : 'Turn sound on'}
+          aria-pressed={meta.sound}
+          onClick={() => {
+            setSound(!meta.sound);
+            setSave((s) => ({
+              ...s,
+              profile: { ...s.profile, meta: { ...metaOf(s.profile), sound: !meta.sound } },
+            }));
+          }}
+        >
+          <Icon name="bell" size={17} />
+          <span>{meta.sound ? 'Sound on' : 'Sound off'}</span>
         </button>
         <button onClick={() => setModal('help')}>
           Keep a little light with you <Icon name="external" size={12} />

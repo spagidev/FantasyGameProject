@@ -23,6 +23,7 @@ import {
 } from '../game/engine';
 import { EnemyPortrait, KeeperPortrait, Landscape } from './Art';
 import { Icon, type IconName } from './Icon';
+import { play } from '../sound';
 
 type CombatAction = 'strike' | 'guard' | 'skill' | 'technique' | 'flask';
 /** Keys 1–5 in ruleset 3; the first two rulesets keep their original 1–4. */
@@ -67,7 +68,31 @@ function preview(run: Run, type: CombatAction) {
 
 type Floater = { id: number; side: 'enemy' | 'hero'; text: string; tone: string };
 
-export function Combat({ run, dispatch }: { run: Run; dispatch: (a: Action) => void }) {
+/** One sentence of guidance for a keeper's very first fights, chosen from the situation. */
+function coaching(run: Run): string {
+  const e = run.enemy!;
+  const incoming = incomingDamage(run);
+  if (e.stagger === 2)
+    return 'It is staggered: its action is lost and your hits deal +50%. This is the moment for your strongest blow.';
+  if (e.stagger === 1) return 'Still reeling: your hits deal +50% until it acts again.';
+  if (incoming >= guardAmount(run))
+    return `A heavy blow is coming. Guard absorbs ${guardAmount(run)} of it — or break its poise first and the blow never lands.`;
+  if (incoming > 0 && incoming <= guardAmount(run) && e.poise! <= incoming)
+    return 'Guard this whole blow and the perfect guard will break its poise.';
+  if (!intentFor(run)!.damage)
+    return 'It is not attacking this turn. A free turn to strike, or to drink a flask safely.';
+  return `Read the line under each action: it is exactly what will happen. Poise ${e.poise}: wear it to zero to stagger.`;
+}
+
+export function Combat({
+  run,
+  dispatch,
+  coach = false,
+}: {
+  run: Run;
+  dispatch: (a: Action) => void;
+  coach?: boolean;
+}) {
   const k = KEEPERS[run.keeper];
   const e = run.enemy!;
   const v3 = run.ruleset === 3;
@@ -108,6 +133,12 @@ export function Combat({ run, dispatch }: { run: Run; dispatch: (a: Action) => v
       add('hero', 'Perfect guard', 'call');
     else if (taken === 0 && before.turn !== run.turn && incomingDamage(before) > 0 && !v3)
       add('hero', 'Guarded', 'call');
+    if ((run.stats?.staggers ?? 0) > (before.stats?.staggers ?? 0)) play('stagger');
+    else if ((run.stats?.parries ?? 0) > (before.stats?.parries ?? 0)) play('perfect');
+    else if (taken > 0) play('hurt');
+    else if (dealt > 0) play('strike');
+    else if (taken < 0) play('heal');
+    else if (before.turn !== run.turn) play('guard');
     if (!next.length) return;
     setFloaters(next);
     setPulse((p) => ({ enemy: p.enemy + (dealt > 0 ? 1 : 0), hero: p.hero + (taken > 0 ? 1 : 0) }));
@@ -395,6 +426,12 @@ export function Combat({ run, dispatch }: { run: Run; dispatch: (a: Action) => v
           </p>
         </div>
       </div>
+      {coach && run.ruleset === 3 && (
+        <p className="duel-coach" role="note">
+          <Icon name="flame" size={15} />
+          <span>{coaching(run)}</span>
+        </p>
+      )}
       <div className="duel-controls">
         <div className="duel-controls-top">
           <span>

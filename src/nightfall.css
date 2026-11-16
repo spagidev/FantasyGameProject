@@ -726,7 +726,8 @@
   .app-shell[data-phase='combat'] .play-layout .keeper-panel {
     display: none;
   }
-  .app-shell[data-phase='combat'] .expedition-bar {
+  .app-shell[data-phase='combat'] .expedition-bar,
+  .app-shell[data-phase='combat'] .play-layout .battle-log {
     display: none;
   }
   .app-shell[data-phase='combat'] .play-layout {
@@ -1171,4 +1172,25 @@
 }
 .codex-card .eyebrow {
   color: #6b5030;
+}
+
+/* First-fight guidance and the sound switch. */
+.duel-coach {
+  display: flex;
+  gap: 9px;
+  margin: 0;
+  padding: 10px 20px;
+  border-bottom: 1px solid #d9cfae;
+  background: #f1e6c6;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #4d3d1f;
+}
+.duel-coach svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #8a5f2a;
+}
+.sound-toggle[aria-pressed='true'] {
+  color: #7a4712;
 }

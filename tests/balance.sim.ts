@@ -24,7 +24,7 @@ test('record a reproducible ruleset / keeper / strategic-route matrix', async ()
     for (const keeper of ['warden', 'seer', 'wayfarer'] as KeeperId[])
       for (const plan of ['well', 'kiln', 'lens'] as const)
         for (const seed of seeds) {
-          let run: Run = { ...newRun(keeper, seed), ruleset };
+          let run: Run = newRun(keeper, seed, false, { ruleset });
           let actions = 0;
           let combatTurns = 0;
           while (!['won', 'lost'].includes(run.phase) && actions < 300) {
@@ -79,6 +79,57 @@ test('record a reproducible ruleset / keeper / strategic-route matrix', async ()
             sites: run.waylights,
           });
         }
+  // Ruleset 3: the seeded routes of The Long Night at the first and the deepest dusk.
+  const night: {
+    keeper: string;
+    dusk: number;
+    seed: number;
+    outcome: string;
+    health: number;
+    combatTurns: number;
+    staggers: number;
+    perfectGuards: number;
+  }[] = [];
+  for (const dusk of [0, 8])
+    for (const keeper of ['warden', 'seer', 'wayfarer'] as KeeperId[])
+      for (const seed of seeds) {
+        let run: Run = newRun(keeper, seed, false, { dusk });
+        let actions = 0;
+        while (!['won', 'lost'].includes(run.phase) && actions++ < 900) {
+          const next = transition(run, campaignAction(run));
+          expect(next).not.toBe(run);
+          run = next;
+        }
+        night.push({
+          keeper,
+          dusk,
+          seed,
+          outcome: run.phase,
+          health: run.health,
+          combatTurns: run.stats!.turns,
+          staggers: run.stats!.staggers,
+          perfectGuards: run.stats!.parries,
+        });
+      }
+  const nightGroups = [0, 8].flatMap((dusk) =>
+    (['warden', 'seer', 'wayfarer'] as const).map((keeper) => {
+      const group = night.filter((r) => r.dusk === dusk && r.keeper === keeper);
+      const mean = (f: (r: (typeof night)[number]) => number) =>
+        Math.round((group.reduce((n, r) => n + f(r), 0) / group.length) * 10) / 10;
+      return {
+        key: `3/${keeper}/dusk ${dusk}`,
+        runs: group.length,
+        wins: group.filter((r) => r.outcome === 'won').length,
+        meanCombatTurns: mean((r) => r.combatTurns),
+        meanStaggers: mean((r) => r.staggers),
+        meanPerfectGuards: mean((r) => r.perfectGuards),
+      };
+    }),
+  );
+  expect(nightGroups.filter((g) => g.key.endsWith('dusk 0')).every((g) => g.wins === g.runs)).toBe(
+    true,
+  );
+  console.table(nightGroups);
   const groups = [...new Set(results.map((r) => `${r.ruleset}/${r.keeper}/${r.plan}`))].map(
     (key) => {
       const group = results.filter((r) => `${r.ruleset}/${r.keeper}/${r.plan}` === key);
@@ -109,6 +160,12 @@ test('record a reproducible ruleset / keeper / strategic-route matrix', async ()
             'Bounded 12-action search, beam width 18. Three fixed route plans; legal transitions only. Evidence of automated reachability, not novice difficulty or fun.',
           groups,
           results,
+          longNight: {
+            policy:
+              'Ruleset 3, seeded routes. The same bounded search player (9 actions deep, beam 18) with rarity-first relic choices. A search player is far stronger than a person: Dusk 0 must always be winnable; Dusk 8 is expected to defeat it sometimes.',
+            groups: nightGroups,
+            results: night,
+          },
         },
         null,
         2,
