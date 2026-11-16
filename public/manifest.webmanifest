@@ -1,0 +1,11 @@
+{
+  "name": "Emberwake · The Last Light",
+  "short_name": "Emberwake",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#eae5d9",
+  "theme_color": "#16362f",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

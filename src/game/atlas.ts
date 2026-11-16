@@ -566,7 +566,10 @@ export function applyAtlasAction(run: Run, action: AtlasAction): Run {
       evening = `You build ${work.name.toLowerCase()} onto the wagon.`;
     } else {
       const kind = omenAt(r.seed, a.day) === 'kind';
-      r.health = Math.min(r.maxHealth, r.health + (kind ? KIND_HEALING : REST_HEALING));
+      r.health = Math.min(
+        r.maxHealth,
+        r.health + (kind ? KIND_HEALING : REST_HEALING) + (r.relics.includes('spa') ? 6 : 0),
+      );
       evening = 'You rest by the wagon’s fire.';
     }
     // Dawn.
@@ -574,7 +577,9 @@ export function applyAtlasAction(run: Run, action: AtlasAction): Run {
     a.oil = a.range;
     const works = worksOf(a);
     const health =
-      r.waylights.filter((id) => id === 'well').length * 2 + (works.includes('stove') ? 4 : 0);
+      r.waylights.filter((id) => id === 'well').length * 2 +
+      (works.includes('stove') ? 4 : 0) +
+      (r.relics.includes('window') ? 3 : 0);
     const coins =
       r.waylights.filter((id) => id === 'kiln').length * 4 + (works.includes('strongbox') ? 6 : 0);
     const flask = works.includes('still') && r.flasks < 2;

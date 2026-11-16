@@ -1,4 +1,19 @@
-# Emberwake · Free roads checkpoint (v0.10.0)
+# Emberwake · Boons and offline checkpoint (v0.11.0)
+
+## v0.11
+
+Backlog items 5, 6, 7, 9 and 10 shipped. Items 5/9 and 6/10 were built by two mid-tier subagents in parallel from the backlog, item 7 (province boons) by the lead model.
+
+- **Boons:** `Province.boon` in `src/atlas/provinces.ts`; `unlockedRelics` adds the boon of every recovered province. Hooks in `engine.ts` / `atlas.ts`. `provinces.ts` imports its JSON `with { type: 'json' }` because Playwright loads `meta.ts` in Node.
+- **Map:** continuous view `{cx, cy, scale}` in `AtlasMap`; wheel zooms only when the map is focused or with Ctrl.
+- **Offline:** `public/manifest.webmanifest`, `public/sw.js` (registered in production only), `OfflineBadge`; the Worker build asserts both files.
+- **Share links:** `?road=<base36 seed>&keeper=&dusk=` prefills the lobby; never replaces a run.
+- Icons for the eight boons: `docs/ART_BRIEF_3.md`.
+- Remaining backlog: 8 (Slovak translation, needs a human reviewer), 11 (second country, needs network access), 12 (owner decisions).
+
+---
+
+# Earlier checkpoint · Free roads (v0.10.0)
 
 ## v0.10
 

@@ -438,7 +438,8 @@ function legacyEnemy(node: MapNode, ruleset: 1 | 2): Enemy {
 }
 
 /** Nights that count on an Atlas chart (halved by the ward-lantern): each adds 2% health to enemies not yet fought, up to 30%. */
-export const nightsOf = (r: Pick<Run, 'atlas'>) => darkNights(r.atlas);
+export const nightsOf = (r: Pick<Run, 'atlas'> & { relics?: RelicId[] }) =>
+  r.relics?.includes('window') ? 0 : darkNights(r.atlas);
 export function makeEnemy(node: MapNode, ruleset: Ruleset = 3, dusk = 0, nights = 0): Enemy {
   if (ruleset < 3 || !node.foe) return legacyEnemy(node, ruleset === 1 ? 1 : 2);
   const foe = FOES[node.foe];
@@ -532,10 +533,12 @@ export function strikeHealing(r: Run) {
   return r.keeper === 'wayfarer' ? (r.talents.includes('sap') ? 3 : 2) : 0;
 }
 export function flaskHealing(r: Run) {
-  return 16 + (r.relics.includes('dew') ? 8 : 0);
+  return 16 + (r.relics.includes('dew') ? 8 : 0) + (r.relics.includes('spa') ? 6 : 0);
 }
 export function restAmount(r: Run) {
-  return r.ruleset < 3 ? 18 : 20 - ((r.dusk ?? 0) >= 6 ? 6 : 0);
+  return r.ruleset < 3
+    ? 18
+    : 20 - ((r.dusk ?? 0) >= 6 ? 6 : 0) + (r.relics.includes('spa') ? 6 : 0);
 }
 export function staggerBonus(r: Run) {
   return r.relics.includes('chime') ? 2 : 1.5;
@@ -657,7 +660,8 @@ export function effectiveHit(r: Run, base: number, pierce = false): number {
   let amount = base;
   if (r.weak) amount = Math.floor(amount * 0.75);
   if (e.stagger) amount = Math.floor(amount * staggerBonus(r));
-  if (e.traits?.plated && !pierce) amount = Math.max(1, amount - e.traits.plated);
+  if (e.traits?.plated && !pierce && !r.relics.includes('joinery'))
+    amount = Math.max(1, amount - e.traits.plated);
   return amount;
 }
 /** Ruleset 3 hit: weakness, stagger, plating, guard, then poise. */
@@ -678,6 +682,11 @@ function addRelic(r: Run, id: RelicId) {
   if (id === 'hearthseed') {
     r.maxHealth += 10;
     heal(r, 10);
+  }
+  if (id === 'offcut') {
+    r.maxHealth += 6;
+    heal(r, 6);
+    r.armor += 1;
   }
   if (id === 'idol') {
     r.attack += 4;
@@ -756,6 +765,7 @@ function victory(r: Run) {
   if (kind === 'boss') {
     r.bells += 1;
     r.lore.push(`bell-${r.bells}`);
+    if (r.relics.includes('chapelstone')) heal(r, 15);
     // Each keeper writes their own page after a bell.
     if (r.ruleset === 3) r.lore.push(`${r.keeper}-bell-${r.bells}`);
   }
@@ -896,7 +906,7 @@ function combat3(
     gainFocus(r, strikeFocus(r));
     if (strikeHealing(r)) heal(r, strikeHealing(r));
     if (r.talents.includes('barb')) e.poison += 2;
-    if (e.traits?.thorns) {
+    if (e.traits?.thorns && !r.relics.includes('joinery')) {
       r.health = Math.max(1, r.health - e.traits.thorns);
       note(r, `Thorns cost you ${e.traits.thorns} health.`);
     }
@@ -979,6 +989,7 @@ function combat3(
         if (r.relics.includes('whetstone')) r.charge = true;
         if (r.talents.includes('longsight')) gainFocus(r, 1);
         if (hasSet(r, 'watch')) heal(r, 2);
+        if (r.relics.includes('clapperboard')) r.coins += 3;
         if (r.relics.includes('mirror')) e.health = Math.max(0, e.health - Math.floor(blocked / 2));
         wear(r, omenOf(r) === 'bells' ? Math.ceil(blocked * 1.25) : blocked);
       }
@@ -1050,6 +1061,7 @@ export function transition(run: Run, action: Action): Run {
     r.turn = 0;
     clearBattle(r);
     omenFrost(r);
+    if (r.relics.includes('wellrope')) r.guard = 6;
     r.focus = startingFocus(r);
     r.phase = 'combat';
     r.log = [`${guard.name} guards ${atlasSite(r.side, r.atlas).name}.`];
@@ -1078,6 +1090,7 @@ export function transition(run: Run, action: Action): Run {
       r.turn = 0;
       clearBattle(r);
       omenFrost(r);
+      if (r.relics.includes('wellrope')) r.guard = 6;
       r.focus = startingFocus(r);
       r.phase = 'combat';
       r.log = [
@@ -1092,6 +1105,7 @@ export function transition(run: Run, action: Action): Run {
       r.phase = node.kind as 'event' | 'camp' | 'shop';
       if (v3 && node.kind === 'shop') {
         r.shop = drawRelics(r, 'shop', 3, 6000 + r.depth * 17);
+        if (r.relics.includes('wire')) heal(r, 10);
         if (hasSet(r, 'purse') && r.flasks < 5) {
           r.flasks++;
           note(r, 'The pilgrim’s purse: the trader presses a flask into your hand.');

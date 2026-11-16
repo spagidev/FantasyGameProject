@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { campaignAction } from '../../tests/player';
 import { RELICS, STARTING_RELICS, type RelicId } from './data';
+import { PROVINCES, campaignMap } from '../atlas/provinces';
 import { newRun, transition, type Run } from './engine';
 import {
   DEEDS,
@@ -118,7 +119,10 @@ describe('records, deeds and unlocks', () => {
     expect(duskUnlocked(metaOf(advanceSave(base, deepest).profile), 'warden')).toBe(8);
   });
   it('every deed is reachable in principle and unlocks exactly the locked relics', () => {
-    const locked = (Object.keys(RELICS) as RelicId[]).filter((id) => !STARTING_RELICS.includes(id));
+    const boons = PROVINCES.map((p) => p.boon);
+    const locked = (Object.keys(RELICS) as RelicId[]).filter(
+      (id) => !STARTING_RELICS.includes(id) && !boons.includes(id),
+    );
     expect(
       DEEDS.map((d) => d.unlocks)
         .filter(Boolean)
@@ -126,7 +130,7 @@ describe('records, deeds and unlocks', () => {
     ).toEqual([...locked].sort());
     expect(new Set(DEEDS.map((d) => d.id)).size).toBe(DEEDS.length);
     const all = { ...emptyMeta(), deeds: DEEDS.map((d) => d.id) };
-    expect(unlockedRelics(all)).toHaveLength(Object.keys(RELICS).length);
+    expect(unlockedRelics(all)).toHaveLength(Object.keys(RELICS).length - boons.length);
     const run: Run = {
       ...newRun('warden', 1),
       coins: 150,
@@ -135,6 +139,18 @@ describe('records, deeds and unlocks', () => {
     };
     const earned = metaOf(advanceSave(emptySave(), run).profile).deeds;
     expect(earned.sort()).toEqual(['big-hit', 'breaker', 'collector', 'hoard', 'hunter', 'parry']);
+  });
+  it('recovering a province’s legend adds its boon to future roads, and nothing else', () => {
+    const [a, b] = campaignMap.cities.filter((c) => c.region === 'SK-PV');
+    const stamp = { title: 'The Veiled Crossroads', area: 'Prešovský kraj' };
+    const half = { ...emptyMeta(), cities: { [a.key]: { ...stamp, completed: true } } };
+    expect(unlockedRelics(half)).not.toContain('joinery');
+    const both = { ...half, cities: { ...half.cities, [b.key]: { ...stamp, completed: true } } };
+    expect(unlockedRelics(both)).toContain('joinery');
+    expect(unlockedRelics(both).filter((id) => PROVINCES.some((p) => p.boon === id))).toEqual([
+      'joinery',
+    ]);
+    expect(new Set(PROVINCES.map((p) => p.boon)).size).toBe(8);
   });
   it('the daily road is the same all day, records a best score and keeps a bounded history', () => {
     const noon = dailyRoad(new Date(2026, 10, 15, 12));

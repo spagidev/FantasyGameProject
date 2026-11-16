@@ -196,7 +196,7 @@ test('today’s road, the codex and combat previews', async ({ page }) => {
     await expect(page.getByRole('tabpanel')).toBeVisible();
   }
   await page.getByRole('tab', { name: /Relics/ }).click();
-  await expect(page.getByRole('tabpanel')).toContainText('16 of 28 relics');
+  await expect(page.getByRole('tabpanel')).toContainText('16 of 36 relics');
   const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(accessibility.violations).toEqual([]);
 });

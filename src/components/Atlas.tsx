@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   ATLAS_SITES,
   FINDS,
@@ -140,6 +140,18 @@ function EveningDialog({
           Each evening the keeper may build one work onto the hearth-wagon or rest by its fire,
           never both.
         </p>
+        <p className="wagon-purse">
+          <Icon name="coins" size={14} /> You carry {run.coins} coins
+        </p>
+        <div className="wagon-dawn" aria-live="polite">
+          <b>
+            Day {preview.day} dawns: {preview.parts.join(' · ')}
+          </b>
+          <span>
+            The dark gathers: enemies ahead gain 2% health{' '}
+            {preview.ward ? 'every second night' : 'each night'}
+          </span>
+        </div>
         <div className="wagon-options">
           <button
             className="wagon-option"
@@ -189,15 +201,6 @@ function EveningDialog({
             );
           })}
         </div>
-        <div className="wagon-dawn" aria-live="polite">
-          <b>
-            Day {preview.day} dawns: {preview.parts.join(' · ')}
-          </b>
-          <span>
-            The dark gathers: enemies ahead gain 2% health{' '}
-            {preview.ward ? 'every second night' : 'each night'}
-          </span>
-        </div>
       </div>
     </Modal>
   );
@@ -217,11 +220,183 @@ export function AtlasMap({
   const sites = atlasSites(state);
   const current = atlasSite(state.position, state);
   const [selected, setSelected] = useState(state.position);
-  const [zoom, setZoom] = useState(true);
+  const W = pack.width;
+  const H = pack.height;
+  const [view, setView] = useState(() => {
+    const [x, y] = pack.points[state.position];
+    const scale = 2;
+    return {
+      scale,
+      cx: Math.min(W - W / scale / 2, Math.max(W / scale / 2, x)),
+      cy: Math.min(H - H / scale / 2, Math.max(H / scale / 2, y)),
+    };
+  });
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const panned = useRef(false);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const gesture = useRef<{
+    id: number;
+    x: number;
+    y: number;
+    view: typeof view;
+    dragging: boolean;
+  } | null>(null);
+  const pinch = useRef<{ dist: number; scale: number } | null>(null);
+  const clampView = (v: { cx: number; cy: number; scale: number }) => {
+    const scale = Math.min(4, Math.max(1, v.scale));
+    const w = W / scale;
+    const h = H / scale;
+    return {
+      scale,
+      cx: Math.min(W - w / 2, Math.max(w / 2, v.cx)),
+      cy: Math.min(H - h / 2, Math.max(h / 2, v.cy)),
+    };
+  };
+  /** Screen point to chart units under the current viewBox (honours letterboxing). */
+  const toChart = (clientX: number, clientY: number, v = viewRef.current) => {
+    const rect = svgRef.current!.getBoundingClientRect();
+    const w = W / v.scale;
+    const h = H / v.scale;
+    const k = Math.min(rect.width / w, rect.height / h) || 1;
+    const ox = (rect.width - w * k) / 2;
+    const oy = (rect.height - h * k) / 2;
+    return {
+      k,
+      x: v.cx - w / 2 + (clientX - rect.left - ox) / k,
+      y: v.cy - h / 2 + (clientY - rect.top - oy) / k,
+    };
+  };
+  /** Zoom to `scale`, keeping the chart point under (clientX, clientY) fixed. */
+  const zoomAt = (scale: number, clientX?: number, clientY?: number) => {
+    const v = viewRef.current;
+    const next = Math.min(4, Math.max(1, scale));
+    if (clientX === undefined || clientY === undefined) {
+      setView(clampView({ ...v, scale: next }));
+    } else {
+      const before = toChart(clientX, clientY, v);
+      const rect = svgRef.current!.getBoundingClientRect();
+      const w = W / next;
+      const h = H / next;
+      const k = Math.min(rect.width / w, rect.height / h) || 1;
+      const ox = (rect.width - w * k) / 2;
+      const oy = (rect.height - h * k) / 2;
+      setView(
+        clampView({
+          scale: next,
+          cx: before.x - (clientX - rect.left - ox) / k + w / 2,
+          cy: before.y - (clientY - rect.top - oy) / k + h / 2,
+        }),
+      );
+    }
+    panned.current = true;
+  };
+  const centreOn = (id: string, scale?: number) => {
+    const q = pack.points[id];
+    setView(clampView({ cx: q[0], cy: q[1], scale: scale ?? viewRef.current.scale }));
+  };
+  useEffect(() => {
+    // Wheel zoom: a native, non-passive listener so the page keeps scrolling unless the
+    // map is focused (or Ctrl is held, as pinch-on-trackpad reports).
+    const el = canvasRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && document.activeElement !== el) return;
+      e.preventDefault();
+      zoomAt(
+        viewRef.current.scale * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)),
+        e.clientX,
+        e.clientY,
+      );
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  });
+  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 1) {
+      gesture.current = {
+        id: e.pointerId,
+        x: e.clientX,
+        y: e.clientY,
+        view: viewRef.current,
+        dragging: false,
+      };
+    } else if (pointers.current.size === 2) {
+      const [a, b] = [...pointers.current.values()];
+      pinch.current = { dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, scale: viewRef.current.scale };
+      gesture.current = null;
+    }
+  };
+  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch.current && pointers.current.size >= 2) {
+      const [a, b] = [...pointers.current.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      zoomAt(pinch.current.scale * (dist / pinch.current.dist), (a.x + b.x) / 2, (a.y + b.y) / 2);
+      return;
+    }
+    const g = gesture.current;
+    if (!g || g.id !== e.pointerId) return;
+    const dx = e.clientX - g.x;
+    const dy = e.clientY - g.y;
+    if (!g.dragging) {
+      // Under 4 px it is still a click, so landmark selection keeps working.
+      if (Math.hypot(dx, dy) < 4) return;
+      g.dragging = true;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    const k = toChart(0, 0, g.view).k;
+    panned.current = true;
+    setView(clampView({ ...g.view, cx: g.view.cx - dx / k, cy: g.view.cy - dy / k }));
+  };
+  const onPointerEnd = (e: React.PointerEvent<SVGSVGElement>) => {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
+    if (gesture.current?.id === e.pointerId) gesture.current = null;
+  };
+  const onMapKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget || e.ctrlKey || e.metaKey || e.altKey) return;
+    const v = viewRef.current;
+    const step = W / v.scale / 5;
+    const pan = (dx: number, dy: number) => {
+      panned.current = true;
+      setView(clampView({ ...v, cx: v.cx + dx, cy: v.cy + dy }));
+    };
+    const keys: Record<string, () => void> = {
+      ArrowLeft: () => pan(-step, 0),
+      ArrowRight: () => pan(step, 0),
+      ArrowUp: () => pan(0, -step),
+      ArrowDown: () => pan(0, step),
+      '+': () => zoomAt(v.scale * 1.5),
+      '=': () => zoomAt(v.scale * 1.5),
+      '-': () => zoomAt(v.scale / 1.5),
+      _: () => zoomAt(v.scale / 1.5),
+      '0': () => {
+        panned.current = true;
+        setView({ cx: W / 2, cy: H / 2, scale: 1 });
+      },
+    };
+    if (keys[e.key]) {
+      e.preventDefault();
+      keys[e.key]();
+    }
+  };
   const [evening, setEvening] = useState(false);
   const [omenOpen, setOmenOpen] = useState(false);
   const uid = useId().replace(/:/g, '');
   useEffect(() => setSelected(state.position), [state.position]);
+  const lastPosition = useRef(state.position);
+  useEffect(() => {
+    if (lastPosition.current === state.position) return;
+    lastPosition.current = state.position;
+    // Follow the keeper after a walk, unless the player has moved the map since the last one.
+    if (!panned.current) centreOn(state.position);
+    panned.current = false;
+  });
   const site = atlasSite(selected, state);
   const p = pack.points[state.position];
   const neighbours = atlasNeighbours(state);
@@ -262,9 +437,9 @@ export function AtlasMap({
     const node = nodeOf(run, s.depth, s.lane!);
     return SITE_ART[waylightFor(node) ?? node.kind];
   };
-  const viewBox = zoom
-    ? `${Math.max(0, Math.min(500, p[0] - 250))} ${Math.max(0, Math.min(405, p[1] - 202.5))} 500 405`
-    : '0 0 1000 810';
+  const vw = W / view.scale;
+  const vh = H / view.scale;
+  const viewBox = `${view.cx - vw / 2} ${view.cy - vh / 2} ${vw} ${vh}`;
   return (
     <section className="atlas-board" aria-label="The Lost Atlas">
       <div className="atlas-heading">
@@ -373,8 +548,21 @@ export function AtlasMap({
           }}
         />
       )}
-      <div className={`atlas-canvas ${zoom ? 'atlas-zoomed' : ''}`}>
+      <div
+        className="atlas-canvas atlas-pannable"
+        ref={canvasRef}
+        tabIndex={0}
+        role="group"
+        aria-label="Pannable chart. Drag or use the arrow keys to pan, plus and minus to zoom, 0 for the whole chart."
+        onKeyDown={onMapKey}
+      >
         <svg
+          ref={svgRef}
+          style={{ touchAction: 'none' }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerEnd}
+          onPointerCancel={onPointerEnd}
           viewBox={viewBox}
           role="img"
           aria-label={`Fantasy chart of real terrain. ${seen.length} of ${ATLAS_SITES.length} landmarks charted. You are at ${current.name}.`}
@@ -623,7 +811,7 @@ export function AtlasMap({
         <span
           className="atlas-scale"
           style={{
-            width: `${(500 / (state.chart?.metresPerPixel ?? 3.52) / (zoom ? 500 : 1000)) * 100}%`,
+            width: `${(500 / (state.chart?.metresPerPixel ?? 3.52) / vw) * 100}%`,
           }}
           aria-label="Map scale: 500 metres"
         >
@@ -631,12 +819,38 @@ export function AtlasMap({
         </span>
         <div className="atlas-tools">
           <button
-            onClick={() => setZoom((z) => !z)}
-            aria-pressed={zoom}
-            aria-label={zoom ? 'Show whole chart' : 'Zoom to keeper'}
+            onClick={() => zoomAt(view.scale * 1.5)}
+            aria-label="Zoom in"
+            disabled={view.scale >= 4}
+          >
+            +
+          </button>
+          <button
+            onClick={() => zoomAt(view.scale / 1.5)}
+            aria-label="Zoom out"
+            disabled={view.scale <= 1}
+          >
+            −
+          </button>
+          <button
+            onClick={() => {
+              panned.current = false;
+              centreOn(state.position);
+            }}
+            aria-label="Centre on keeper"
+          >
+            <Icon name="compass" size={16} />
+            Keeper
+          </button>
+          <button
+            onClick={() => {
+              panned.current = true;
+              setView({ cx: W / 2, cy: H / 2, scale: 1 });
+            }}
+            aria-label="Show whole chart"
           >
             <Icon name="eye" size={16} />
-            {zoom ? 'Whole chart' : 'Closer'}
+            Whole chart
           </button>
         </div>
         <span className="atlas-discovery">

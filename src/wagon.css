@@ -241,3 +241,39 @@
     padding: 8px 14px;
   }
 }
+
+.wagon-purse {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-weight: 600;
+  color: #16362f;
+}
+.atlas-pannable {
+  cursor: grab;
+}
+.atlas-pannable:active {
+  cursor: grabbing;
+}
+.atlas-pannable:focus-visible {
+  outline: 3px solid #ffe3ac;
+  outline-offset: -3px;
+}
+.atlas-canvas .atlas-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: calc(100% - 90px);
+}
+.atlas-canvas .atlas-tools button {
+  justify-content: center;
+  min-width: 37px;
+}
+.atlas-canvas .atlas-tools button:disabled {
+  opacity: 0.5;
+}
+.atlas-canvas .atlas-tools button:focus-visible {
+  outline: 3px solid #ffe3ac;
+  outline-offset: 2px;
+}
