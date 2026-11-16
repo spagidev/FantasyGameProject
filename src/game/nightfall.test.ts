@@ -6,6 +6,7 @@ import {
   KEEPERS,
   RELICS,
   STARTING_RELICS,
+  startingStats,
   type Intent,
   type KeeperId,
   type RelicId,
@@ -60,6 +61,25 @@ const act = (r: Run, type: 'strike' | 'guard' | 'skill' | 'technique' | 'flask')
 function withPattern(r: Run, pattern: Intent[], patch: Partial<NonNullable<Run['enemy']>> = {}) {
   return { ...r, enemy: { ...r.enemy!, pattern, ...patch } };
 }
+
+describe('ruleset 3 starting statistics', () => {
+  it('the balance pass adjusts only new expeditions', () => {
+    expect(startingStats('warden')).toEqual({ health: 48, attack: 7, armor: 2 });
+    expect(startingStats('seer')).toEqual({ health: 38, attack: 6, armor: 1 });
+    expect(startingStats('wayfarer')).toEqual({ health: 44, attack: 6, armor: 1 });
+    for (const keeper of Object.keys(KEEPERS) as KeeperId[]) {
+      const r = newRun(keeper, 1);
+      expect([r.health, r.maxHealth, r.attack, r.armor]).toEqual([
+        startingStats(keeper).health,
+        startingStats(keeper).health,
+        startingStats(keeper).attack,
+        startingStats(keeper).armor,
+      ]);
+      const old = newRun(keeper, 1, false, { ruleset: 2 });
+      expect([old.health, old.armor]).toEqual([KEEPERS[keeper].health, KEEPERS[keeper].armor]);
+    }
+  });
+});
 
 describe('poise and stagger', () => {
   it('hits wear poise; breaking it cancels the telegraphed action and exposes the enemy', () => {
@@ -136,7 +156,7 @@ describe('keeper techniques', () => {
       { name: 'Wait', damage: 0, guard: 1 },
     ]);
     const next = act(r, 'technique');
-    expect(next.health).toBe(36);
+    expect(next.health).toBe(38);
     expect(next.stats!.parries).toBe(1);
     expect(next.enemy!.stagger).toBe(2);
     expect(techniqueBlocked(next)).toBe('Not enough focus');
@@ -189,16 +209,16 @@ describe('enemy intentions and traits', () => {
     const one = act(r, 'strike');
     expect(one.weak).toBe(2);
     expect(one.frost).toBe(3);
-    expect(one.health).toBe(36);
+    expect(one.health).toBe(38);
     const two = act(one, 'strike'); // 6 × 0.75 = 4
     expect(two.enemy!.health).toBe(one.enemy!.health - 4);
     expect(two.weak).toBe(1);
-    expect(two.health).toBe(36 - 3);
+    expect(two.health).toBe(38 - 3);
     expect(two.frost).toBe(2);
     const three = act(two, 'flask');
     expect(three.frost).toBe(0);
     expect(three.weak).toBe(0);
-    expect(three.health).toBe(36);
+    expect(three.health).toBe(38);
     const warded = act({ ...r, relics: ['sprig'] }, 'strike');
     expect(warded.weak).toBe(0);
     expect(warded.frost).toBe(0);

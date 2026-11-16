@@ -8,6 +8,18 @@ import { dailyRoad, scoreOf } from '../src/game/meta';
 import legacyJournal from './fixtures/v1-journal.json' with { type: 'json' };
 import { campaignAction } from './player';
 
+// The lobby opens on the campaign; these specs exercise the classic quick road.
+test.beforeEach(async ({ page }) => {
+  await page.context().addInitScript(() => {
+    try {
+      if (!localStorage.getItem('emberwake.lobby.mode'))
+        localStorage.setItem('emberwake.lobby.mode', 'quick');
+    } catch {
+      /* storage unavailable */
+    }
+  });
+});
+
 async function readRun(page: Page): Promise<Run> {
   return page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).run, SAVE_KEY);
 }
@@ -296,6 +308,7 @@ test('blocked browser storage allows a complete in-memory turn', async ({ page }
   });
   await page.goto('/');
   await expect(page.getByRole('alert')).toContainText('Browser storage is unavailable');
+  await page.getByRole('button', { name: /The First Crossing/ }).click();
   await page.getByRole('button', { name: /Begin expedition/ }).click();
   await page.locator('.route-choice').first().click();
   await page.locator('.duel-action').first().click();
@@ -372,6 +385,7 @@ test('journal export/import restores an exact turn and rejects invalid files', a
   const newContext = await browser.newContext();
   const restoredPage = await newContext.newPage();
   await restoredPage.goto('/');
+  await restoredPage.getByRole('button', { name: /The First Crossing/ }).click();
   await restoredPage.getByRole('button', { name: 'Seer', exact: true }).click();
   await restoredPage.getByRole('button', { name: /Begin expedition/ }).click();
   const beforeRestore = await readRun(restoredPage);

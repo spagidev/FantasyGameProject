@@ -1,6 +1,18 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+// The lobby opens on the campaign; these specs exercise the classic quick road.
+test.beforeEach(async ({ page }) => {
+  await page.context().addInitScript(() => {
+    try {
+      if (!localStorage.getItem('emberwake.lobby.mode'))
+        localStorage.setItem('emberwake.lobby.mode', 'quick');
+    } catch {
+      /* storage unavailable */
+    }
+  });
+});
+
 async function toSlovak(page: Page) {
   await page.getByRole('button', { name: 'Slovenčina' }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'sk');

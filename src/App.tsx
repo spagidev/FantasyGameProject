@@ -87,6 +87,14 @@ function load(): { save: Save; warning: Warning } {
 
 const keeperIds = Object.keys(KEEPERS) as KeeperId[];
 const terminal = (run: Run | null) => run?.phase === 'won' || run?.phase === 'lost';
+const LOBBY_MODE_KEY = 'emberwake.lobby.mode';
+function readLobbyMode(): 'classic' | 'atlas' {
+  try {
+    return localStorage.getItem(LOBBY_MODE_KEY) === 'quick' ? 'classic' : 'atlas';
+  } catch {
+    return 'atlas';
+  }
+}
 function seedFrom(text: string) {
   return Array.from(text).reduce((n, c) => (Math.imul(n, 31) + c.charCodeAt(0)) | 0, 5381) >>> 0;
 }
@@ -126,9 +134,17 @@ export default function App() {
   const [warning, setWarning] = useState<Warning>(loaded.warning);
   const [keeper, setKeeper] = useState<KeeperId>(share?.keeper ?? loaded.save.profile.lastKeeper);
   const [seed, setSeed] = useState(share?.road ?? '');
-  const [expedition, setExpedition] = useState<'classic' | 'atlas'>(
-    loaded.save.run?.atlas ? 'atlas' : 'classic',
+  const [expedition, setExpeditionState] = useState<'classic' | 'atlas'>(() =>
+    loaded.save.run ? (loaded.save.run.atlas ? 'atlas' : 'classic') : readLobbyMode(),
   );
+  const setExpedition = (mode: 'classic' | 'atlas') => {
+    setExpeditionState(mode);
+    try {
+      localStorage.setItem(LOBBY_MODE_KEY, mode === 'atlas' ? 'campaign' : 'quick');
+    } catch {
+      /* storage unavailable */
+    }
+  };
   const [atlasArea, setAtlasArea] = useState('Slovakia');
   const [atlasSource, setAtlasSource] = useState<AtlasSource>('bundled');
   const [atlasNotice, setAtlasNotice] = useState('');
@@ -634,20 +650,6 @@ export default function App() {
                         aria-label={t.app.chooseExpedition}
                       >
                         <button
-                          aria-pressed={expedition === 'classic'}
-                          disabled={atlasLoading}
-                          onClick={() => {
-                            setExpedition('classic');
-                            setAtlasError('');
-                          }}
-                        >
-                          <Icon name="flame" size={18} />
-                          <span>
-                            {t.app.firstCrossing}
-                            <small>{t.app.firstCrossingNote}</small>
-                          </span>
-                        </button>
-                        <button
                           aria-pressed={expedition === 'atlas'}
                           disabled={atlasLoading}
                           onClick={() => {
@@ -659,6 +661,20 @@ export default function App() {
                           <span>
                             {t.app.lostAtlas} <i>{t.app.explore}</i>
                             <small>{t.app.lostAtlasNote}</small>
+                          </span>
+                        </button>
+                        <button
+                          aria-pressed={expedition === 'classic'}
+                          disabled={atlasLoading}
+                          onClick={() => {
+                            setExpedition('classic');
+                            setAtlasError('');
+                          }}
+                        >
+                          <Icon name="flame" size={18} />
+                          <span>
+                            {t.app.firstCrossing}
+                            <small>{t.app.firstCrossingNote}</small>
                           </span>
                         </button>
                       </div>

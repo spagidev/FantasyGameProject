@@ -18,6 +18,15 @@ House rules for every item: the engine in `src/game/` is pure and deterministic 
 - **Evening dialog polish** (item 9).
 - **Share a road** (item 10): `?road=&keeper=&dusk=` links and a copy button on the ending screen.
 
+## Round four
+
+- ✓ **One front door** (v0.13): the Lost Atlas is the campaign and the lobby's default; the First Crossing is the quick road; the last choice is remembered.
+- ✓ **Balance pass** (v0.13): ruleset-3 Seer 38 health / 1 armor and Wayfarer 44 health (`startingStats`). A fully naive scripted player now wins 64 / 58 / 54 % (Warden / Seer / Wayfarer) instead of 64 / 32 / 48 %. The balance report adds a beginner fairness check (keepers within 20 points) and Lost Atlas runs.
+- ◐ **A gentle first expedition** (engine part v0.13): `src/game/tips.ts` decides which single guide note is due — Atlas, lamp oil, wagon, free order, troves, omens, rewards, traders, lessons, sets, provinces — stored in `meta.tips`, switchable off with `meta.tipsOff`. **Next (Build):** show the note as a dismissible card above the board (“From the keeper’s guide”, title, text, “Got it”, “Hide guide notes”), add Slovak text for all eleven notes to `src/i18n`, and make the lobby show `startingStats(keeper)` instead of `KEEPERS[keeper]`.
+- **The real map changes the fight** · Lead: terrain around each encounter site from the chart's own features (water, groves, dense buildings) gives one visible combat rule per site, shown on the scout card and as shading on the chart.
+- **Keeper level-ups during a run** · Lead: experience from fights, a level every two encounters with a choice of three; rebalance enemy health.
+- **Feel** · Build: attack and hit motion on portraits, a soft ambient soundscape per realm (opt-in), a fuller bell when a guardian falls.
+
 ## Shipped in v0.10
 
 - **Relic sets** (item 4): four sets with one bonus each.

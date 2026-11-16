@@ -3,6 +3,18 @@ import AxeBuilder from '@axe-core/playwright';
 import { SAVE_KEY, emptySave } from '../src/game/storage';
 import { readFileSync } from 'node:fs';
 
+// The lobby opens on the campaign; these specs exercise the classic quick road.
+test.beforeEach(async ({ page }) => {
+  await page.context().addInitScript(() => {
+    try {
+      if (!localStorage.getItem('emberwake.lobby.mode'))
+        localStorage.setItem('emberwake.lobby.mode', 'quick');
+    } catch {
+      /* storage unavailable */
+    }
+  });
+});
+
 const campaignMap = JSON.parse(readFileSync('src/atlas/slovakia-map.json', 'utf8')) as {
   cities: { key: string; region: string }[];
 };

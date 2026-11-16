@@ -8,7 +8,7 @@ This document is the contract for the pure state engine in `src/game/engine.ts`.
 
 Twelve crossings in three realms. In each realm: a waylight guardian (three lanes, three different enemies), two crossings arranged by the seed, then the bell guardian. The second crossing is always one story, one elite and one ordinary battle in a seeded order; the third always contains a sanctuary and a trader plus either a story or an elite, so every route can reach a sanctuary or a trader before the guardian. Lane movement is unchanged: all lanes at the start of a realm, otherwise the same or a neighbouring lane. A story scene never repeats within one expedition. Lost Atlas charts keep their fixed encounter kinds and use the same combat, relics and scenes.
 
-Keepers start as before (Warden 48/7/2, Seer 36/6/0, Wayfarer 40/6/1 health/attack/armor), with 35 coins and two flasks. The Seer starts every battle with 1 extra focus.
+Keepers start at Warden 48/7/2, Seer 38/6/1, Wayfarer 44/6/1 (health/attack/armor; the Seer and Wayfarer were raised in the v0.13 balance pass, `startingStats` in `data.ts`), with 35 coins and two flasks. The Seer starts every battle with 1 extra focus. The first two rulesets keep the original 48/7/2, 36/6/0 and 40/6/1.
 
 ### A turn
 

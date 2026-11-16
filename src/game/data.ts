@@ -238,6 +238,26 @@ export const KEEPERS = {
   },
 } as const;
 
+/**
+ * Ruleset 3 starting statistics (v0.13 balance pass). The Seer gains 2 health and 1 armor and
+ * the Wayfarer 4 health, after scripted-beginner simulations showed the Seer winning 32% and
+ * the Wayfarer 48% of base-difficulty expeditions against the Warden's 64%. The first two
+ * rulesets keep the original numbers in KEEPERS.
+ */
+const NIGHT_ADJUSTMENT: Record<KeeperId, { health: number; armor: number }> = {
+  warden: { health: 0, armor: 0 },
+  seer: { health: 2, armor: 1 },
+  wayfarer: { health: 4, armor: 0 },
+};
+export function startingStats(keeper: KeeperId) {
+  const k = KEEPERS[keeper];
+  return {
+    health: k.health + NIGHT_ADJUSTMENT[keeper].health,
+    attack: k.attack,
+    armor: k.armor + NIGHT_ADJUSTMENT[keeper].armor,
+  };
+}
+
 export const RELICS: Record<
   RelicId,
   { name: string; description: string; flavor: string; icon: string; rarity: Rarity }

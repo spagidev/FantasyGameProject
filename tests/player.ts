@@ -7,6 +7,9 @@ import {
   nodeOf,
   transition,
   availableTalents,
+  flaskHealing,
+  incomingDamage,
+  skillCost,
   type Action,
   type Run,
 } from '../src/game/engine';
@@ -155,4 +158,22 @@ export function campaignAction(r: Run): Action {
         ? { type: 'buy', item: 'heal' }
         : { type: 'leave' };
   return { type: 'ending', choice: 'dawn' };
+}
+
+/**
+ * A scripted beginner: guards blows of 10 or more, drinks when the next blow would kill or
+ * health is low, uses the keeper skill whenever affordable, otherwise strikes. Never uses the
+ * second technique. Out of combat it plays the same choices as campaignAction. Used by the
+ * balance report as a rough stand-in for a new player, not as evidence of human difficulty.
+ */
+export function beginnerAction(r: Run): Action {
+  if (r.phase !== 'combat') return campaignAction(r);
+  const incoming = incomingDamage(r);
+  const canDrink = r.flasks > 0 && r.health < r.maxHealth;
+  if (r.health <= incoming && canDrink && r.health + flaskHealing(r) > incoming)
+    return { type: 'flask' };
+  if (incoming >= 10 || incoming >= r.health) return { type: 'guard' };
+  if (r.health * 3 < r.maxHealth && canDrink && incoming < 8) return { type: 'flask' };
+  if (r.focus >= skillCost(r)) return { type: 'skill' };
+  return { type: 'strike' };
 }

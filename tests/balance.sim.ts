@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { format } from 'prettier';
 import { type KeeperId, type TalentId, type WaylightId } from '../src/game/data';
 import { availableTalents, newRun, nextNodes, transition, type Run } from '../src/game/engine';
-import { campaignAction } from './player';
+import { beginnerAction, campaignAction } from './player';
 
 test('record a reproducible ruleset / keeper / strategic-route matrix', async () => {
   const seeds = [42, 2026, 8128, 16384, 65537];
@@ -111,6 +111,41 @@ test('record a reproducible ruleset / keeper / strategic-route matrix', async ()
           perfectGuards: run.stats!.parries,
         });
       }
+  // The scripted beginner on seeded routes at Dusk 0: a fairness check between keepers.
+  const beginner = (['warden', 'seer', 'wayfarer'] as KeeperId[]).map((keeper) => {
+    let wins = 0;
+    const runs = 60;
+    for (let i = 1; i <= runs; i++) {
+      let run: Run = newRun(keeper, i * 7919 + 13);
+      let steps = 0;
+      while (!['won', 'lost'].includes(run.phase) && steps++ < 900) {
+        const next = transition(run, beginnerAction(run));
+        run = next === run ? transition(run, { type: 'strike' }) : next;
+      }
+      wins += run.phase === 'won' ? 1 : 0;
+    }
+    return { key: `3/${keeper}/beginner`, runs, wins, winRate: Math.round((wins / runs) * 100) };
+  });
+  // Lost Atlas charts (free order, omens, wagon rests) with the search player at Dusk 0.
+  const atlas = (['warden', 'seer', 'wayfarer'] as KeeperId[]).map((keeper) => {
+    let wins = 0;
+    let days = 0;
+    for (const seed of seeds) {
+      let run: Run = newRun(keeper, seed, true);
+      let steps = 0;
+      while (!['won', 'lost'].includes(run.phase) && steps++ < 2000)
+        run = transition(run, campaignAction(run));
+      wins += run.phase === 'won' ? 1 : 0;
+      days += run.atlas!.day ?? 0;
+    }
+    return { key: `3/${keeper}/atlas`, runs: seeds.length, wins, meanDays: days / seeds.length };
+  });
+  console.table(beginner);
+  console.table(atlas);
+  expect(atlas.every((g) => g.wins === g.runs)).toBe(true);
+  // Keepers should be within reach of one another for a beginner.
+  const rates = beginner.map((g) => g.winRate);
+  expect(Math.max(...rates) - Math.min(...rates)).toBeLessThanOrEqual(20);
   const nightGroups = [0, 8].flatMap((dusk) =>
     (['warden', 'seer', 'wayfarer'] as const).map((keeper) => {
       const group = night.filter((r) => r.dusk === dusk && r.keeper === keeper);
@@ -160,6 +195,16 @@ test('record a reproducible ruleset / keeper / strategic-route matrix', async ()
             'Bounded 12-action search, beam width 18. Three fixed route plans; legal transitions only. Evidence of automated reachability, not novice difficulty or fun.',
           groups,
           results,
+          beginner: {
+            policy:
+              'Scripted beginner (tests/player.ts beginnerAction): guards blows of 10+, drinks when needed, skill when affordable, never the second technique. 60 seeds per keeper, Dusk 0, seeded routes.',
+            groups: beginner,
+          },
+          atlas: {
+            policy:
+              'Search player on the bundled Saltbound chart, Dusk 0: free order, omens and wagon rests.',
+            groups: atlas,
+          },
           longNight: {
             policy:
               'Ruleset 3, seeded routes. The same bounded search player (9 actions deep, beam 18) with rarity-first relic choices. A search player is far stronger than a person: Dusk 0 must always be winnable; Dusk 8 is expected to defeat it sometimes.',

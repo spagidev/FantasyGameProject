@@ -4,6 +4,18 @@ import { newRun, nextNodes, transition, type Run } from '../src/game/engine';
 import { advanceSave, emptySave, SAVE_KEY } from '../src/game/storage';
 import { campaignAction } from './player';
 
+// The lobby opens on the campaign; these specs exercise the classic quick road.
+test.beforeEach(async ({ page }) => {
+  await page.context().addInitScript(() => {
+    try {
+      if (!localStorage.getItem('emberwake.lobby.mode'))
+        localStorage.setItem('emberwake.lobby.mode', 'quick');
+    } catch {
+      /* storage unavailable */
+    }
+  });
+});
+
 function scenes() {
   const found = new Map<string, Run>();
   let run = newRun('warden', 123),

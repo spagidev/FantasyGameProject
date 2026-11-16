@@ -27,6 +27,7 @@ import {
   RELICS,
   RELIC_SETS,
   STARTING_RELICS,
+  startingStats,
   TALENTS,
   WAYLIGHTS,
   type EnemyArt,
@@ -187,6 +188,8 @@ export function newRun(
   const k = KEEPERS[keeper];
   const ruleset = options.ruleset ?? 3;
   const dusk = ruleset === 3 ? Math.max(0, Math.min(DUSK_MAX, options.dusk ?? 0)) : 0;
+  const base = ruleset === 3 ? startingStats(keeper) : k;
+  const health = base.health;
   return {
     version: 2,
     ...(atlas
@@ -198,10 +201,10 @@ export function newRun(
     phase: 'map',
     depth: -1,
     lane: 1,
-    health: k.health,
-    maxHealth: k.health,
+    health,
+    maxHealth: health,
     attack: k.attack,
-    armor: k.armor,
+    armor: base.armor,
     coins: 35,
     flasks: dusk >= 3 ? 1 : 2,
     focus: 2,
