@@ -46,7 +46,7 @@ import {
 import { DEEDS, dailyRoad, duskUnlocked, unlockedRelics, type Meta } from './game/meta';
 import { Chronicle } from './components/Chronicle';
 import { DuskPicker, ScoreCard } from './components/Night';
-import { EnemyPortrait, KeeperPortrait, Landscape } from './components/Art';
+import { KeeperPortrait, Landscape, RelicIcon, SceneArt } from './components/Art';
 import { Icon, type IconName } from './components/Icon';
 import { Modal } from './components/Modal';
 import { RouteMap } from './components/RouteMap';
@@ -999,7 +999,7 @@ function RelicInventory({ ids }: { ids: RelicId[] }) {
         <div className="relic-list">
           {ids.map((id) => (
             <div className="inventory-relic" key={id} title={RELICS[id].flavor}>
-              <Icon name={RELICS[id].icon as IconName} />
+              <RelicIcon id={id} size={30} />
               <span>
                 <strong>{RELICS[id].name}</strong>
                 <small>{RELICS[id].description}</small>
@@ -1028,6 +1028,12 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
         <span className="scene-sigil">
           <Icon name={boss ? 'bell' : 'gem'} size={34} />
         </span>
+        {run.enemy && (
+          <p className="victory-beat">
+            <b>{run.enemy.name} falls.</b>
+            {run.stats && run.turn > 0 && ` ${run.turn} turns.`}
+          </p>
+        )}
         <span className="eyebrow">
           {boss ? 'A BELL REMEMBERS ITS SONG' : 'THE DARK YIELDS A LITTLE'}
         </span>
@@ -1058,7 +1064,7 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
               onClick={() => dispatch({ type: 'reward', id })}
             >
               <span className="relic-large">
-                <Icon name={RELICS[id].icon as IconName} size={32} />
+                <RelicIcon id={id} size={56} />
               </span>
               <span className={`eyebrow rarity-${RELICS[id].rarity}`}>
                 {run.ruleset === 3 ? `${RELICS[id].rarity.toUpperCase()} RELIC` : 'RELIC'}
@@ -1094,6 +1100,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
     <section className="scene-board encounter-board">
       <Landscape chapter={Math.floor(run.depth / 4)} />
       <div className="scene-content">
+        {run.phase === 'event' && <SceneArt id={event.options[0].lore} />}
         <span className="scene-sigil">
           <Icon name={node.kind} size={34} />
         </span>
@@ -1137,7 +1144,7 @@ function Encounter({ run, dispatch }: { run: Run; dispatch: (a: Action) => void 
                   disabled={!canBuy(run, id)}
                   onClick={() => dispatch({ type: 'buy', item: id })}
                 >
-                  <Icon name={RELICS[id].icon as IconName} size={22} />
+                  <RelicIcon id={id} size={34} />
                   <span>
                     <strong>{RELICS[id].name}</strong>
                     <small>
@@ -1287,6 +1294,7 @@ function Ending({
     <section className="scene-board ending-board">
       <Landscape chapter={lost ? Math.floor(run.depth / 4) : 2} />
       <div className="scene-content">
+        {!choosing && <SceneArt id={lost ? 'fallen' : (run.ending ?? 'dawn')} />}
         <span className="scene-sigil">
           <Icon name={lost ? 'flame' : 'sun'} size={40} />
         </span>
@@ -1519,9 +1527,12 @@ function Help() {
         <div>
           <h3>The Lost Atlas</h3>
           <p>
-            A second kind of expedition, drawn over real OpenStreetMap roads. Walk the roads to lift
-            the veil, reach each encounter and enter it. Side paths hide supplies. If you recognize
-            the real city, name it in the field journal for +2 attack. One guess per bell.
+            A second kind of expedition, drawn over real OpenStreetMap roads. Each day your lamp oil
+            carries you a fixed distance; make camp for a new day. Waylights pay at dawn, and every
+            night the enemies ahead grow a little tougher. Select a landmark to plan a route: the
+            map shows its distance and walking time, and one button walks it. Small finds lie on
+            some roads. If you recognize the real city, name it in the field journal for +2 attack.
+            One guess per bell.
           </p>
         </div>
       </div>

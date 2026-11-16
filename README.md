@@ -44,6 +44,20 @@ Browser tests use `/usr/bin/chromium` when present. On other machines, run `npx 
 
 The list above describes the first two rulesets. In combat your action resolves first, then poison, then the enemy's visible intention. **Guard lasts one enemy action. Flasks also end your turn.** Open “How to play” for the complete introduction.
 
+## The Living Map · v0.8
+
+The Lost Atlas becomes an adventure map with a clock, and the map becomes a tool.
+
+- **Days and lamp oil.** A keeper walks a fixed distance of real road per day. Make camp for a new day: freed waylights pay at dawn, and the dark gathers a little each night.
+- **Wayside finds** lie on the roads themselves, so a detour is a decision.
+- **A route planner.** Select any charted landmark to see the shortest known route, its distance and walking time and whether today's oil reaches it; one button walks it.
+- **Trail blazes** on walked roads, kilometres and minutes instead of paces, links to OpenStreetMap and Mapy.com once a city is named.
+- **The atlas passport** in the Chronicle stamps every real place you chart, complete and name.
+- **Clarity:** tap any status chip for its meaning, action titles show the true damage, a victory beat before the spoils.
+- **Illustrations on demand.** Enemy portraits, relic icons, map pictograms and scene paintings are picked up from `src/art/` when present and fall back to the built-in graphics when not. [The art brief](docs/ART_BRIEF.md) specifies every file.
+
+See [the round-two plan](docs/ROUND2_PLAN.md).
+
 ## The Long Night · v0.7
 
 New expeditions use a third ruleset built so that every turn asks a question and every run is different. Earlier journals continue under their own rules.

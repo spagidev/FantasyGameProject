@@ -1,5 +1,7 @@
 import { useId } from 'react';
-import type { EnemyArt, KeeperId } from '../game/data';
+import { FOE_ART, RELIC_ART, SCENE_ART, SITE_ART } from '../artwork';
+import { RELICS, type EnemyArt, type KeeperId, type RelicId } from '../game/data';
+import { Icon, type IconName } from './Icon';
 
 /** Each realm occupies one strip of the locally bundled painted atlas. */
 export function Landscape({
@@ -224,6 +226,53 @@ export function KeeperPortrait({
 }) {
   return <span aria-hidden="true" className={`keeper-portrait portrait-${keeper} ${className}`} />;
 }
-export function EnemyPortrait({ art }: { art: EnemyArt }) {
-  return <span aria-hidden="true" className={`enemy-portrait enemy-portrait-${art}`} />;
+/**
+ * An enemy's own painting when one has been supplied (src/art/foes), otherwise the shared
+ * portrait of its kind, tinted so that different enemies still read differently.
+ */
+export function EnemyPortrait({ art, id, tint }: { art: EnemyArt; id?: string; tint?: number }) {
+  const own = id ? FOE_ART[id] : undefined;
+  return own ? (
+    <span
+      aria-hidden="true"
+      className="enemy-portrait enemy-portrait-own"
+      style={{ backgroundImage: `url(${own})` }}
+    />
+  ) : (
+    <span
+      aria-hidden="true"
+      className={`enemy-portrait enemy-portrait-${art}`}
+      style={tint ? { filter: `hue-rotate(${tint}deg)` } : undefined}
+    />
+  );
+}
+/** A relic's painted icon when supplied, otherwise its line icon. */
+export function RelicIcon({ id, size = 22 }: { id: RelicId; size?: number }) {
+  return RELIC_ART[id] ? (
+    <img className="relic-art" src={RELIC_ART[id]} width={size} height={size} alt="" />
+  ) : (
+    <Icon name={RELICS[id].icon as IconName} size={size} />
+  );
+}
+/** A map pictogram when supplied, otherwise the line icon given. */
+export function SiteIcon({
+  kind,
+  fallback,
+  size = 34,
+  iconSize = 20,
+}: {
+  kind: string;
+  fallback: IconName;
+  size?: number;
+  iconSize?: number;
+}) {
+  return SITE_ART[kind] ? (
+    <img className="site-art" src={SITE_ART[kind]} width={size} height={size} alt="" />
+  ) : (
+    <Icon name={fallback} size={iconSize} />
+  );
+}
+/** A wide illustration for a story scene, ending or defeat; renders nothing when absent. */
+export function SceneArt({ id }: { id: string }) {
+  return SCENE_ART[id] ? <img className="scene-art" src={SCENE_ART[id]} alt="" /> : null;
 }

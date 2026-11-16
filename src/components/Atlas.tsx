@@ -1,6 +1,10 @@
 import { useEffect, useId, useState } from 'react';
 import {
   ATLAS_SITES,
+  FINDS,
+  atlasFinds,
+  atlasRoute,
+  travels,
   atlasGeography,
   atlasSites,
   atlasSite,
@@ -11,8 +15,18 @@ import {
   newAtlas,
   type Point,
 } from '../game/atlas';
-import { nodeOf, type Action, type Run, type MapNode } from '../game/engine';
+import { nodeOf, waylightFor, type Action, type Run, type MapNode } from '../game/engine';
+import { SITE_ART } from '../artwork';
 import { Icon } from './Icon';
+
+/** Distances the way a hiking map prints them. */
+export const metres = (m: number) =>
+  m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
+/** Walking time at four kilometres an hour. */
+export const walkingTime = (m: number) => {
+  const minutes = Math.max(1, Math.round(m / (4000 / 60)));
+  return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+};
 
 const line = (points: Point[]) => points.map((p) => p.join(',')).join(' ');
 const glyph = (id: string) =>
@@ -60,6 +74,27 @@ export function AtlasMap({
   if (state.recognized) fogPoints.push(pack.points.haven);
   const canCollect =
     ['cache', 'haven', 'spring'].includes(current.kind) && !state.collected.includes(current.id);
+  const days = travels(state);
+  const route = movable && selected !== state.position ? atlasRoute(state, selected) : null;
+  const reach = days ? state.oil! : Infinity;
+  // How much of the planned route today's oil covers.
+  let affordable = 0;
+  if (route) {
+    let left = reach;
+    for (const i of route.edges) {
+      if (pack.edges[i].metres > left) break;
+      left -= pack.edges[i].metres;
+      affordable++;
+    }
+  }
+  const stranded = days && movable && neighbours.every((n) => n.metres > reach);
+  const finds = run && days ? atlasFinds(run.seed, state) : [];
+  const pinArt = (s: (typeof sites)[number]) => {
+    if (s.depth === undefined) return SITE_ART[s.kind === 'cache' ? 'chest' : s.kind];
+    if (!run) return undefined;
+    const node = nodeOf(run, s.depth, s.lane!);
+    return SITE_ART[waylightFor(node) ?? node.kind];
+  };
   const viewBox = zoom
     ? `${Math.max(0, Math.min(500, p[0] - 250))} ${Math.max(0, Math.min(405, p[1] - 202.5))} 500 405`
     : '0 0 1000 810';
@@ -97,6 +132,34 @@ export function AtlasMap({
             </>
           )}
         </p>
+      )}
+      {days && run && (
+        <div className={`atlas-day ${stranded ? 'is-stranded' : ''}`}>
+          <strong>Day {state.day}</strong>
+          <div
+            className="oil-meter"
+            role="meter"
+            aria-label="Lamp oil left today"
+            aria-valuemin={0}
+            aria-valuemax={state.range}
+            aria-valuenow={Math.min(state.oil!, state.range!)}
+          >
+            <i style={{ width: `${Math.min(100, (state.oil! / state.range!) * 100)}%` }} />
+          </div>
+          <span>
+            Lamp oil for <b>{metres(state.oil!)}</b> more today
+            {stranded && ' · not enough for any road from here'}
+          </span>
+          <button
+            className="secondary-button"
+            data-action="camp"
+            disabled={!movable}
+            onClick={() => dispatch?.({ type: 'atlas-camp' })}
+            title="Start a new day with full oil. Waylights pay at dawn; the dark gathers a little."
+          >
+            Make camp
+          </button>
+        </div>
       )}
       <div className={`atlas-canvas ${zoom ? 'atlas-zoomed' : ''}`}>
         <svg
@@ -219,19 +282,54 @@ export function AtlasMap({
                 />
               ),
             )}
-            {pack.edges.map((e, i) => (
+            {pack.edges.map((e, i) =>
+              state.roads.includes(i) ? (
+                // A walked road carries a trail blaze: white, colour, white.
+                <g key={i} fill="none" strokeLinejoin="round" strokeLinecap="round">
+                  <polyline points={line(e.points)} stroke="#fbf3dc" strokeWidth="5.4" />
+                  <polyline points={line(e.points)} stroke="#b4432c" strokeWidth="1.9" />
+                </g>
+              ) : (
+                <polyline
+                  key={i}
+                  points={line(e.points)}
+                  fill="none"
+                  stroke="#6e603e"
+                  strokeWidth="2"
+                  strokeDasharray="3 5"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  opacity=".8"
+                />
+              ),
+            )}
+            {route?.edges.map((i, n) => (
               <polyline
-                key={i}
-                points={line(e.points)}
+                key={`route${i}`}
+                className="atlas-route"
+                points={line(pack.edges[i].points)}
                 fill="none"
-                stroke={state.roads.includes(i) ? '#f8e3ad' : '#6e603e'}
-                strokeWidth={state.roads.includes(i) ? 3.4 : 2}
-                strokeDasharray={state.roads.includes(i) ? undefined : '3 5'}
+                stroke={n < affordable ? '#ffd27a' : '#e9e2c9'}
+                strokeWidth="7"
+                strokeDasharray={n < affordable ? undefined : '2 9'}
                 strokeLinejoin="round"
                 strokeLinecap="round"
-                opacity=".8"
+                opacity=".75"
               />
             ))}
+            {finds
+              .filter((f) => !state.finds!.includes(f.edge))
+              .map((f) => (
+                <g key={f.edge} className="atlas-find">
+                  <title>{`${FINDS[f.kind].name}: ${FINDS[f.kind].text}`}</title>
+                  <path
+                    d={`M${f.point[0]} ${f.point[1] - 9}l8 9-8 9-8-9z`}
+                    fill="#f6d58e"
+                    stroke="#5d4521"
+                    strokeWidth="1.6"
+                  />
+                </g>
+              ))}
           </g>
           <g
             fill="#bbbdac"
@@ -265,20 +363,34 @@ export function AtlasMap({
                   stroke={active ? '#ffe3ac' : '#cfb37a'}
                   strokeWidth="2"
                 />
-                <text x={q[0]} y={q[1] + 5} textAnchor="middle" fill="#f9dfaa" fontSize="18">
-                  {done ? '✓' : glyph(s.id)}
-                </text>
+                {pinArt(s) && !done ? (
+                  <image href={pinArt(s)} x={q[0] - 15} y={q[1] - 15} width="30" height="30" />
+                ) : (
+                  <text x={q[0]} y={q[1] + 5} textAnchor="middle" fill="#f9dfaa" fontSize="18">
+                    {done ? '✓' : glyph(s.id)}
+                  </text>
+                )}
               </g>
             );
           })}
           <g aria-hidden="true" pointerEvents="none">
             <circle cx={p[0]} cy={p[1]} r="29" fill={`url(#${uid}halo)`} />
-            <path
-              d={`M${p[0]} ${p[1] - 30}l8 13-8 6-8-6z`}
-              fill="#ffe4a2"
-              stroke="#654e32"
-              strokeWidth="1.5"
-            />
+            {run && SITE_ART[`keeper-${run.keeper}`] ? (
+              <image
+                href={SITE_ART[`keeper-${run.keeper}`]}
+                x={p[0] - 17}
+                y={p[1] - 50}
+                width="34"
+                height="34"
+              />
+            ) : (
+              <path
+                d={`M${p[0]} ${p[1] - 30}l8 13-8 6-8-6z`}
+                fill="#ffe4a2"
+                stroke="#654e32"
+                strokeWidth="1.5"
+              />
+            )}
           </g>
         </svg>
         <span className="atlas-north" aria-label="North is up">
@@ -289,9 +401,9 @@ export function AtlasMap({
           style={{
             width: `${(500 / (state.chart?.metresPerPixel ?? 3.52) / (zoom ? 500 : 1000)) * 100}%`,
           }}
-          aria-label="Map scale: approximately 500 paces"
+          aria-label="Map scale: 500 metres"
         >
-          500 paces
+          500 m
         </span>
         <div className="atlas-tools">
           <button
@@ -364,13 +476,19 @@ export function AtlasMap({
               <p>{site.subtitle}</p>
             </div>
             <div className="atlas-location-actions">
-              {selected !== state.position && neighbours.some((n) => n.id === selected) && (
+              {route && (
                 <button
-                  className="secondary-button"
-                  disabled={!movable}
-                  onClick={() => dispatch?.({ type: 'atlas-move', to: selected })}
+                  className="primary-button"
+                  data-action="walk-route"
+                  disabled={affordable === 0}
+                  onClick={() => dispatch?.({ type: 'atlas-walk', to: selected })}
                 >
-                  Walk here <Icon name="arrow" size={15} />
+                  {affordable === route.edges.length
+                    ? 'Walk this route'
+                    : affordable === 0
+                      ? 'Out of oil for today'
+                      : 'Walk as far as the oil lasts'}{' '}
+                  <Icon name="arrow" size={15} />
                 </button>
               )}
               {selected === state.position && canEnter && (
@@ -404,6 +522,25 @@ export function AtlasMap({
                 <span className="atlas-status">This kindness is already gathered.</span>
               )}
             </div>
+            {route && (
+              <p className="atlas-plan">
+                <Icon name="compass" size={15} />
+                <span>
+                  <b>{metres(route.metres)}</b> · about {walkingTime(route.metres)} on foot ·{' '}
+                  {route.edges.length} {route.edges.length === 1 ? 'road' : 'roads'}
+                  {days &&
+                    (affordable === route.edges.length
+                      ? ' · within today’s oil'
+                      : ' · farther than today’s oil: camp on the way')}
+                </span>
+              </p>
+            )}
+            {movable && selected !== state.position && !route && (
+              <p className="atlas-plan">
+                <Icon name="compass" size={15} />
+                <span>No charted road leads there yet. Walk into the veil to find one.</span>
+              </p>
+            )}
             {selected === state.position &&
               current.depth !== undefined &&
               current.depth > run.depth + 1 && (
@@ -420,6 +557,7 @@ export function AtlasMap({
                   <button
                     data-destination={n.id}
                     key={n.id}
+                    disabled={n.metres > reach}
                     onClick={() => dispatch?.({ type: 'atlas-move', to: n.id })}
                   >
                     <Icon name="compass" size={17} />
@@ -428,8 +566,13 @@ export function AtlasMap({
                         {charted(state, n.id) ? atlasSite(n.id, state).name : 'Beyond the veil'}
                       </strong>
                       <small>
-                        {bearing(state.position, n.id, state)} · {n.metres} paces
-                        {state.visited.includes(n.id) ? ' · walked' : ''}
+                        {bearing(state.position, n.id, state)} · {metres(n.metres)} ·{' '}
+                        {walkingTime(n.metres)}
+                        {n.metres > reach
+                          ? ' · needs a new day'
+                          : state.roads.includes(n.index)
+                            ? ' · walked'
+                            : ''}
                       </small>
                     </span>
                     <Icon name="arrow" size={15} />
@@ -487,6 +630,11 @@ export function AtlasJournal({ run, dispatch }: { run: Run; dispatch: (a: Action
         <span>
           <b>{a.steps}</b> roads walked
         </span>
+        {a.day !== undefined && (
+          <span>
+            <b>{a.day}</b> {a.day === 1 ? 'day' : 'days'}
+          </span>
+        )}
         <span>
           <b>{run.bells}/3</b> bells awake
         </span>
@@ -532,6 +680,17 @@ export function AtlasJournal({ run, dispatch }: { run: Run; dispatch: (a: Action
             rel="noreferrer"
           >
             Compare with the waking world ↗
+          </a>
+          <a
+            href={
+              a.chart
+                ? `https://mapy.com/en/turisticka?x=${a.chart.centre[0]}&y=${a.chart.centre[1]}&z=14`
+                : 'https://mapy.com/en/turisticka?x=7.425&y=43.737&z=14'
+            }
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open the hiking map on Mapy.com ↗
           </a>
         </div>
       ) : (

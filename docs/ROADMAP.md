@@ -20,6 +20,12 @@ Implemented from `docs/IMPROVEMENT_PLAN.md`: ruleset 3 (poise, perfect guards, t
 
 Next for this line: human playtests of Dusk 0 difficulty per keeper; portraits for the new enemies (they currently share four tinted paintings); a movement cost or risk on Atlas roads so detours are a decision; more elites per realm.
 
+## Milestone 5 · The Living Map
+
+Implemented from `docs/ROUND2_PLAN.md`: days, lamp oil, camp and dawn income on the Atlas; wayside finds; an engine-level route planner; trail blazes and real units; the atlas passport; tap-to-explain chips; an optional-artwork pipeline (`src/artwork.ts`, `docs/ART_BRIEF.md`).
+
+Next: deliver the illustrations in the brief; let guarded side sites offer optional fights; free-order encounters within a realm; a second country's bundled charts.
+
 ## Next useful improvements
 
 1. **Playtest the decisions.** Gather human feedback on combat clarity, difficulty, and route incentives. Use the recorded seed/keeper/route matrix as a baseline before adjusting stats; automated search currently wins all 90 samples. The bounded test player proves legal winning paths; it is not evidence of novice difficulty or overall balance.

@@ -2,6 +2,7 @@ import type { RegionalChart } from '../atlas/types';
 import {
   applyAtlasAction,
   atlasSite,
+  travels,
   newAtlas,
   cloneAtlasRun,
   type AtlasAction,
@@ -175,7 +176,9 @@ export function newRun(
   const dusk = ruleset === 3 ? Math.max(0, Math.min(DUSK_MAX, options.dusk ?? 0)) : 0;
   return {
     version: 2,
-    ...(atlas ? { atlas: newAtlas(typeof atlas === 'object' ? atlas : undefined) } : {}),
+    ...(atlas
+      ? { atlas: newAtlas(typeof atlas === 'object' ? atlas : undefined, ruleset === 3) }
+      : {}),
     ruleset,
     seed: seed >>> 0,
     keeper,
@@ -390,13 +393,18 @@ function legacyEnemy(node: MapNode, ruleset: 1 | 2): Enemy {
   };
 }
 
-export function makeEnemy(node: MapNode, ruleset: Ruleset = 3, dusk = 0): Enemy {
+/** Nights spent on an Atlas chart: each adds 2% health to enemies not yet fought, up to 30%. */
+export const nightsOf = (r: Pick<Run, 'atlas'>) => (travels(r.atlas) ? r.atlas.day - 1 : 0);
+export function makeEnemy(node: MapNode, ruleset: Ruleset = 3, dusk = 0, nights = 0): Enemy {
   if (ruleset < 3 || !node.foe) return legacyEnemy(node, ruleset === 1 ? 1 : 2);
   const foe = FOES[node.foe];
   const big = node.kind !== 'battle';
   const extra = (dusk >= 5 ? 1 : 0) + (big && dusk >= 2 ? 2 : 0);
   const grow = (p: Intent[]) => p.map((i) => ({ ...i, damage: i.damage ? i.damage + extra : 0 }));
-  const health = Math.round(foe.health * (1 + (dusk >= 1 ? 0.1 : 0) + (dusk >= 8 ? 0.15 : 0)));
+  const health = Math.round(
+    foe.health *
+      (1 + (dusk >= 1 ? 0.1 : 0) + (dusk >= 8 ? 0.15 : 0) + Math.min(0.3, nights * 0.02)),
+  );
   const poise = Math.round(foe.poise * (dusk >= 4 ? 1.25 : 1));
   return {
     id: foe.id,
@@ -589,13 +597,23 @@ function wear(r: Run, amount: number) {
   note(r, `${e.name} is staggered: it loses its next action and takes more damage.`);
   if (r.talents.includes('breaker')) gainFocus(r, 2);
 }
-/** Ruleset 3 hit: weakness, stagger, plating, guard, then poise. */
-function hit3(r: Run, base: number, options: { pierce?: boolean; poise?: number } = {}) {
-  const e = r.enemy!;
+/**
+ * What a hit of this base damage becomes against the current enemy, before its guard:
+ * weakness, then stagger, then plating. Earlier rulesets have none of the three.
+ */
+export function effectiveHit(r: Run, base: number, pierce = false): number {
+  const e = r.enemy;
+  if (r.ruleset < 3 || !e) return base;
   let amount = base;
   if (r.weak) amount = Math.floor(amount * 0.75);
   if (e.stagger) amount = Math.floor(amount * staggerBonus(r));
-  if (e.traits?.plated && !options.pierce) amount = Math.max(1, amount - e.traits.plated);
+  if (e.traits?.plated && !pierce) amount = Math.max(1, amount - e.traits.plated);
+  return amount;
+}
+/** Ruleset 3 hit: weakness, stagger, plating, guard, then poise. */
+function hit3(r: Run, base: number, options: { pierce?: boolean; poise?: number } = {}) {
+  const e = r.enemy!;
+  const amount = effectiveHit(r, base, options.pierce);
   const blocked = options.pierce ? 0 : Math.min(e.guard, amount);
   e.guard -= blocked;
   e.health = Math.max(0, e.health - (amount - blocked));
@@ -944,6 +962,8 @@ function combat3(
 export function transition(run: Run, action: Action): Run {
   if (
     action.type === 'atlas-move' ||
+    action.type === 'atlas-walk' ||
+    action.type === 'atlas-camp' ||
     action.type === 'atlas-name' ||
     action.type === 'atlas-collect'
   )
@@ -952,7 +972,8 @@ export function transition(run: Run, action: Action): Run {
   const v3 = r.ruleset === 3;
   if (action.type === 'travel') {
     if (!nextNodes(r).some((n) => n.lane === action.lane)) return run;
-    const benefits = roadBenefits(r);
+    // On a chart with days, waylights pay at dawn instead of at each crossing.
+    const benefits = travels(r.atlas) ? { health: 0, coins: 0 } : roadBenefits(r);
     heal(r, benefits.health);
     r.coins += benefits.coins;
     r.depth += 1;
@@ -963,7 +984,7 @@ export function transition(run: Run, action: Action): Run {
     r.enemy = null;
     if (v3) r.shop = [];
     if (['battle', 'elite', 'boss'].includes(node.kind)) {
-      r.enemy = makeEnemy(node, r.ruleset, r.dusk ?? 0);
+      r.enemy = makeEnemy(node, r.ruleset, r.dusk ?? 0, nightsOf(r));
       r.turn = 0;
       clearBattle(r);
       r.focus = startingFocus(r);

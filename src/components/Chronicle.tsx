@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { BOSSES, ELITES, FOES, ORDINARY, describeTraits, type Foe } from '../game/bestiary';
 import { CHAPTERS, KEEPERS, LORE, RELICS, type KeeperId, type RelicId } from '../game/data';
-import { DEEDS, duskUnlocked, unlockedRelics, type Meta } from '../game/meta';
-import { EnemyPortrait } from './Art';
+import { DEEDS, KNOWN_CHARTS, duskUnlocked, unlockedRelics, type Meta } from '../game/meta';
+import { EnemyPortrait, RelicIcon } from './Art';
 import { intentEffects } from './Combat';
-import { Icon, type IconName } from './Icon';
+import { Icon } from './Icon';
 
-type Tab = 'memories' | 'deeds' | 'relics' | 'bestiary' | 'records';
+type Tab = 'memories' | 'deeds' | 'relics' | 'bestiary' | 'atlas' | 'records';
 
 export function Chronicle({
   lore,
@@ -34,6 +34,11 @@ export function Chronicle({
       count: `${meta.relics.length}/${relicIds.length}`,
     },
     { id: 'bestiary', label: 'Bestiary', count: `${meta.foes.length}/${foes.length}` },
+    {
+      id: 'atlas',
+      label: 'Atlas',
+      count: `${Object.keys(meta.cities).length}/${Math.max(KNOWN_CHARTS, Object.keys(meta.cities).length)}`,
+    },
     { id: 'records', label: 'Records', count: `${wins}/${runs}` },
   ];
   return (
@@ -134,7 +139,11 @@ export function Chronicle({
                     key={id}
                     className={`codex-card rarity-${RELICS[id].rarity} ${found ? 'is-done' : 'is-open'}`}
                   >
-                    <Icon name={open ? (RELICS[id].icon as IconName) : 'eye'} size={18} />
+                    {open ? (
+                      <RelicIcon id={id} size={found ? 40 : 18} />
+                    ) : (
+                      <Icon name="eye" size={18} />
+                    )}
                     <span className={`eyebrow rarity-${RELICS[id].rarity}`}>
                       {RELICS[id].rarity.toUpperCase()}
                     </span>
@@ -174,6 +183,43 @@ export function Chronicle({
             ))}
           </>
         )}
+        {tab === 'atlas' && (
+          <>
+            <p className="codex-note">
+              Every chart is a real place. Walk it for a stamp, finish its expedition, and name the
+              city beneath the veil to write its true name here.
+            </p>
+            <div className="codex-grid">
+              {Object.entries(meta.cities).map(([key, city]) => (
+                <article
+                  key={key}
+                  className={`codex-card passport ${city.name ? 'is-done' : 'is-open'}`}
+                >
+                  <Icon name={city.name ? 'map' : 'compass'} size={18} />
+                  <span className="eyebrow">{city.area.toUpperCase()}</span>
+                  <h2>{city.name ?? city.title}</h2>
+                  <p>
+                    {city.name ? `Charted as ${city.title}.` : 'Its true name is still veiled.'}
+                  </p>
+                  <small>
+                    Walked{city.completed ? ' · expedition completed' : ''}
+                    {city.name ? ' · named' : ''}
+                  </small>
+                </article>
+              ))}
+              {Array.from(
+                { length: Math.max(0, KNOWN_CHARTS - Object.keys(meta.cities).length) },
+                (_, i) => (
+                  <article key={i} className="codex-card is-open passport">
+                    <Icon name="eye" size={18} />
+                    <h2>An uncharted place</h2>
+                    <p>Begin a Lost Atlas expedition to find it.</p>
+                  </article>
+                ),
+              )}
+            </div>
+          </>
+        )}
         {tab === 'records' && <Records meta={meta} runs={runs} wins={wins} />}
       </div>
       <button className="secondary-button" onClick={onBack}>
@@ -205,8 +251,8 @@ function FoeCard({ foe, met, rank }: { foe: Foe; met: boolean; rank: string }) {
       .join('  →  ');
   return (
     <article className="codex-card is-done foe-card">
-      <span className="foe-face" style={{ filter: `hue-rotate(${foe.tint}deg)` }}>
-        <EnemyPortrait art={foe.art} />
+      <span className="foe-face">
+        <EnemyPortrait art={foe.art} id={foe.id} tint={foe.tint} />
       </span>
       {rank && <span className="eyebrow">{rank.toUpperCase()}</span>}
       <h2>{foe.name}</h2>

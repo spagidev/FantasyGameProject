@@ -12,7 +12,9 @@ async function readRun(page: Page): Promise<Run> {
   return page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).run, SAVE_KEY);
 }
 async function clickAction(page: Page, run: Run, action: Action) {
-  if (action.type === 'atlas-move') {
+  if (action.type === 'atlas-camp') {
+    await page.locator('[data-action="camp"]').click();
+  } else if (action.type === 'atlas-move') {
     await page.locator(`[data-destination="${action.to}"]`).click();
   } else if (action.type === 'travel' && run.atlas) {
     await page.getByRole('button', { name: 'Enter encounter' }).click();
@@ -403,6 +405,50 @@ test('journal export/import restores an exact turn and rejects invalid files', a
   await restoredPage.reload();
   expect(await readRun(restoredPage)).toEqual(original);
   await newContext.close();
+});
+
+test('the Atlas is a day’s walk: lamp oil, camp, a route planner and a passport stamp', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /The Lost Atlas/ }).click();
+  await page.getByRole('button', { name: 'Original offline chart', exact: true }).click();
+  await page.getByRole('button', { name: /Begin expedition/ }).click();
+  let run = await readRun(page);
+  expect(run.atlas).toMatchObject({ day: 1, oil: run.atlas!.range, finds: [] });
+  await expect(page.getByRole('meter', { name: 'Lamp oil left today' })).toBeVisible();
+  // Walk one road, then plan the way back: distance, time and a single button.
+  await page.locator('[data-destination="watch"]').click();
+  run = await readRun(page);
+  expect(run.atlas!.oil).toBeLessThan(run.atlas!.range!);
+  // The road back is longer than the oil that is left: the planner says so.
+  await page.locator('.atlas-index summary').click();
+  await page.locator('.atlas-index button').filter({ hasText: 'The Thornward Gate' }).click();
+  await expect(page.locator('.atlas-plan')).toContainText('1.5 km');
+  await expect(page.locator('.atlas-plan')).toContainText('on foot');
+  await expect(page.locator('.atlas-plan')).toContainText('camp on the way');
+  await expect(page.locator('[data-action="walk-route"]')).toBeDisabled();
+  // Camp: a new day, full oil, and now one button walks the planned route.
+  await page.locator('[data-action="camp"]').click();
+  run = await readRun(page);
+  expect(run.atlas).toMatchObject({ day: 2, oil: run.atlas!.range });
+  await expect(page.locator('.atlas-day')).toContainText('Day 2');
+  await page.locator('.atlas-index button').filter({ hasText: 'The Thornward Gate' }).click();
+  await expect(page.locator('.atlas-plan')).toContainText('within today’s oil');
+  await page.locator('[data-action="walk-route"]').click();
+  expect((await readRun(page)).atlas!.position).toBe('origin');
+  await page.locator('[data-action="camp"]').click();
+  // A tapped status chip explains itself in words.
+  await page.locator('[data-destination="watch"]').click();
+  await page.getByRole('button', { name: 'Enter encounter' }).click();
+  await page.locator('.combatant-hero .chip').first().click();
+  await expect(page.locator('.duel-explain')).toContainText('Reduces every hit you take');
+  await page.getByRole('button', { name: /Chronicle/ }).click();
+  await page.getByRole('tab', { name: /Atlas/ }).click();
+  await expect(page.getByRole('tabpanel')).toContainText('The Saltbound Coast');
+  await expect(page.getByRole('tabpanel')).toContainText('Its true name is still veiled');
+  const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(accessibility.violations).toEqual([]);
 });
 
 test('Lost Atlas completes a real-road campaign, persists its fog, and keeps maps local', async ({

@@ -12,6 +12,7 @@ import {
   availableTalents,
   makeEnemy,
   nextNodes,
+  nightsOf,
   priceOf,
   restAmount,
   roadBenefits,
@@ -68,7 +69,9 @@ export function Scout({
   onTravel: () => void;
 }) {
   const combat = ['battle', 'elite', 'boss'].includes(node.kind);
-  const enemy = combat ? makeEnemy(node, run?.ruleset ?? 3, run?.dusk ?? 0) : null;
+  const enemy = combat
+    ? makeEnemy(node, run?.ruleset ?? 3, run?.dusk ?? 0, run ? nightsOf(run) : 0)
+    : null;
   const site = (run?.ruleset ?? 3) >= 2 ? waylightFor(node) : null;
   const v3 = (run?.ruleset ?? 3) === 3;
   const traits = describeTraits(enemy?.traits);

@@ -147,6 +147,37 @@ describe('records, deeds and unlocks', () => {
     expect(metaOf(save.profile).history).toHaveLength(HISTORY_LENGTH);
     expect(save.profile.runs).toBe(21);
   });
+  it('the atlas passport stamps a chart when walked, named and completed, and never forgets', () => {
+    const start = newRun('warden', 123, true);
+    let save = advanceSave(emptySave(), start);
+    expect(metaOf(save.profile).cities).toEqual({
+      saltbound: { title: 'The Saltbound Coast', area: 'A small southern coast', completed: false },
+    });
+    const named = transition(start, { type: 'atlas-name', name: 'Monaco' });
+    save = advanceSave(save, named);
+    expect(metaOf(save.profile).cities.saltbound).toMatchObject({
+      name: 'Monaco',
+      completed: false,
+    });
+    // A later, unnamed walk of the same chart keeps the name; completing it is remembered.
+    const later: Run = {
+      ...newRun('seer', 5, true),
+      phase: 'won',
+      depth: 11,
+      bells: 3,
+      ending: 'dawn',
+    };
+    save = advanceSave({ ...save, run: null }, later);
+    expect(metaOf(save.profile).cities.saltbound).toEqual({
+      title: 'The Saltbound Coast',
+      area: 'A small southern coast',
+      name: 'Monaco',
+      completed: true,
+    });
+    expect(metaOf(advanceSave(save, newRun('warden', 1)).profile).cities).toEqual(
+      metaOf(save.profile).cities,
+    );
+  });
   it('older journals gain empty records and hostile records are dropped, not fatal', () => {
     const old = JSON.parse(JSON.stringify(emptySave()));
     delete old.profile.meta;
@@ -162,6 +193,11 @@ describe('records, deeds and unlocks', () => {
       bestStreak: 2,
       daily: { '2026-11-15': 40, nonsense: 9, '2026-11-16': -1 },
       sound: 'yes',
+      cities: {
+        c42: { title: 'The Veiled Crossroads', area: 'Trnavský kraj', completed: 'yes' },
+        '../etc': { title: 'x' },
+        c7: { area: 'no title' },
+      },
     };
     const clean = sanitizeMeta(hostile);
     expect(clean).toEqual({
@@ -187,6 +223,7 @@ describe('records, deeds and unlocks', () => {
       bestStreak: 5,
       daily: { '2026-11-15': 40 },
       sound: false,
+      cities: { c42: { title: 'The Veiled Crossroads', area: 'Trnavský kraj', completed: false } },
     });
     const save = { ...emptySave(), profile: { ...emptySave().profile, meta: hostile } };
     expect(metaOf(decodeSave(JSON.stringify(save))!.profile)).toEqual(clean);

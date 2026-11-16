@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { describeTraits } from '../game/bestiary';
 import { KEEPERS, NODE_LABELS, type Intent } from '../game/data';
 import {
+  effectiveHit,
   flaskHealing,
   guardAmount,
   hitDamage,
@@ -66,6 +67,25 @@ function preview(run: Run, type: CombatAction) {
   };
 }
 
+/** A status chip. Hover shows its meaning; a tap or click writes it under the arena. */
+function Chip({
+  tone = '',
+  text,
+  explain,
+  children,
+}: {
+  tone?: string;
+  text: string;
+  explain: (text: string) => void;
+  children: ReactNode;
+}) {
+  return (
+    <button type="button" className={`chip ${tone}`} title={text} onClick={() => explain(text)}>
+      {children}
+    </button>
+  );
+}
+
 type Floater = { id: number; side: 'enemy' | 'hero'; text: string; tone: string };
 
 /** One sentence of guidance for a keeper's very first fights, chosen from the situation. */
@@ -111,6 +131,7 @@ export function Combat({
   const previous = useRef(run);
   const counter = useRef(0);
   const [floaters, setFloaters] = useState<Floater[]>([]);
+  const [explain, setExplain] = useState('');
   const [pulse, setPulse] = useState({ enemy: 0, hero: 0 });
   useEffect(() => {
     const before = previous.current;
@@ -159,7 +180,7 @@ export function Combat({
       type: 'strike',
       icon: 'sword',
       title: 'Strike',
-      detail: `Deal ${strike.damage}${strike.hits > 1 ? ' × 2' : ''} damage`,
+      detail: `Deal ${effectiveHit(run, strike.damage)}${strike.hits > 1 ? ' × 2' : ''} damage`,
       sub: `+${strikeFocus(run)} focus${strikeHealing(run) ? ` · heal ${strikeHealing(run)}` : ''}${
         v3 && e.traits?.thorns ? ` · thorns ${e.traits.thorns}` : ''
       }`,
@@ -177,7 +198,7 @@ export function Combat({
       type: 'skill',
       icon: run.keeper === 'wayfarer' ? 'leaf' : 'sparkles',
       title: k.skill,
-      detail: `Deal ${skillDamage(run)}${run.keeper === 'seer' ? ' piercing' : ''} damage`,
+      detail: `Deal ${effectiveHit(run, skillDamage(run), run.keeper === 'seer')}${run.keeper === 'seer' ? ' piercing' : ''} damage`,
       sub: `${skillCost(run)} focus${
         run.keeper === 'wayfarer'
           ? ` · +${poisonAmount(run)} poison`
@@ -200,7 +221,7 @@ export function Combat({
             title: k.technique,
             detail:
               run.keeper === 'warden'
-                ? `Deal ${guardAmount(run)} damage`
+                ? `Deal ${effectiveHit(run, guardAmount(run))} damage`
                 : run.keeper === 'seer'
                   ? `Block all ${incoming} damage`
                   : `Deal ${e.poison * 2} poison damage`,
@@ -271,31 +292,32 @@ export function Combat({
                 <i style={{ width: `${(run.health / run.maxHealth) * 100}%` }} />
               </div>
               <div className="chips">
-                <span title="Reduces every hit you take">
+                <Chip text="Reduces every hit you take" explain={setExplain}>
                   <Icon name="shield" size={12} /> {run.armor} armor
-                </span>
+                </Chip>
                 {run.guard > 0 && (
-                  <span className="good" title="Absorbs damage this turn">
+                  <Chip tone="good" text="Absorbs damage this turn" explain={setExplain}>
                     {run.guard} guard
-                  </span>
+                  </Chip>
                 )}
                 {!!run.weak && (
-                  <span className="bad" title="Your hits deal 25% less">
+                  <Chip tone="bad" text="Your hits deal 25% less" explain={setExplain}>
                     Weakened {run.weak}
-                  </span>
+                  </Chip>
                 )}
                 {!!run.frost && (
-                  <span
-                    className="bad"
-                    title="Costs this much health each enemy turn, then melts by 1"
+                  <Chip
+                    tone="bad"
+                    text="Costs this much health each enemy turn, then melts by 1"
+                    explain={setExplain}
                   >
                     Frost {run.frost}
-                  </span>
+                  </Chip>
                 )}
                 {run.charge && (
-                  <span className="good" title="Your next Strike deals 6 more">
+                  <Chip tone="good" text="Your next Strike deals 6 more" explain={setExplain}>
                     Sharpened
-                  </span>
+                  </Chip>
                 )}
               </div>
             </div>
@@ -305,9 +327,8 @@ export function Combat({
             <span
               key={`e${pulse.enemy}`}
               className={`duel-portrait ${pulse.enemy ? 'figure-hit' : ''}`}
-              style={e.tint ? { filter: `hue-rotate(${e.tint}deg)` } : undefined}
             >
-              <EnemyPortrait art={e.art} />
+              <EnemyPortrait art={e.art} id={e.id} tint={e.tint} />
             </span>
             <div className="vitals">
               <div className="vitals-name">
@@ -344,30 +365,39 @@ export function Combat({
               )}
               <div className="chips">
                 {e.guard > 0 && (
-                  <span title="Absorbs hit damage until broken">
+                  <Chip text="Absorbs hit damage until broken" explain={setExplain}>
                     <Icon name="shield" size={12} /> {e.guard} guard
-                  </span>
+                  </Chip>
                 )}
                 {e.poison > 0 && (
-                  <span className="good" title="Deals this much after your action, then fades by 1">
+                  <Chip
+                    tone="good"
+                    text="Deals this much after your action, then fades by 1"
+                    explain={setExplain}
+                  >
                     <Icon name="leaf" size={12} /> {e.poison} poison
-                  </span>
+                  </Chip>
                 )}
                 {!!e.fury && (
-                  <span className="bad" title="Added to every hit it lands">
+                  <Chip tone="bad" text="Added to every hit it lands" explain={setExplain}>
                     <Icon name="flame" size={12} /> {e.fury} fury
-                  </span>
+                  </Chip>
                 )}
                 {traits.map((t) => (
-                  <span key={t.label} className="trait" title={t.text}>
+                  <Chip key={t.label} tone="trait" text={t.text} explain={setExplain}>
                     {t.label}
-                  </span>
+                  </Chip>
                 ))}
               </div>
             </div>
             {floats('enemy')}
           </div>
         </div>
+        {explain && (
+          <p className="duel-explain" role="status">
+            <Icon name="info" size={13} /> {explain}
+          </p>
+        )}
         <div
           className={`duel-intent ${!skipped && incoming > 10 ? 'is-danger' : ''} ${skipped ? 'is-skipped' : ''}`}
         >
