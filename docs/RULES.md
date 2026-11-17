@@ -8,7 +8,7 @@ This document is the contract for the pure state engine in `src/game/engine.ts`.
 
 Twelve crossings in three realms. In each realm: a waylight guardian (three lanes, three different enemies), two crossings arranged by the seed, then the bell guardian. The second crossing is always one story, one elite and one ordinary battle in a seeded order; the third always contains a sanctuary and a trader plus either a story or an elite, so every route can reach a sanctuary or a trader before the guardian. Lane movement is unchanged: all lanes at the start of a realm, otherwise the same or a neighbouring lane. A story scene never repeats within one expedition. Lost Atlas charts keep their fixed encounter kinds and use the same combat, relics and scenes.
 
-Keepers start as before (Warden 48/7/2, Seer 36/6/0, Wayfarer 40/6/1 health/attack/armor), with 35 coins and two flasks. The Seer starts every battle with 1 extra focus.
+Keepers start at Warden 48/7/2, Seer 38/6/1, Wayfarer 44/6/1 (health/attack/armor; the Seer and Wayfarer were raised in the v0.13 balance pass, `startingStats` in `data.ts`), with 35 coins and two flasks. The Seer starts every battle with 1 extra focus. The first two rulesets keep the original 48/7/2, 36/6/0 and 40/6/1.
 
 ### A turn
 
@@ -107,6 +107,25 @@ Four sets of three existing relics. Carrying all three of a set adds one rule (r
 ### Province boons (v0.11)
 
 When both hidden cities of a province are rekindled (its legend recovered), that province's relic joins the pool of every later expedition. Each is drawn and offered like any other relic: **Coronation Offcut** (the Reedmarch, uncommon) +6 maximum health and +1 armor; **Warm-spring Flask** (the Belled Plain, uncommon) flasks, sanctuary rests and wagon rests restore 6 more; **Captive's Well-rope** (the Castled Narrows, uncommon) every battle begins with 6 guard, which lasts until the enemy's first action; **Chapel Cornerstone** (the Old Seat, uncommon) every bell rung restores 15 health; **Tinker's Wire** (the Tinkers' Fells, uncommon) entering a trader restores 10 health; **Miners' Clapper** (the Copper Heart, uncommon) every perfect guard also gives 3 coins; **Nail-less Joint** (the Wooden Spires, rare) enemy thorns and plating have no effect; **The Last Lit Window** (the Eastern Lantern, rare) nights never toughen enemies, and every dawn restores 3 health. Boons add variety; they do not change starting statistics.
+
+### The ground of an encounter (v0.13)
+
+On Atlas charts begun from v0.13 (`atlas.ground`), each encounter site has a ground read from the real roads around it (`src/game/terrain.ts`), measured in metres so that each city's character shows. In order: 3,500 m or more of road within 300 m is **Narrow streets** — enemy attacks of several hits land one hit fewer; under 1,800 m is **Open ground** — the battle begins with 1 extra focus; otherwise, roads winding 1.4 or more (path against straight distance) are a **Winding hill road** — the enemy's poise is a fifth lower; a site where four or more of the expedition's roads meet is a **Crossroads** — victory gives 8 more coins; anything else is plain. The ground shows on the chart, the scout card and the combat board; scouted numbers already include it.
+
+### Keeper levels (v0.13)
+
+Ruleset-3 expeditions begun from v0.13 carry `xp` and `perks`. Each victory gives experience — a battle 2, an elite 3, a bell guardian 4, a guarded trove 2 — and every 5 experience is a level. After the spoils (and after a lesson, when both are due) each unspent level offers three perks, chosen by the seed from those not yet taken to their limit:
+
+| Perk            | Effect                                  | Limit |
+| --------------- | --------------------------------------- | ----- |
+| A stronger arm  | +2 attack                               | 3     |
+| A deeper breath | +6 maximum health, restore 6            | 3     |
+| Scars that hold | +1 armor                                | 1     |
+| A watcher's eye | every battle begins with 1 extra focus  | 1     |
+| Hedge-lore      | a flask now; flasks restore 6 more      | 1     |
+| Second nature   | the second technique costs 1 less focus | 1     |
+
+To answer the perks, every enemy on such an expedition has 25% more health (`enemyFor`, also used by scouting). Measured with the naive scripted player at Dusk 0 over 160 seeds: 72 / 62 / 61 % (Warden / Seer / Wayfarer) with levels, against 64 / 58 / 54 % without. Journals saved before v0.13 have no levels and keep their numbers.
 
 ### Records
 

@@ -1,6 +1,17 @@
 import { TROVES, atlasSites, encounterState, validAtlas } from './atlas';
 import { FOES } from './bestiary';
-import { KEEPERS, LORE, NEW_TALENTS, RELICS, TALENTS, WAYLIGHTS, type KeeperId } from './data';
+import {
+  KEEPERS,
+  LEVEL_XP,
+  LORE,
+  NEW_TALENTS,
+  PERKS,
+  RELICS,
+  TALENTS,
+  WAYLIGHTS,
+  type KeeperId,
+  type PerkId,
+} from './data';
 import { DUSK_MAX, nodeOf, type Run } from './engine';
 import { advanceMeta, emptyMeta, sanitizeMeta, type Meta } from './meta';
 
@@ -49,6 +60,7 @@ export function validRun(x: unknown): x is Run {
       'combat',
       'reward',
       'talent',
+      'levelup',
       'event',
       'camp',
       'shop',
@@ -124,6 +136,21 @@ export function validRun(x: unknown): x is Run {
     )
       return false;
   }
+  // Keeper levels: present together or not at all, never more perks than levels earned.
+  if ((x.xp === undefined) !== (x.perks === undefined)) return false;
+  if (x.xp !== undefined) {
+    if (!v3 || !integer(x.xp, 0, 1000) || !strings(x.perks, 30)) return false;
+    const perks = x.perks as string[];
+    if (!perks.every((id) => Object.hasOwn(PERKS, id))) return false;
+    if (
+      (Object.keys(PERKS) as PerkId[]).some(
+        (id) => perks.filter((p) => p === id).length > PERKS[id].max,
+      )
+    )
+      return false;
+    if (perks.length > Math.floor(x.xp / LEVEL_XP)) return false;
+    if (x.phase === 'levelup' && perks.length >= Math.floor(x.xp / LEVEL_XP)) return false;
+  } else if (x.phase === 'levelup') return false;
   if (
     x.atlas !== undefined &&
     (!validAtlas(x.atlas) ||

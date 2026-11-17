@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-16T15:03:15.300Z",
+  "generatedAt": "2026-11-16T17:43:33.690Z",
   "seeds": [42, 2026, 8128, 16384, 65537],
   "policy": "Bounded 12-action search, beam width 18. Three fixed route plans; legal transitions only. Evidence of automated reachability, not novice difficulty or fun.",
   "groups": [
@@ -1302,6 +1302,52 @@
       "sites": ["lens", "lens", "lens"]
     }
   ],
+  "beginner": {
+    "policy": "Scripted beginner (tests/player.ts beginnerAction): guards blows of 10+, drinks when needed, skill when affordable, never the second technique. 60 seeds per keeper, Dusk 0, seeded routes.",
+    "groups": [
+      {
+        "key": "3/warden/beginner",
+        "runs": 60,
+        "wins": 52,
+        "winRate": 87
+      },
+      {
+        "key": "3/seer/beginner",
+        "runs": 60,
+        "wins": 53,
+        "winRate": 88
+      },
+      {
+        "key": "3/wayfarer/beginner",
+        "runs": 60,
+        "wins": 57,
+        "winRate": 95
+      }
+    ]
+  },
+  "atlas": {
+    "policy": "Search player on the bundled Saltbound chart, Dusk 0: free order, omens and wagon rests.",
+    "groups": [
+      {
+        "key": "3/warden/atlas",
+        "runs": 5,
+        "wins": 5,
+        "meanDays": 4
+      },
+      {
+        "key": "3/seer/atlas",
+        "runs": 5,
+        "wins": 5,
+        "meanDays": 4
+      },
+      {
+        "key": "3/wayfarer/atlas",
+        "runs": 5,
+        "wins": 5,
+        "meanDays": 4
+      }
+    ]
+  },
   "longNight": {
     "policy": "Ruleset 3, seeded routes. The same bounded search player (9 actions deep, beam 18) with rarity-first relic choices. A search player is far stronger than a person: Dusk 0 must always be winnable; Dusk 8 is expected to defeat it sometimes.",
     "groups": [
@@ -1317,9 +1363,9 @@
         "key": "3/seer/dusk 0",
         "runs": 5,
         "wins": 5,
-        "meanCombatTurns": 59,
-        "meanStaggers": 20,
-        "meanPerfectGuards": 19.6
+        "meanCombatTurns": 58,
+        "meanStaggers": 20.4,
+        "meanPerfectGuards": 18.8
       },
       {
         "key": "3/wayfarer/dusk 0",
@@ -1341,17 +1387,17 @@
         "key": "3/seer/dusk 8",
         "runs": 5,
         "wins": 5,
-        "meanCombatTurns": 81.2,
-        "meanStaggers": 22.6,
-        "meanPerfectGuards": 27.2
+        "meanCombatTurns": 81.4,
+        "meanStaggers": 22.2,
+        "meanPerfectGuards": 28
       },
       {
         "key": "3/wayfarer/dusk 8",
         "runs": 5,
         "wins": 4,
-        "meanCombatTurns": 61,
+        "meanCombatTurns": 62,
         "meanStaggers": 13,
-        "meanPerfectGuards": 11.2
+        "meanPerfectGuards": 12
       }
     ],
     "results": [
@@ -1410,38 +1456,38 @@
         "dusk": 0,
         "seed": 42,
         "outcome": "won",
-        "health": 41,
-        "combatTurns": 48,
-        "staggers": 17,
-        "perfectGuards": 15
+        "health": 46,
+        "combatTurns": 50,
+        "staggers": 18,
+        "perfectGuards": 17
       },
       {
         "keeper": "seer",
         "dusk": 0,
         "seed": 2026,
         "outcome": "won",
-        "health": 46,
-        "combatTurns": 70,
-        "staggers": 23,
-        "perfectGuards": 24
+        "health": 48,
+        "combatTurns": 68,
+        "staggers": 22,
+        "perfectGuards": 25
       },
       {
         "keeper": "seer",
         "dusk": 0,
         "seed": 8128,
         "outcome": "won",
-        "health": 33,
-        "combatTurns": 65,
-        "staggers": 21,
-        "perfectGuards": 21
+        "health": 37,
+        "combatTurns": 62,
+        "staggers": 23,
+        "perfectGuards": 16
       },
       {
         "keeper": "seer",
         "dusk": 0,
         "seed": 16384,
         "outcome": "won",
-        "health": 36,
-        "combatTurns": 60,
+        "health": 38,
+        "combatTurns": 61,
         "staggers": 22,
         "perfectGuards": 20
       },
@@ -1450,17 +1496,17 @@
         "dusk": 0,
         "seed": 65537,
         "outcome": "won",
-        "health": 32,
-        "combatTurns": 52,
+        "health": 38,
+        "combatTurns": 49,
         "staggers": 17,
-        "perfectGuards": 18
+        "perfectGuards": 16
       },
       {
         "keeper": "wayfarer",
         "dusk": 0,
         "seed": 42,
         "outcome": "won",
-        "health": 48,
+        "health": 52,
         "combatTurns": 45,
         "staggers": 12,
         "perfectGuards": 12
@@ -1470,7 +1516,7 @@
         "dusk": 0,
         "seed": 2026,
         "outcome": "won",
-        "health": 41,
+        "health": 45,
         "combatTurns": 61,
         "staggers": 14,
         "perfectGuards": 17
@@ -1480,7 +1526,7 @@
         "dusk": 0,
         "seed": 8128,
         "outcome": "won",
-        "health": 39,
+        "health": 43,
         "combatTurns": 60,
         "staggers": 18,
         "perfectGuards": 19
@@ -1490,7 +1536,7 @@
         "dusk": 0,
         "seed": 16384,
         "outcome": "won",
-        "health": 36,
+        "health": 40,
         "combatTurns": 53,
         "staggers": 16,
         "perfectGuards": 12
@@ -1500,7 +1546,7 @@
         "dusk": 0,
         "seed": 65537,
         "outcome": "won",
-        "health": 40,
+        "health": 44,
         "combatTurns": 49,
         "staggers": 13,
         "perfectGuards": 14
@@ -1560,50 +1606,50 @@
         "dusk": 8,
         "seed": 42,
         "outcome": "won",
-        "health": 22,
-        "combatTurns": 75,
-        "staggers": 19,
-        "perfectGuards": 31
+        "health": 20,
+        "combatTurns": 77,
+        "staggers": 20,
+        "perfectGuards": 27
       },
       {
         "keeper": "seer",
         "dusk": 8,
         "seed": 2026,
         "outcome": "won",
-        "health": 25,
-        "combatTurns": 83,
-        "staggers": 24,
-        "perfectGuards": 28
+        "health": 35,
+        "combatTurns": 91,
+        "staggers": 25,
+        "perfectGuards": 31
       },
       {
         "keeper": "seer",
         "dusk": 8,
         "seed": 8128,
         "outcome": "won",
-        "health": 14,
-        "combatTurns": 77,
-        "staggers": 24,
-        "perfectGuards": 20
+        "health": 21,
+        "combatTurns": 82,
+        "staggers": 25,
+        "perfectGuards": 28
       },
       {
         "keeper": "seer",
         "dusk": 8,
         "seed": 16384,
         "outcome": "won",
-        "health": 26,
-        "combatTurns": 95,
-        "staggers": 26,
-        "perfectGuards": 32
+        "health": 18,
+        "combatTurns": 86,
+        "staggers": 22,
+        "perfectGuards": 31
       },
       {
         "keeper": "seer",
         "dusk": 8,
         "seed": 65537,
         "outcome": "won",
-        "health": 18,
-        "combatTurns": 76,
-        "staggers": 20,
-        "perfectGuards": 25
+        "health": 30,
+        "combatTurns": 71,
+        "staggers": 19,
+        "perfectGuards": 23
       },
       {
         "keeper": "wayfarer",
@@ -1620,27 +1666,27 @@
         "dusk": 8,
         "seed": 2026,
         "outcome": "won",
-        "health": 10,
-        "combatTurns": 58,
-        "staggers": 12,
-        "perfectGuards": 6
+        "health": 14,
+        "combatTurns": 63,
+        "staggers": 13,
+        "perfectGuards": 9
       },
       {
         "keeper": "wayfarer",
         "dusk": 8,
         "seed": 8128,
         "outcome": "won",
-        "health": 26,
-        "combatTurns": 75,
+        "health": 28,
+        "combatTurns": 76,
         "staggers": 18,
-        "perfectGuards": 17
+        "perfectGuards": 18
       },
       {
         "keeper": "wayfarer",
         "dusk": 8,
         "seed": 16384,
         "outcome": "won",
-        "health": 18,
+        "health": 35,
         "combatTurns": 62,
         "staggers": 13,
         "perfectGuards": 15
@@ -1650,9 +1696,9 @@
         "dusk": 8,
         "seed": 65537,
         "outcome": "won",
-        "health": 33,
-        "combatTurns": 61,
-        "staggers": 13,
+        "health": 37,
+        "combatTurns": 60,
+        "staggers": 12,
         "perfectGuards": 11
       }
     ]

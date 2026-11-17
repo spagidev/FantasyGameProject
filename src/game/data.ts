@@ -238,6 +238,82 @@ export const KEEPERS = {
   },
 } as const;
 
+/**
+ * Keeper levels (v0.13): experience from every victory, a level every five, and a choice of
+ * three perks at each level. Each perk can be taken up to `max` times.
+ */
+export type PerkId = 'might' | 'vigor' | 'ward' | 'insight' | 'herbs' | 'mastery';
+export const PERKS: Record<
+  PerkId,
+  { name: string; effect: string; flavor: string; max: number; icon: string }
+> = {
+  might: {
+    name: 'A stronger arm',
+    effect: 'Gain 2 attack.',
+    flavor: 'The ember is heavier than it looks. Carrying it has done you good.',
+    max: 3,
+    icon: 'sword',
+  },
+  vigor: {
+    name: 'A deeper breath',
+    effect: 'Gain 6 maximum health and restore 6.',
+    flavor: 'The road has taught your lungs the shape of the dark.',
+    max: 3,
+    icon: 'heart',
+  },
+  ward: {
+    name: 'Scars that hold',
+    effect: 'Gain 1 armor.',
+    flavor: 'Every blow you survived left something behind to meet the next.',
+    max: 1,
+    icon: 'shield',
+  },
+  insight: {
+    name: 'A watcher’s eye',
+    effect: 'Begin every battle with 1 extra focus.',
+    flavor: 'You have started to see the first move before it is made.',
+    max: 1,
+    icon: 'eye',
+  },
+  herbs: {
+    name: 'Hedge-lore',
+    effect: 'Gain a flask now, and flasks restore 6 more health.',
+    flavor: 'Somewhere along the way you learned which weeds are kind.',
+    max: 1,
+    icon: 'flask',
+  },
+  mastery: {
+    name: 'Second nature',
+    effect: 'Your second technique costs 1 less focus.',
+    flavor: 'What you once had to think about, your hands now simply do.',
+    max: 1,
+    icon: 'sparkles',
+  },
+};
+/** Experience a level takes, and what each kind of victory gives. */
+export const LEVEL_XP = 5;
+export const XP_FOR = { battle: 2, elite: 3, boss: 4, trove: 2 } as const;
+
+/**
+ * Ruleset 3 starting statistics (v0.13 balance pass). The Seer gains 2 health and 1 armor and
+ * the Wayfarer 4 health, after scripted-beginner simulations showed the Seer winning 32% and
+ * the Wayfarer 48% of base-difficulty expeditions against the Warden's 64%. The first two
+ * rulesets keep the original numbers in KEEPERS.
+ */
+const NIGHT_ADJUSTMENT: Record<KeeperId, { health: number; armor: number }> = {
+  warden: { health: 0, armor: 0 },
+  seer: { health: 2, armor: 1 },
+  wayfarer: { health: 4, armor: 0 },
+};
+export function startingStats(keeper: KeeperId) {
+  const k = KEEPERS[keeper];
+  return {
+    health: k.health + NIGHT_ADJUSTMENT[keeper].health,
+    attack: k.attack,
+    armor: k.armor + NIGHT_ADJUSTMENT[keeper].armor,
+  };
+}
+
 export const RELICS: Record<
   RelicId,
   { name: string; description: string; flavor: string; icon: string; rarity: Rarity }

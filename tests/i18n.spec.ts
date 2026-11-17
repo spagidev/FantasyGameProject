@@ -1,6 +1,18 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+// The lobby opens on the campaign; these specs exercise the classic quick road.
+test.beforeEach(async ({ page }) => {
+  await page.context().addInitScript(() => {
+    try {
+      if (!localStorage.getItem('emberwake.lobby.mode'))
+        localStorage.setItem('emberwake.lobby.mode', 'quick');
+    } catch {
+      /* storage unavailable */
+    }
+  });
+});
+
 async function toSlovak(page: Page) {
   await page.getByRole('button', { name: 'Slovenčina' }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'sk');
@@ -78,4 +90,32 @@ test('the Slovak lobby is accessible and fits a phone without sideways scrolling
   }
   const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(result.violations).toEqual([]);
+});
+
+test('Slovak letters in the serif come from the serif itself, not a fallback font', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Slovenčina' }).click();
+  await page.evaluate(() => document.fonts.ready);
+  // č, ď, ľ, ň, š, ť, ž live in Latin Extended-A. If the serif lacks them they are drawn by
+  // the fallback font, heavier and larger. Measure each letter in "serif, monospace" against
+  // monospace alone: identical widths would mean the serif had no glyph of its own.
+  const missing = await page.evaluate(async () => {
+    const letters = [...'čďľňšťžČĎĽŇŠŤŽ'];
+    const result: string[] = [];
+    for (const style of ['normal', 'italic']) {
+      await document.fonts.load(`${style} 500 40px "Cormorant Garamond"`, letters.join(''));
+      const ctx = document.createElement('canvas').getContext('2d')!;
+      for (const letter of letters) {
+        ctx.font = `${style} 500 40px "Cormorant Garamond", monospace`;
+        const serif = ctx.measureText(letter).width;
+        ctx.font = `${style} 500 40px monospace`;
+        if (Math.abs(serif - ctx.measureText(letter).width) < 0.01)
+          result.push(`${style} ${letter}`);
+      }
+    }
+    return result;
+  });
+  expect(missing).toEqual([]);
 });

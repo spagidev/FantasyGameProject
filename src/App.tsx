@@ -8,10 +8,13 @@ import {
   CHAPTERS,
   EVENTS,
   KEEPERS,
+  startingStats,
   LORE,
   RELICS,
   RELIC_SETS,
   setOf,
+  LEVEL_XP,
+  XP_FOR,
   WAYLIGHTS,
   type KeeperId,
   type RelicId,
@@ -25,7 +28,7 @@ import {
   canEvent,
   incomingDamage,
   intentFor,
-  makeEnemy,
+  enemyFor,
   newRun,
   nextNodes,
   nodeOf,
@@ -34,6 +37,8 @@ import {
   transition,
   waylightFor,
   victoryCoins,
+  levels,
+  levelOf,
   type Action,
   type Run,
   type MapNode,
@@ -59,9 +64,11 @@ import { Combat, combatKeys } from './components/Combat';
 import { play, setSound } from './sound';
 import { VOICES, pageFor } from './game/lore';
 import { Journal } from './components/Journal';
-import { Scout, TalentChoice, WaylightsPanel } from './components/Strategy';
+import { LevelUp, Scout, TalentChoice, WaylightsPanel } from './components/Strategy';
 import { AtlasMap, AtlasJournal } from './components/Atlas';
 import { OfflineBadge } from './components/OfflineBadge';
+import { GuideNote } from './components/GuideNote';
+import { tipFor } from './game/tips';
 import { DICTS, LanguageProvider, useT, type Lang } from './i18n';
 
 type Warning = '' | 'unreadable' | 'unavailable' | 'full';
@@ -87,6 +94,14 @@ function load(): { save: Save; warning: Warning } {
 
 const keeperIds = Object.keys(KEEPERS) as KeeperId[];
 const terminal = (run: Run | null) => run?.phase === 'won' || run?.phase === 'lost';
+const LOBBY_MODE_KEY = 'emberwake.lobby.mode';
+function readLobbyMode(): 'classic' | 'atlas' {
+  try {
+    return localStorage.getItem(LOBBY_MODE_KEY) === 'quick' ? 'classic' : 'atlas';
+  } catch {
+    return 'atlas';
+  }
+}
 function seedFrom(text: string) {
   return Array.from(text).reduce((n, c) => (Math.imul(n, 31) + c.charCodeAt(0)) | 0, 5381) >>> 0;
 }
@@ -126,9 +141,17 @@ export default function App() {
   const [warning, setWarning] = useState<Warning>(loaded.warning);
   const [keeper, setKeeper] = useState<KeeperId>(share?.keeper ?? loaded.save.profile.lastKeeper);
   const [seed, setSeed] = useState(share?.road ?? '');
-  const [expedition, setExpedition] = useState<'classic' | 'atlas'>(
-    loaded.save.run?.atlas ? 'atlas' : 'classic',
+  const [expedition, setExpeditionState] = useState<'classic' | 'atlas'>(() =>
+    loaded.save.run ? (loaded.save.run.atlas ? 'atlas' : 'classic') : readLobbyMode(),
   );
+  const setExpedition = (mode: 'classic' | 'atlas') => {
+    setExpeditionState(mode);
+    try {
+      localStorage.setItem(LOBBY_MODE_KEY, mode === 'atlas' ? 'campaign' : 'quick');
+    } catch {
+      /* storage unavailable */
+    }
+  };
   const [atlasArea, setAtlasArea] = useState('Slovakia');
   const [atlasSource, setAtlasSource] = useState<AtlasSource>('bundled');
   const [atlasNotice, setAtlasNotice] = useState('');
@@ -143,7 +166,13 @@ export default function App() {
   const boardRef = useRef<HTMLDivElement>(null);
   const run = save.run;
   const meta = metaOf(save.profile);
+  const setMeta = (change: (m: Meta) => Meta) =>
+    setSave((s) => ({
+      ...s,
+      profile: { ...s.profile, meta: change(metaOf(s.profile)) },
+    }));
   const lang: Lang = meta.lang ?? 'en';
+  const tip = tipFor(save.run, meta);
   const t = DICTS[lang];
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -548,6 +577,16 @@ export default function App() {
               )}
               <div className={`game-layout ${run ? 'play-layout' : 'launch-layout'}`}>
                 <div className="game-main" ref={boardRef}>
+                  {tip && view === 'journey' && (
+                    <GuideNote
+                      key={tip}
+                      id={tip}
+                      onGotIt={() =>
+                        setMeta((m) => ({ ...m, tips: [...new Set([...(m.tips ?? []), tip])] }))
+                      }
+                      onHide={() => setMeta((m) => ({ ...m, tipsOff: true }))}
+                    />
+                  )}
                   {run?.atlas && run.phase !== 'map' && (
                     <details className="atlas-fold">
                       <summary>{t.app.atlasFold}</summary>
@@ -570,6 +609,8 @@ export default function App() {
                     />
                   ) : run.phase === 'reward' ? (
                     <Rewards run={run} dispatch={dispatch} />
+                  ) : run.phase === 'levelup' ? (
+                    <LevelUp run={run} dispatch={dispatch} />
                   ) : run.phase === 'talent' ? (
                     <TalentChoice run={run} dispatch={dispatch} />
                   ) : ['camp', 'shop', 'event'].includes(run.phase) ? (
@@ -634,20 +675,6 @@ export default function App() {
                         aria-label={t.app.chooseExpedition}
                       >
                         <button
-                          aria-pressed={expedition === 'classic'}
-                          disabled={atlasLoading}
-                          onClick={() => {
-                            setExpedition('classic');
-                            setAtlasError('');
-                          }}
-                        >
-                          <Icon name="flame" size={18} />
-                          <span>
-                            {t.app.firstCrossing}
-                            <small>{t.app.firstCrossingNote}</small>
-                          </span>
-                        </button>
-                        <button
                           aria-pressed={expedition === 'atlas'}
                           disabled={atlasLoading}
                           onClick={() => {
@@ -659,6 +686,20 @@ export default function App() {
                           <span>
                             {t.app.lostAtlas} <i>{t.app.explore}</i>
                             <small>{t.app.lostAtlasNote}</small>
+                          </span>
+                        </button>
+                        <button
+                          aria-pressed={expedition === 'classic'}
+                          disabled={atlasLoading}
+                          onClick={() => {
+                            setExpedition('classic');
+                            setAtlasError('');
+                          }}
+                        >
+                          <Icon name="flame" size={18} />
+                          <span>
+                            {t.app.firstCrossing}
+                            <small>{t.app.firstCrossingNote}</small>
                           </span>
                         </button>
                       </div>
@@ -724,15 +765,15 @@ export default function App() {
                         <div className="keeper-base-stats">
                           <span>
                             <Icon name="heart" size={14} />
-                            {t.app.healthN(KEEPERS[keeper].health)}
+                            {t.app.healthN(startingStats(keeper).health)}
                           </span>
                           <span>
                             <Icon name="sword" size={14} />
-                            {t.app.attackN(KEEPERS[keeper].attack)}
+                            {t.app.attackN(startingStats(keeper).attack)}
                           </span>
                           <span>
                             <Icon name="shield" size={14} />
-                            {t.app.armorN(KEEPERS[keeper].armor)}
+                            {t.app.armorN(startingStats(keeper).armor)}
                           </span>
                         </div>
                         <span className="keeper-style">{KEEPERS[keeper].style}</span>
@@ -824,7 +865,7 @@ export default function App() {
                                 <em>
                                   {['battle', 'boss', 'elite'].includes(node.kind)
                                     ? t.app.fightLine(
-                                        makeEnemy(node, run.ruleset, run.dusk).maxHealth,
+                                        enemyFor(run, node).maxHealth,
                                         victoryCoins(run, node),
                                       )
                                     : node.kind === 'event'
@@ -984,17 +1025,22 @@ export default function App() {
                 ? t.app.srMap
                 : run.phase === 'reward'
                   ? t.app.srReward
-                  : run.phase === 'lost'
-                    ? t.app.srLost
-                    : run.phase === 'won'
-                      ? t.app.srWon
-                      : run.phase
+                  : run.phase === 'levelup'
+                    ? t.app.srLevelUp
+                    : run.phase === 'lost'
+                      ? t.app.srLost
+                      : run.phase === 'won'
+                        ? t.app.srWon
+                        : run.phase
             : t.app.srLobby}
         </div>
 
         {modal === 'help' && (
           <Modal title={t.app.helpTitle} onClose={() => setModal(null)}>
-            <Help />
+            <Help
+              guideOn={!meta.tipsOff}
+              onGuide={() => setMeta((m) => ({ ...m, tipsOff: !m.tipsOff }))}
+            />
           </Modal>
         )}
         {scouted && (
@@ -1087,6 +1133,21 @@ function KeeperPanel({ run }: { run: Run }) {
       >
         <i style={{ width: `${(run.health / run.maxHealth) * 100}%` }} />
       </div>
+      {levels(run) && (
+        <div className="level-line">
+          <span>{t.app.level(levelOf(run))}</span>
+          <div
+            className="xp-bar"
+            role="meter"
+            aria-label={t.app.experience}
+            aria-valuenow={run.xp! % LEVEL_XP}
+            aria-valuemin={0}
+            aria-valuemax={LEVEL_XP}
+          >
+            <i style={{ width: `${((run.xp! % LEVEL_XP) / LEVEL_XP) * 100}%` }} />
+          </div>
+        </div>
+      )}
       <div className="run-stats">
         <span>
           <Icon name="sword" /> <b>{attackOf(run)}</b>
@@ -1205,6 +1266,14 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
           )}
           {run.relics.includes('thread') && <span>{t.app.plusHealth}</span>}
         </div>
+        {levels(run) && (
+          <div className="reward-xp">
+            <Icon name="sparkles" size={14} />{' '}
+            {t.app.plusXp(
+              trove ? XP_FOR.trove : XP_FOR[nodeOf(run).kind as 'battle' | 'elite' | 'boss'],
+            )}
+          </div>
+        )}
         {site && (
           <div className="reward-waylight">
             <Icon name="flame" size={20} />
@@ -1584,7 +1653,8 @@ function Ending({
   );
 }
 
-function Help() {
+function Help({ guideOn, onGuide }: { guideOn: boolean; onGuide: () => void }) {
+  const t = useT();
   return (
     <div className="help-content">
       <p>
@@ -1732,6 +1802,12 @@ function Help() {
             name it in the field journal for +2 attack. One guess per bell.
           </p>
         </div>
+      </div>
+      <div className="help-guide-toggle">
+        <button className="secondary-button" aria-pressed={guideOn} onClick={onGuide}>
+          {t.guide.toggle}: {guideOn ? t.guide.on : t.guide.off}
+        </button>
+        <small>{t.guide.toggleNote}</small>
       </div>
       <div className="help-footer">
         <Icon name="check" size={16} /> Autosaved on this device after every move.

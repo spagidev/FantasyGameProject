@@ -1,3 +1,4 @@
+import { TIPS } from './tips';
 import { campaignProgress } from '../atlas/provinces';
 import { FOES } from './bestiary';
 import { KEEPERS, LORE, RELICS, STARTING_RELICS, type KeeperId, type RelicId } from './data';
@@ -32,6 +33,10 @@ export type Meta = {
   /** Best score on each date-seeded road, by YYYY-MM-DD. */
   daily: Record<string, number>;
   sound: boolean;
+  /** Guide notes already read (v0.13). */
+  tips?: string[];
+  /** The player turned guide notes off. */
+  tipsOff?: boolean;
   /** The atlas passport: every real place charted, keyed by its chart. */
   cities: Record<string, CityStamp>;
   /** Interface language. Absent means English. */
@@ -434,6 +439,9 @@ export function sanitizeMeta(x: unknown): Meta {
   meta.streak = whole(x.streak, 1e6);
   meta.bestStreak = Math.max(meta.streak, whole(x.bestStreak, 1e6));
   meta.sound = x.sound === true;
+  if (Array.isArray(x.tips))
+    meta.tips = [...new Set(x.tips.filter((t) => typeof t === 'string' && Object.hasOwn(TIPS, t)))];
+  if (x.tipsOff === true) meta.tipsOff = true;
   if (x.lang === 'en' || x.lang === 'sk') meta.lang = x.lang;
   if (Array.isArray(x.history))
     meta.history = x.history

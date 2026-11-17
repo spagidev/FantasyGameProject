@@ -1,12 +1,25 @@
-import { CHAPTERS, EVENTS, KEEPERS, TALENTS, WAYLIGHTS, type WaylightId } from '../game/data';
+import {
+  CHAPTERS,
+  EVENTS,
+  KEEPERS,
+  PERKS,
+  TALENTS,
+  WAYLIGHTS,
+  type WaylightId,
+} from '../game/data';
 import { describeTraits, FOES } from '../game/bestiary';
+import { TERRAIN } from '../game/terrain';
 import { encounterState, siteAt } from '../game/atlas';
 import {
   realmOf,
   availableTalents,
+  enemyFor,
   makeEnemy,
   nextNodes,
   nightsOf,
+  levelOf,
+  pendingLevels,
+  perkChoices,
   priceOf,
   restAmount,
   roadBenefits,
@@ -67,9 +80,7 @@ export function Scout({
   const t = useT();
   const s = t.strategy;
   const combat = ['battle', 'elite', 'boss'].includes(node.kind);
-  const enemy = combat
-    ? makeEnemy(node, run?.ruleset ?? 3, run?.dusk ?? 0, run ? nightsOf(run) : 0)
-    : null;
+  const enemy = combat ? (run ? enemyFor(run, node) : makeEnemy(node, 3)) : null;
   const site = (run?.ruleset ?? 3) >= 2 ? waylightFor(node) : null;
   const v3 = (run?.ruleset ?? 3) === 3;
   const traits = describeTraits(enemy?.traits);
@@ -115,6 +126,11 @@ export function Scout({
                   {t.label} · {t.text}
                 </span>
               ))}
+              {node.terrain && (
+                <span title={TERRAIN[node.terrain].flavor}>
+                  {TERRAIN[node.terrain].name} · {TERRAIN[node.terrain].rule}
+                </span>
+              )}
             </div>
           )}
           <span className="eyebrow">{s.patternEyebrow}</span>
@@ -326,6 +342,44 @@ export function TalentChoice({ run, dispatch }: { run: Run; dispatch: (action: A
           ))}
         </div>
         <p className="scene-hint">{s.talentHint}</p>
+      </div>
+    </section>
+  );
+}
+
+export function LevelUp({ run, dispatch }: { run: Run; dispatch: (action: Action) => void }) {
+  const s = useT().strategy;
+  return (
+    <section className="scene-board talent-board levelup-board">
+      <Landscape chapter={realmOf(run)} />
+      <div className="scene-content">
+        <span className="scene-sigil">
+          <Icon name="flame" size={34} />
+        </span>
+        <span className="eyebrow">{s.levelEyebrow(levelOf(run) + 1)}</span>
+        <h2>{s.levelTitle}</h2>
+        <p className="scene-lead">{s.levelLead}</p>
+        <div className="reward-grid">
+          {perkChoices(run).map((id) => (
+            <button
+              className="reward-card perk-card"
+              key={id}
+              data-perk={id}
+              onClick={() => dispatch({ type: 'perk', id })}
+            >
+              <span className="relic-large">
+                <Icon name={PERKS[id].icon as IconName} size={30} />
+              </span>
+              <h3>{PERKS[id].name}</h3>
+              <p>{PERKS[id].effect}</p>
+              <em>{PERKS[id].flavor}</em>
+              <span className="take-relic">
+                {s.takePerk} <Icon name="arrow" size={14} />
+              </span>
+            </button>
+          ))}
+        </div>
+        {pendingLevels(run) > 1 && <p className="scene-hint">{s.levelMore}</p>}
       </div>
     </section>
   );

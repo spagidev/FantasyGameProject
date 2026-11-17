@@ -59,9 +59,9 @@ export const sk: Dict = {
     h1Mid: 'Každá cesta',
     h1MidEm: 'zanecháva spomienku.',
     leadLobby:
-      'Slnko sa vytratilo. Svet zabudol prečo.\nJeden uhlík, tri zvony a cesta do neznáma.',
+      'Slnko sa vytratilo. Svet zabudol prečo.\nJeden uhlík, tri zvony a cesta do neznáma.\nKampaň naprieč ôsmimi slovenskými krajmi.',
     leadEnded: 'Každý prechod mení strážcu. Každý koniec zanecháva začiatok.',
-    prepare: 'Priprav svoju cestu',
+    prepare: 'Začni kampaň',
     guide: 'Príručka strážcu',
     editionAtlas: 'STRATENÝ ATLAS',
     editionFirst: 'PRVÝ PRECHOD',
@@ -92,10 +92,10 @@ export const sk: Dict = {
     step1Title: 'Kde začína tvoj príbeh?',
     chooseExpedition: 'Vyber výpravu',
     firstCrossing: 'Prvý prechod',
-    firstCrossingNote: 'Pôvodné dobrodružstvo',
+    firstCrossingNote: 'Rýchla cesta · asi 15 minút',
     lostAtlas: 'Stratený atlas',
-    explore: 'OBJAVUJ',
-    lostAtlasNote: 'Skutočný terén. Skrytý svet.',
+    explore: 'KAMPAŇ',
+    lostAtlasNote: 'Kampaň · skutočné mapy ôsmich slovenských krajov',
     step2: '02 · VYBER SI STRÁŽCU',
     step2Title: 'Kto ponesie uhlík?',
     chooseKeeper: 'Vyber si strážcu',
@@ -146,6 +146,10 @@ export const sk: Dict = {
       `Ťah ${turn}. Zdravie ${health}. ${intent}: ${damage} základného poškodenia.`,
     srMap: 'Vyber si ďalšiu cestu.',
     srReward: 'Víťazstvo. Vyber si odmenu.',
+    srLevelUp: 'Nová úroveň. Vyber si výhodu.',
+    level: (n) => `Úroveň ${n}`,
+    experience: 'Skúsenosti',
+    plusXp: (n) => `+${n} skúseností`,
     srLost: 'Tvoja výprava skončila.',
     srWon: 'Tvoja výprava je dokončená.',
     srLobby: 'Vyber si strážcu a začni výpravu.',
@@ -701,6 +705,11 @@ export const sk: Dict = {
     talentLead: (keeper) =>
       `${keeper} počuje v zvone povedomý hlas. Nie rozkaz. Lekciu. Vyber si jednu, ktorú vezmeš do ďalšej ríše.`,
     rememberLesson: 'Zapamätať si túto lekciu',
+    levelEyebrow: (n) => `ÚROVEŇ ${n}`,
+    levelTitle: 'Cesta ťa zmenila.',
+    levelLead: 'Každá míľa niečo zanechá. Vyber si, čo ti zostane.',
+    takePerk: 'Vziať túto',
+    levelMore: 'Po tejto čaká ešte jedna úroveň.',
     talentHint:
       'Jedna lekcia po každom z prvých dvoch zvonov. Trvá túto výpravu. Nabudúce vyber inú cestu.',
   },
@@ -737,6 +746,62 @@ export const sk: Dict = {
       'Obnovením sa v tomto zariadení nahradí výprava a kronika. Ak chceš zachovať oboje, najprv si stiahni aktuálny denník.',
     restore: 'Obnoviť tento denník',
     privacy: 'Súbory sa kontrolujú a otvárajú tu. Nič sa nenahráva.',
+  },
+  guide: {
+    eyebrow: 'Z príručky strážcu',
+    gotIt: 'Rozumiem',
+    hide: 'Skryť poznámky z príručky',
+    toggle: 'Poznámky z príručky',
+    on: 'zapnuté',
+    off: 'vypnuté',
+    toggleNote:
+      'Krátke poznámky z príručky strážcu sa objavia, keď ti prvýkrát pomôžu. Prečítané poznámky zostanú prečítané.',
+  },
+  tips: {
+    atlas: {
+      title: 'Skutočné cesty, skryté mesto',
+      text: 'Toto sú pravé ulice skutočného miesta, ktorému sa všetky mená zabudli. Choď po cestách a závoj sa nadvihne. Žiariace kruhy sú stretnutia, do ktorých môžeš vstúpiť hneď.',
+    },
+    oil: {
+      title: 'Olej do lampy na jeden deň',
+      text: 'Každá cesta stojí presne toľko oleja do lampy, aká je dlhá. Keď oleja ubúda, utábor sa: nový deň vyjde s plnou lampou, no každú noc budú nepriatelia pred tebou o niečo silnejší.',
+    },
+    wagon: {
+      title: 'Krbový voz',
+      text: 'Tvoj tábor je malé mestečko, ktoré putuje s tebou. Každý večer do neho postav jedno dielo alebo si odpočiň pri jeho ohni, nikdy nie oboje. Diela vynášajú každý úsvit, takže tie prvé vynesú najdlhšie.',
+    },
+    order: {
+      title: 'V akom poradí chceš',
+      text: 'Tri stretnutia v ríši môžeš absolvovať v ľubovoľnom poradí. Naplánuj si trasu, ktorá dobre využije tvoj olej; strážca zvona čaká, kým nie sú hotové všetky tri.',
+    },
+    trove: {
+      title: 'Strážený poklad',
+      text: 'Toto miesto niečo stráži. Boj je dobrovoľný: ak zvíťazíš, získaš poklad a výber z vzácnych relikvií. Nechaj ho na neskôr a pri pokladi bude stáť silnejší strážca.',
+    },
+    omen: {
+      title: 'Almanach sa obracia',
+      text: 'Každé tri dni prinesú znamenie s jedným pravidlom, ktoré vidíš v paneli dňa. Ťukni naň a prečítaj si, čo mení, kým sa almanach znova neobráti.',
+    },
+    reward: {
+      title: 'Niečo, čo stojí za to nosiť',
+      text: 'Vezmi si jednu relikviu alebo si doplň 12 zdravia. Relikvie vydržia len počas tejto výpravy. Vzácnejšie padajú z elitných súperov, strážcov a pokladov.',
+    },
+    shop: {
+      title: 'Lampášový trh',
+      text: 'Kúp si ľubovoľnú kombináciu, na ktorú máš mince; každú vec raz za návštevu. Mince nemajú po skončení výpravy žiadnu hodnotu.',
+    },
+    lesson: {
+      title: 'Zapamätaná lekcia',
+      text: 'Po každom z prvých dvoch zvonov sa tvoj strážca naučí jednu lekciu. Vydrží celú výpravu a ovplyvní, ako budeš bojovať v ďalšej ríši.',
+    },
+    set: {
+      title: 'Súčasť súpravy',
+      text: 'Táto relikvia patrí do súpravy o troch kusoch. Ak ich v jednej výprave nosíš všetky tri, získaš ešte jedno pravidlo; karty relikvií ukazujú, koľko ich máš.',
+    },
+    province: {
+      title: 'Provincia Veyru',
+      text: 'Každé mesto, ktoré znovu rozžiaríš, sa vyrazí do atlasu kroniky. Rozžiar obe skryté mestá provincie a získaš jej legendu aj novú relikviu pre budúce cesty.',
+    },
   },
   offline: { available: 'Dostupné offline' },
 };

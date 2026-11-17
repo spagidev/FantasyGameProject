@@ -36,9 +36,11 @@ import {
 import { SITE_ART, WORK_ART } from '../artwork';
 import { omenOf, OMENS } from '../game/omens';
 import { Modal } from './Modal';
+import { TERRAIN } from '../game/terrain';
 import { SceneArt } from './Art';
 import { provinceOfKraj } from '../atlas/provinces';
 import { Icon, type IconName } from './Icon';
+import { setAmbient } from '../sound';
 import { useLang, useT, type Dict } from '../i18n';
 
 /** Distances the way a hiking map prints them. */
@@ -211,6 +213,10 @@ export function AtlasMap({
   const t = useT().atlas;
   const sep = useT().decimalSep;
   const state = run?.atlas ?? newAtlas();
+  const bells = run ? Math.max(0, Math.min(2, run.bells)) : null;
+  useEffect(() => {
+    setAmbient(bells as 0 | 1 | 2 | null);
+  }, [bells]);
   const pack = atlasGeography(state);
   const sites = atlasSites(state);
   const current = atlasSite(state.position, state);
@@ -897,6 +903,12 @@ export function AtlasMap({
               </span>
               <h3>{site.name}</h3>
               <p>{site.subtitle}</p>
+              {run && site.depth !== undefined && nodeOf(run, site.depth, site.lane!).terrain && (
+                <p className="atlas-ground">
+                  <b>{TERRAIN[nodeOf(run, site.depth, site.lane!).terrain!].name}.</b>{' '}
+                  {TERRAIN[nodeOf(run, site.depth, site.lane!).terrain!].rule}
+                </p>
+              )}
             </div>
             <div className="atlas-location-actions">
               {route && (
