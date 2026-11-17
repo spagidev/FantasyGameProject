@@ -26,7 +26,7 @@ import {
   canEvent,
   incomingDamage,
   intentFor,
-  makeEnemy,
+  enemyFor,
   newRun,
   nextNodes,
   nodeOf,
@@ -859,7 +859,7 @@ export default function App() {
                                 <em>
                                   {['battle', 'boss', 'elite'].includes(node.kind)
                                     ? t.app.fightLine(
-                                        makeEnemy(node, run.ruleset, run.dusk).maxHealth,
+                                        enemyFor(run, node).maxHealth,
                                         victoryCoins(run, node),
                                       )
                                     : node.kind === 'event'

@@ -7,6 +7,7 @@ import {
   nodeOf,
   transition,
   availableTalents,
+  perkChoices,
   flaskHealing,
   incomingDamage,
   skillCost,
@@ -78,6 +79,7 @@ export function bestCombatAction(run: Run): Action {
 
 export function campaignAction(r: Run): Action {
   if (r.phase === 'talent') return { type: 'talent', id: availableTalents(r)[0] };
+  if (r.phase === 'levelup') return { type: 'perk', id: perkChoices(r)[0] };
   if (r.phase === 'combat') return bestCombatAction(r);
   if (r.phase === 'map') {
     if (r.atlas && !nextNodes(r).length) {

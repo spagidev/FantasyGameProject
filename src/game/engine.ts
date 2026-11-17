@@ -29,8 +29,11 @@ import {
   LEGACY_RELICS,
   NEW_TALENTS,
   RELICS,
+  LEVEL_XP,
+  PERKS,
   RELIC_SETS,
   STARTING_RELICS,
+  XP_FOR,
   startingStats,
   TALENTS,
   WAYLIGHTS,
@@ -39,6 +42,7 @@ import {
   type Intent,
   type KeeperId,
   type NodeKind,
+  type PerkId,
   type RelicId,
   type SetId,
   type TalentId,
@@ -46,7 +50,17 @@ import {
 } from './data';
 
 export type Phase =
-  'map' | 'combat' | 'reward' | 'talent' | 'event' | 'camp' | 'shop' | 'ending' | 'won' | 'lost';
+  | 'map'
+  | 'combat'
+  | 'reward'
+  | 'talent'
+  | 'levelup'
+  | 'event'
+  | 'camp'
+  | 'shop'
+  | 'ending'
+  | 'won'
+  | 'lost';
 export type Ruleset = 1 | 2 | 3;
 /** classic: rulesets 1–2. atlas: ruleset 3 on a chart (fixed kinds). seeded: ruleset 3 routes. */
 export type Layout = 'classic' | 'atlas' | 'seeded';
@@ -146,6 +160,9 @@ export type Run = {
   daily?: string;
   /** The guarded trove being fought for (v0.10): a side fight that does not advance the road. */
   side?: string;
+  /** Keeper levels (v0.13): experience earned, and the perks chosen at each level. */
+  xp?: number;
+  perks?: PerkId[];
 };
 export type ShopItem = 'flask' | 'heal' | 'forge' | RelicId;
 export type Action =
@@ -159,6 +176,7 @@ export type Action =
   | { type: 'buy'; item: ShopItem }
   | { type: 'leave' }
   | { type: 'talent'; id: TalentId }
+  | { type: 'perk'; id: PerkId }
   | { type: 'ending'; choice: 'dawn' | 'hearth' };
 export const DUSK_MAX = 8;
 export const DUSK_RULES = [
@@ -238,6 +256,8 @@ export function newRun(
           strikes: 0,
           spent: [],
           slain: [],
+          xp: 0,
+          perks: [],
           stats: { turns: 0, staggers: 0, parries: 0, taken: 0, elites: 0, flasks: 0, bestHit: 0 },
           ...(options.daily ? { daily: options.daily } : {}),
         }
@@ -375,6 +395,38 @@ export const realmOf = (r: Pick<Run, 'side' | 'bells' | 'phase' | 'depth'>) =>
   r.side
     ? Math.min(2, r.bells)
     : Math.max(0, Math.floor(Math.min(11, r.phase === 'map' ? r.depth + 1 : r.depth) / 4));
+
+/** Whether this expedition uses keeper levels (new ruleset-3 expeditions from v0.13). */
+export const levels = (r: Pick<Run, 'xp'>) => r.xp !== undefined;
+/** Levels earned but not yet spent on a perk. */
+export const pendingLevels = (r: Pick<Run, 'xp' | 'perks'>) =>
+  levels(r) ? Math.floor(r.xp! / LEVEL_XP) - (r.perks?.length ?? 0) : 0;
+/** The keeper's level, starting at 1. */
+export const levelOf = (r: Pick<Run, 'xp' | 'perks'>) => 1 + (r.perks?.length ?? 0);
+/** The three perks offered at the next level: seeded, never one already taken to its limit. */
+export function perkChoices(r: Run): PerkId[] {
+  const taken = (id: PerkId) => (r.perks ?? []).filter((p) => p === id).length;
+  const open = (Object.keys(PERKS) as PerkId[]).filter((id) => taken(id) < PERKS[id].max);
+  const salt = 9500 + (r.perks?.length ?? 0) * 7;
+  return open
+    .map((id, i) => ({ id, key: hash(r.seed, salt + i) }))
+    .sort((a, b) => a.key - b.key || a.id.localeCompare(b.id))
+    .slice(0, 3)
+    .map((p) => p.id);
+}
+/** What follows a reward or a lesson: a level to spend, or the road. */
+const afterSpoils = (r: Run): Phase => (pendingLevels(r) > 0 ? 'levelup' : 'map');
+/**
+ * Enemies on expeditions with keeper levels are a little hardier, to answer the perks
+ * (v0.13 balance pass). Scouting uses the same function, so numbers always match.
+ */
+export const LEVEL_TOUGHNESS = 0.25;
+export function enemyFor(r: Run, node: MapNode): Enemy {
+  const e = makeEnemy(node, r.ruleset, r.dusk ?? 0, nightsOf(r));
+  if (!levels(r) || e.maxPoise === undefined) return e;
+  const health = Math.round(e.maxHealth * (1 + LEVEL_TOUGHNESS));
+  return { ...e, health, maxHealth: health };
+}
 
 /** Encounters entered so far, including one in progress. */
 export const encountersEntered = (r: Pick<Run, 'path'>) => r.path.length;
@@ -514,6 +566,7 @@ export function startingFocus(r: Run) {
       roadBenefits(r).focus +
       (r.ruleset === 3 && r.keeper === 'seer' ? 1 : 0) +
       (r.talents.includes('astral') ? 1 : 0) +
+      (r.perks?.includes('insight') ? 1 : 0) +
       (r.relics.includes('vigil') ? 1 : 0) +
       (omenOf(r) === 'moth' ? 1 : 0),
   );
@@ -541,6 +594,9 @@ export function guardAmount(r: Run) {
     (r.talents.includes('moonward') ? 2 : 0)
   );
 }
+export function techniqueCost(r: Run) {
+  return KEEPERS[r.keeper].techniqueCost - (r.perks?.includes('mastery') ? 1 : 0);
+}
 export function skillCost(r: Run) {
   return Math.max(1, KEEPERS[r.keeper].cost - (r.relics.includes('lodestar') ? 1 : 0));
 }
@@ -558,7 +614,12 @@ export function strikeHealing(r: Run) {
   return r.keeper === 'wayfarer' ? (r.talents.includes('sap') ? 3 : 2) : 0;
 }
 export function flaskHealing(r: Run) {
-  return 16 + (r.relics.includes('dew') ? 8 : 0) + (r.relics.includes('spa') ? 6 : 0);
+  return (
+    16 +
+    (r.relics.includes('dew') ? 8 : 0) +
+    (r.relics.includes('spa') ? 6 : 0) +
+    (r.perks?.includes('herbs') ? 6 : 0)
+  );
 }
 export function restAmount(r: Run) {
   return r.ruleset < 3
@@ -772,6 +833,7 @@ function victory(r: Run) {
     if (r.enemy?.id) r.slain!.push(r.enemy.id);
     note(r, `${r.enemy?.name} falls. The trove is yours.`);
     note(r, grantGift(r, id) ?? '');
+    if (levels(r)) r.xp! += XP_FOR.trove;
     r.rewards = drawRelics(r, 'elite', 3, 9000 + TROVES.indexOf(id as 'cache') * 17);
     r.phase = 'reward';
     return;
@@ -796,6 +858,7 @@ function victory(r: Run) {
     if (r.ruleset === 3) r.lore.push(`${r.keeper}-bell-${r.bells}`);
   }
   if (r.ruleset === 3) {
+    if (levels(r)) r.xp! += XP_FOR[kind as 'battle' | 'elite' | 'boss'] ?? 0;
     if (r.enemy?.id) r.slain!.push(r.enemy.id);
     if (kind === 'elite') r.stats!.elites++;
     if (kind !== 'battle' && r.relics.includes('bellrope') && r.flasks < 5) r.flasks++;
@@ -889,7 +952,7 @@ function legacyCombat(run: Run, r: Run, action: { type: 'strike' | 'guard' | 'sk
 /** Whether the keeper's second technique can be used right now, and why not. */
 export function techniqueBlocked(r: Run): string | null {
   if (r.ruleset < 3 || !r.enemy) return 'Not available';
-  if (r.focus < KEEPERS[r.keeper].techniqueCost) return 'Not enough focus';
+  if (r.focus < techniqueCost(r)) return 'Not enough focus';
   if (r.keeper === 'seer' && incomingDamage(r) === 0) return 'No blow to foresee';
   if (r.keeper === 'wayfarer' && r.enemy.poison === 0) return 'No poison to quicken';
   return null;
@@ -954,7 +1017,7 @@ function combat3(
       e.poison += poisonAmount(r);
     }
   } else if (action.type === 'technique') {
-    r.focus -= k.techniqueCost;
+    r.focus -= techniqueCost(r);
     note(r, `${k.technique}.`);
     if (r.keeper === 'warden') hit3(r, guardAmount(r), { poise: 2 });
     else if (r.keeper === 'seer') r.guard = Math.max(r.guard, incomingDamage(r));
@@ -1083,7 +1146,7 @@ export function transition(run: Run, action: Action): Run {
     const guard = r.phase === 'map' && r.atlas ? troveGuard(r, r.atlas.position) : null;
     if (!guard) return run;
     r.side = r.atlas!.position;
-    r.enemy = makeEnemy(guard, 3, r.dusk ?? 0, nightsOf(r));
+    r.enemy = enemyFor(r, guard);
     r.turn = 0;
     clearBattle(r);
     omenFrost(r);
@@ -1112,7 +1175,7 @@ export function transition(run: Run, action: Action): Run {
     r.enemy = null;
     if (v3) r.shop = [];
     if (['battle', 'elite', 'boss'].includes(node.kind)) {
-      r.enemy = makeEnemy(node, r.ruleset, r.dusk ?? 0, nightsOf(r));
+      r.enemy = enemyFor(r, node);
       r.turn = 0;
       clearBattle(r);
       omenFrost(r);
@@ -1161,7 +1224,7 @@ export function transition(run: Run, action: Action): Run {
       note(r, `You carry the ${RELICS[action.id].name}. ${RELICS[action.id].flavor}`);
     } else return run;
     r.rewards = [];
-    r.phase = !r.side && r.ruleset >= 2 && r.depth % 4 === 3 ? 'talent' : 'map';
+    r.phase = !r.side && r.ruleset >= 2 && r.depth % 4 === 3 ? 'talent' : afterSpoils(r);
     delete r.side;
     return r;
   }
@@ -1170,7 +1233,21 @@ export function transition(run: Run, action: Action): Run {
     r.talents.push(action.id);
     if (action.id === 'moonward') r.armor += 1;
     note(r, `${TALENTS[action.id].name}: ${TALENTS[action.id].description}`);
-    r.phase = 'map';
+    r.phase = afterSpoils(r);
+    return r;
+  }
+  if (action.type === 'perk' && r.phase === 'levelup') {
+    if (pendingLevels(r) <= 0 || !perkChoices(r).includes(action.id)) return run;
+    r.perks = [...r.perks!, action.id];
+    if (action.id === 'might') r.attack += 2;
+    if (action.id === 'vigor') {
+      r.maxHealth += 6;
+      heal(r, 6);
+    }
+    if (action.id === 'ward') r.armor += 1;
+    if (action.id === 'herbs') r.flasks = Math.min(5, r.flasks + 1);
+    note(r, `Level ${levelOf(r)}. ${PERKS[action.id].name}: ${PERKS[action.id].effect}`);
+    r.phase = afterSpoils(r);
     return r;
   }
   if (action.type === 'event' && r.phase === 'event') {

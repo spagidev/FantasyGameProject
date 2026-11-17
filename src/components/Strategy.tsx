@@ -5,6 +5,7 @@ import { encounterState, siteAt } from '../game/atlas';
 import {
   realmOf,
   availableTalents,
+  enemyFor,
   makeEnemy,
   nextNodes,
   nightsOf,
@@ -68,9 +69,7 @@ export function Scout({
   const t = useT();
   const s = t.strategy;
   const combat = ['battle', 'elite', 'boss'].includes(node.kind);
-  const enemy = combat
-    ? makeEnemy(node, run?.ruleset ?? 3, run?.dusk ?? 0, run ? nightsOf(run) : 0)
-    : null;
+  const enemy = combat ? (run ? enemyFor(run, node) : makeEnemy(node, 3)) : null;
   const site = (run?.ruleset ?? 3) >= 2 ? waylightFor(node) : null;
   const v3 = (run?.ruleset ?? 3) === 3;
   const traits = describeTraits(enemy?.traits);

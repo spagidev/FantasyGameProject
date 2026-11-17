@@ -112,6 +112,21 @@ When both hidden cities of a province are rekindled (its legend recovered), that
 
 On Atlas charts begun from v0.13 (`atlas.ground`), each encounter site has a ground read from the real roads around it (`src/game/terrain.ts`), measured in metres so that each city's character shows. In order: 3,500 m or more of road within 300 m is **Narrow streets** — enemy attacks of several hits land one hit fewer; under 1,800 m is **Open ground** — the battle begins with 1 extra focus; otherwise, roads winding 1.4 or more (path against straight distance) are a **Winding hill road** — the enemy's poise is a fifth lower; a site where four or more of the expedition's roads meet is a **Crossroads** — victory gives 8 more coins; anything else is plain. The ground shows on the chart, the scout card and the combat board; scouted numbers already include it.
 
+### Keeper levels (v0.13)
+
+Ruleset-3 expeditions begun from v0.13 carry `xp` and `perks`. Each victory gives experience — a battle 2, an elite 3, a bell guardian 4, a guarded trove 2 — and every 5 experience is a level. After the spoils (and after a lesson, when both are due) each unspent level offers three perks, chosen by the seed from those not yet taken to their limit:
+
+| Perk            | Effect                                  | Limit |
+| --------------- | --------------------------------------- | ----- |
+| A stronger arm  | +2 attack                               | 3     |
+| A deeper breath | +6 maximum health, restore 6            | 3     |
+| Scars that hold | +1 armor                                | 1     |
+| A watcher's eye | every battle begins with 1 extra focus  | 1     |
+| Hedge-lore      | a flask now; flasks restore 6 more      | 1     |
+| Second nature   | the second technique costs 1 less focus | 1     |
+
+To answer the perks, every enemy on such an expedition has 25% more health (`enemyFor`, also used by scouting). Measured with the naive scripted player at Dusk 0 over 160 seeds: 72 / 62 / 61 % (Warden / Seer / Wayfarer) with levels, against 64 / 58 / 54 % without. Journals saved before v0.13 have no levels and keep their numbers.
+
 ### Records
 
 `src/game/meta.ts`. Score = 10 per crossing + 150 per bell + 40 per elite + 5 per stagger + 3 per perfect guard + 100 for naming an Atlas city + (on completion) 300 and 2 per remaining health, all multiplied by `1 + 0.2 × dusk`. Deeds are judged on every saved step; twelve of them add one relic each to the pool of future expeditions. Records never change a keeper’s starting statistics. Unreadable records in a journal are dropped without rejecting the journal.
