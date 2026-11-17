@@ -308,6 +308,42 @@
 .figure-hit {
   animation: figure-hit 0.36s ease-out;
 }
+.lunge-keeper .keeper-portrait {
+  animation: lunge-right 0.22s ease-in-out;
+}
+.lunge-enemy .enemy-portrait {
+  animation: lunge-left 0.22s ease-in-out;
+}
+.break-flash .enemy-portrait {
+  animation: break-flash 0.5s ease-out;
+}
+.lunge-enemy.break-flash .enemy-portrait {
+  animation:
+    lunge-left 0.22s ease-in-out,
+    break-flash 0.5s ease-out;
+}
+@keyframes lunge-right {
+  50% {
+    transform: translateX(10px);
+  }
+}
+@keyframes lunge-left {
+  50% {
+    transform: translateX(-10px);
+  }
+}
+@keyframes break-flash {
+  0% {
+    box-shadow:
+      0 0 0 0 #f0cf8dcc,
+      0 0 34px #f0cf8d;
+  }
+  100% {
+    box-shadow:
+      0 0 0 22px #f0cf8d00,
+      0 0 34px #f0cf8d55;
+  }
+}
 @keyframes figure-hit {
   0% {
     transform: translateX(0);
@@ -715,7 +751,11 @@
   .floater + .floater {
     opacity: 1;
   }
-  .figure-hit {
+  .figure-hit,
+  .lunge-keeper .keeper-portrait,
+  .lunge-enemy .enemy-portrait,
+  .break-flash .enemy-portrait,
+  .lunge-enemy.break-flash .enemy-portrait {
     animation: none;
   }
   .is-staggered .duel-portrait {

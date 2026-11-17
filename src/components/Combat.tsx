@@ -28,7 +28,7 @@ import {
 } from '../game/engine';
 import { EnemyPortrait, KeeperPortrait, Landscape } from './Art';
 import { Icon, type IconName } from './Icon';
-import { play } from '../sound';
+import { play, setAmbient } from '../sound';
 import { en, type Dict } from '../i18n/en';
 import { useT } from '../i18n';
 
@@ -140,6 +140,12 @@ export function Combat({
   const [floaters, setFloaters] = useState<Floater[]>([]);
   const [explain, setExplain] = useState('');
   const [pulse, setPulse] = useState({ enemy: 0, hero: 0 });
+  const [motion, setMotion] = useState({ hero: false, enemy: false, brk: false });
+  const motionTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => {
+    setAmbient(chapter === 0 || chapter === 1 || chapter === 2 ? chapter : 0);
+  }, [chapter]);
+  useEffect(() => () => clearTimeout(motionTimer.current), []);
   useEffect(() => {
     const before = previous.current;
     previous.current = run;
@@ -169,6 +175,15 @@ export function Combat({
     else if (before.turn !== run.turn) play('guard');
     if (!next.length) return;
     setFloaters(next);
+    const brk = (run.stats?.staggers ?? 0) > (before.stats?.staggers ?? 0);
+    if (dealt > 0 || taken > 0 || brk) {
+      setMotion({ hero: dealt > 0, enemy: taken > 0, brk });
+      clearTimeout(motionTimer.current);
+      motionTimer.current = setTimeout(
+        () => setMotion({ hero: false, enemy: false, brk: false }),
+        420,
+      );
+    }
     setPulse((p) => ({ enemy: p.enemy + (dealt > 0 ? 1 : 0), hero: p.hero + (taken > 0 ? 1 : 0) }));
     const timer = setTimeout(() => setFloaters([]), 1300);
     return () => clearTimeout(timer);
@@ -289,7 +304,7 @@ export function Combat({
           <div className="combatant combatant-hero">
             <span
               key={`h${pulse.hero}`}
-              className={`duel-portrait ${pulse.hero ? 'figure-hit' : ''}`}
+              className={`duel-portrait ${pulse.hero ? 'figure-hit' : ''} ${motion.hero ? 'lunge-keeper' : ''}`}
             >
               <KeeperPortrait keeper={run.keeper} />
             </span>
@@ -342,7 +357,7 @@ export function Combat({
           <div className={`combatant combatant-enemy ${e.stagger ? 'is-staggered' : ''}`}>
             <span
               key={`e${pulse.enemy}`}
-              className={`duel-portrait ${pulse.enemy ? 'figure-hit' : ''}`}
+              className={`duel-portrait ${pulse.enemy ? 'figure-hit' : ''} ${motion.enemy ? 'lunge-enemy' : ''} ${motion.brk ? 'break-flash' : ''}`}
             >
               <EnemyPortrait art={e.art} id={e.id} tint={e.tint} />
             </span>
