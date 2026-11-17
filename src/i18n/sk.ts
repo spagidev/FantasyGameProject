@@ -146,6 +146,10 @@ export const sk: Dict = {
       `Ťah ${turn}. Zdravie ${health}. ${intent}: ${damage} základného poškodenia.`,
     srMap: 'Vyber si ďalšiu cestu.',
     srReward: 'Víťazstvo. Vyber si odmenu.',
+    srLevelUp: 'Nová úroveň. Vyber si výhodu.',
+    level: (n) => `Úroveň ${n}`,
+    experience: 'Skúsenosti',
+    plusXp: (n) => `+${n} skúseností`,
     srLost: 'Tvoja výprava skončila.',
     srWon: 'Tvoja výprava je dokončená.',
     srLobby: 'Vyber si strážcu a začni výpravu.',
@@ -701,6 +705,11 @@ export const sk: Dict = {
     talentLead: (keeper) =>
       `${keeper} počuje v zvone povedomý hlas. Nie rozkaz. Lekciu. Vyber si jednu, ktorú vezmeš do ďalšej ríše.`,
     rememberLesson: 'Zapamätať si túto lekciu',
+    levelEyebrow: (n) => `ÚROVEŇ ${n}`,
+    levelTitle: 'Cesta ťa zmenila.',
+    levelLead: 'Každá míľa niečo zanechá. Vyber si, čo ti zostane.',
+    takePerk: 'Vziať túto',
+    levelMore: 'Po tejto čaká ešte jedna úroveň.',
     talentHint:
       'Jedna lekcia po každom z prvých dvoch zvonov. Trvá túto výpravu. Nabudúce vyber inú cestu.',
   },

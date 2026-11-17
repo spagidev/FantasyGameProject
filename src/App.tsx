@@ -13,6 +13,8 @@ import {
   RELICS,
   RELIC_SETS,
   setOf,
+  LEVEL_XP,
+  XP_FOR,
   WAYLIGHTS,
   type KeeperId,
   type RelicId,
@@ -35,6 +37,8 @@ import {
   transition,
   waylightFor,
   victoryCoins,
+  levels,
+  levelOf,
   type Action,
   type Run,
   type MapNode,
@@ -60,7 +64,7 @@ import { Combat, combatKeys } from './components/Combat';
 import { play, setSound } from './sound';
 import { VOICES, pageFor } from './game/lore';
 import { Journal } from './components/Journal';
-import { Scout, TalentChoice, WaylightsPanel } from './components/Strategy';
+import { LevelUp, Scout, TalentChoice, WaylightsPanel } from './components/Strategy';
 import { AtlasMap, AtlasJournal } from './components/Atlas';
 import { OfflineBadge } from './components/OfflineBadge';
 import { GuideNote } from './components/GuideNote';
@@ -605,6 +609,8 @@ export default function App() {
                     />
                   ) : run.phase === 'reward' ? (
                     <Rewards run={run} dispatch={dispatch} />
+                  ) : run.phase === 'levelup' ? (
+                    <LevelUp run={run} dispatch={dispatch} />
                   ) : run.phase === 'talent' ? (
                     <TalentChoice run={run} dispatch={dispatch} />
                   ) : ['camp', 'shop', 'event'].includes(run.phase) ? (
@@ -1019,11 +1025,13 @@ export default function App() {
                 ? t.app.srMap
                 : run.phase === 'reward'
                   ? t.app.srReward
-                  : run.phase === 'lost'
-                    ? t.app.srLost
-                    : run.phase === 'won'
-                      ? t.app.srWon
-                      : run.phase
+                  : run.phase === 'levelup'
+                    ? t.app.srLevelUp
+                    : run.phase === 'lost'
+                      ? t.app.srLost
+                      : run.phase === 'won'
+                        ? t.app.srWon
+                        : run.phase
             : t.app.srLobby}
         </div>
 
@@ -1125,6 +1133,21 @@ function KeeperPanel({ run }: { run: Run }) {
       >
         <i style={{ width: `${(run.health / run.maxHealth) * 100}%` }} />
       </div>
+      {levels(run) && (
+        <div className="level-line">
+          <span>{t.app.level(levelOf(run))}</span>
+          <div
+            className="xp-bar"
+            role="meter"
+            aria-label={t.app.experience}
+            aria-valuenow={run.xp! % LEVEL_XP}
+            aria-valuemin={0}
+            aria-valuemax={LEVEL_XP}
+          >
+            <i style={{ width: `${((run.xp! % LEVEL_XP) / LEVEL_XP) * 100}%` }} />
+          </div>
+        </div>
+      )}
       <div className="run-stats">
         <span>
           <Icon name="sword" /> <b>{attackOf(run)}</b>
@@ -1243,6 +1266,14 @@ function Rewards({ run, dispatch }: { run: Run; dispatch: (a: Action) => void })
           )}
           {run.relics.includes('thread') && <span>{t.app.plusHealth}</span>}
         </div>
+        {levels(run) && (
+          <div className="reward-xp">
+            <Icon name="sparkles" size={14} />{' '}
+            {t.app.plusXp(
+              trove ? XP_FOR.trove : XP_FOR[nodeOf(run).kind as 'battle' | 'elite' | 'boss'],
+            )}
+          </div>
+        )}
         {site && (
           <div className="reward-waylight">
             <Icon name="flame" size={20} />

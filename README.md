@@ -48,6 +48,15 @@ The list above describes the first two rulesets. In combat your action resolves 
 
 - **Interface language.** A footer switch (EN · SK) shows the interface in English or Slovenčina and remembers the choice in your profile. Navigation, combat, the Atlas day bar and wagon, rewards, shops, the Chronicle and the score card are translated (`src/i18n/`). Story, lore, names and rules text stay English until a native speaker has reviewed a literary translation.
 
+## The campaign, levels and the lie of the land · v0.13
+
+- **One front door.** The Lost Atlas is the campaign and the lobby's default; the First Crossing is a quick road.
+- **Keeper levels.** Every victory gives experience; each level offers three perks. Enemies on levelled roads are a little hardier.
+- **The ground matters.** Each encounter's ground is read from the real streets around it: narrow streets, open ground, a winding hill road or a crossroads, each with one rule. Dense old towns and small towns now play differently.
+- **A gentle first expedition.** The keeper's guide explains each system the first time it matters, once, and can be turned off.
+- **Fairer keepers.** The Seer and Wayfarer were strengthened after simulated beginners struggled with them.
+- **Feel.** Portraits lunge and flash, the bell rings fuller, and each realm has a quiet soundscape when sound is on.
+
 ## Boons, a handier map, and play anywhere · v0.11
 
 - **Province boons.** Recover a province's legend and its relic joins every later road: eight new relics, from a coronation offcut to the last lit window.

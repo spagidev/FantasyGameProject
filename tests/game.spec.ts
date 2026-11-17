@@ -36,6 +36,8 @@ async function clickAction(page: Page, run: Run, action: Action) {
     await page.locator('.route-choice').filter({ hasText: node.name }).first().click();
   } else if (action.type === 'talent') {
     await page.locator('.talent-card').filter({ hasText: TALENTS[action.id].name }).click();
+  } else if (action.type === 'perk') {
+    await page.locator(`.perk-card[data-perk="${action.id}"]`).click();
   } else if (['strike', 'guard', 'skill', 'technique', 'flask'].includes(action.type)) {
     await page.locator(`.duel-action[data-action="${action.type}"]`).click();
   } else if (action.type === 'reward') {

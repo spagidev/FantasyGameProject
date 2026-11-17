@@ -396,3 +396,58 @@
     justify-content: space-between;
   }
 }
+
+/* Keeper levels (v0.13): the level-up screen, the keeper-panel level line, the XP note. */
+.levelup-board .perk-card .relic-large {
+  color: #f1d98f;
+}
+.reward-xp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #e7d6ae;
+  font-size: 12px;
+  margin-top: 6px;
+}
+.reward-xp svg {
+  color: #dfbf82;
+}
+.level-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 0;
+  color: #ece4cb;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.level-line > span {
+  white-space: nowrap;
+}
+.xp-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: #73836255;
+  border: 1px solid #798c5b;
+  box-sizing: content-box;
+}
+.xp-bar > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #e7c77a, #f4e3a8);
+  transition: width 0.28s;
+}
+@media (max-width: 740px) {
+  .level-line {
+    margin-top: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xp-bar > i {
+    transition: none;
+  }
+}

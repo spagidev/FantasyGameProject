@@ -132,6 +132,10 @@ export const en = {
       `Turn ${turn}. Health ${health}. ${intent}: ${damage} raw damage.`,
     srMap: 'Choose your next path.',
     srReward: 'Victory. Choose your reward.',
+    srLevelUp: 'Level up. Choose a perk.',
+    level: (n: number) => `Level ${n}`,
+    experience: 'Experience',
+    plusXp: (n: number) => `+${n} experience`,
     srLost: 'Your expedition has ended.',
     srWon: 'Your expedition is complete.',
     srLobby: 'Choose a keeper and begin an expedition.',
@@ -690,6 +694,11 @@ export const en = {
     talentLead: (keeper: string) =>
       `${keeper} hears a familiar voice inside the bell. Not a command. A lesson. Choose one to carry into the next realm.`,
     rememberLesson: 'Remember this lesson',
+    levelEyebrow: (n: number) => `LEVEL ${n}`,
+    levelTitle: 'The road has changed you.',
+    levelLead: 'Every mile leaves something behind. Choose what stays with you.',
+    takePerk: 'Take this',
+    levelMore: 'One more level waits after this.',
     talentHint:
       'One lesson after each of the first two bells. Lasts this expedition. Choose a different road next time.',
   },
